@@ -7,6 +7,7 @@ import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'rea
 import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogIn, LogOut, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { CategoryItem, Product, CartItem, CustomerDetails } from './types.ts';
 import { db, auth } from './firebase';
 import { 
@@ -108,6 +109,8 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(auth.currentUser);
   const isUserAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
@@ -116,23 +119,15 @@ export default function App() {
     return email === adminEmail || user?.uid === adminUid;
   }, [user]);
 
-  const [viewToggle, setViewToggle] = useState<'admin' | 'customer' | null>(null);
-  
   const view = useMemo(() => {
-    if (viewToggle) return viewToggle;
-    
-    // Check URL params first
-    if (typeof window !== 'undefined' && window.location.search.includes('customer=true')) {
-      return 'customer';
-    }
-    
-    // Auto-switch to admin if logged in as admin
-    if (isUserAdmin) return 'admin';
-    
+    if (location.pathname === '/admin') return 'admin';
     return 'customer';
-  }, [viewToggle, isUserAdmin]);
+  }, [location.pathname]);
 
-  const setView = (v: 'admin' | 'customer') => setViewToggle(v);
+  const setView = (v: 'admin' | 'customer') => {
+    if (v === 'admin') navigate('/admin');
+    else navigate('/');
+  };
 
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
   const [products, setProducts] = useState<Product[]>([]);
@@ -266,7 +261,7 @@ export default function App() {
       console.log("Login successful:", result.user.email);
       if (result.user.email?.toLowerCase().trim() === 'nupeshpatel4342@gmail.com') {
         console.log("User identified as Admin");
-        setView('admin');
+        navigate('/admin');
       } else {
         console.log("User logged in but is not admin:", result.user.email);
       }
@@ -530,559 +525,560 @@ export default function App() {
 
         {/* View Content */}
         <AnimatePresence mode="wait">
-          {view === 'admin' ? (
-            <motion.div
-              key="admin"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {!user ? (
-                <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
-                  <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
-                    <LogIn className="w-10 h-10 text-primary-green -rotate-3" />
-                  </div>
-                  <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Portal</h2>
-                  <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-                    Access inventory management and store settings by signing in with your authorized Google account.
-                  </p>
-                  <motion.button
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={login}
-                    className="flex items-center gap-3 bg-slate-950 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/20"
-                  >
-                    <User className="w-5 h-5 text-emerald-400" />
-                    AUTHENTICATE AS ADMIN
-                  </motion.button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between px-2 mb-2">
-                    <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
-                      <button
-                        onClick={() => setAdminTab('products')}
-                        className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <Package className="w-3.5 h-3.5 inline mr-2" /> PRODUCTS
-                      </button>
-                      <button
-                        onClick={() => setAdminTab('categories')}
-                        className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'categories' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <LayoutDashboard className="w-3.5 h-3.5 inline mr-2" /> CATEGORIES
-                      </button>
-                      <button
-                        onClick={() => setAdminTab('qr')}
-                        className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'qr' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
-                      </button>
+          <Routes location={location}>
+            <Route path="/admin" element={
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="space-y-6"
+              >
+                {!user ? (
+                  <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
+                    <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
+                      <LogIn className="w-10 h-10 text-primary-green -rotate-3" />
                     </div>
+                    <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Portal</h2>
+                    <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
+                      Access inventory management and store settings by signing in with your authorized Google account.
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={login}
+                      className="flex items-center gap-3 bg-slate-950 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/20"
+                    >
+                      <User className="w-5 h-5 text-emerald-400" />
+                      AUTHENTICATE AS ADMIN
+                    </motion.button>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between px-2 mb-2">
+                      <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
+                        <button
+                          onClick={() => setAdminTab('products')}
+                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                          <Package className="w-3.5 h-3.5 inline mr-2" /> PRODUCTS
+                        </button>
+                        <button
+                          onClick={() => setAdminTab('categories')}
+                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'categories' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                          <LayoutDashboard className="w-3.5 h-3.5 inline mr-2" /> CATEGORIES
+                        </button>
+                        <button
+                          onClick={() => setAdminTab('qr')}
+                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'qr' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                          <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
+                        </button>
+                      </div>
+                    </div>
 
-                  {adminTab === 'products' ? (
-                    <div className="grid lg:grid-cols-12 gap-6">
-                      <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
-                        <div className="flex items-center justify-between mb-6">
-                          <h3 className="text-lg font-bold text-slate-900">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
-                          <div className="flex gap-2">
-                            {editingProduct && (
+                    {adminTab === 'products' ? (
+                      <div className="grid lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-slate-900">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
+                            <div className="flex gap-2">
+                              {editingProduct && (
+                                <button 
+                                  onClick={() => setEditingProduct(null)}
+                                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              <span className="tag bg-emerald-100 text-emerald-700">Inventory</span>
+                            </div>
+                          </div>
+                          <ProductForm 
+                            key={editingProduct?.id || 'new'}
+                            onAdd={addProduct} 
+                            onUpdate={(p) => editingProduct && updateProduct(editingProduct.id, p)}
+                            initialData={editingProduct || undefined}
+                            availableCategories={categories.filter(c => c !== 'All')}
+                            availableUnits={units}
+                            onAddNewCategory={(cat) => updateCustomCategories([cat])}
+                            onAddNewUnit={(u) => updateCustomUnits([u])}
+                          />
+                        </div>
+                        
+                        <div className="lg:col-span-8 flex flex-col gap-6">
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="bento-card bg-emerald-50 p-6">
+                              <span className="tag bg-emerald-200 text-emerald-800 w-fit mb-4">Live</span>
+                              <div className="flex flex-col">
+                                <span className="text-4xl font-extrabold text-emerald-950 leading-none mb-1">{products.length}</span>
+                                <span className="text-xs text-emerald-700 uppercase font-bold tracking-wider">Total Products</span>
+                              </div>
+                            </div>
+                            <div className="bento-card bg-slate-900 p-6 text-white">
+                              <span className="tag bg-white/10 text-emerald-400 w-fit mb-4">System</span>
+                              <div className="flex flex-col">
+                                <span className="text-4xl font-extrabold text-emerald-400 leading-none mb-1">{new Set(products.map(p => p.category)).size}</span>
+                                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Active Categories</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bento-card flex-1">
+                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                              <h3 className="font-bold text-slate-900">Product Directory</h3>
+                              <div className="text-xs text-slate-400 font-medium">Auto-synced to Cloud</div>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <div className="divide-y divide-gray-100">
+                                {products.length === 0 ? (
+                                  <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
+                                    No items found in your shop inventory.
+                                  </div>
+                                ) : (
+                                  Array.from(new Set(products.map(p => p.category))).sort().map(cat => (
+                                    <div key={cat} className="bg-white">
+                                      <div className="bg-slate-50/80 px-6 py-2 sticky top-0 z-10 border-y border-slate-100">
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{cat}</span>
+                                      </div>
+                                      <table className="w-full text-left border-collapse">
+                                        <tbody className="divide-y divide-slate-50">
+                                          {products.filter(p => p.category === cat).map((p) => (
+                                            <tr key={p.id} className="group hover:bg-emerald-50/30 transition-colors">
+                                              <td className="px-6 py-4 w-16">
+                                                {p.image ? (
+                                                  <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                                                ) : (
+                                                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
+                                                    <ImageIcon className="w-5 h-5" />
+                                                  </div>
+                                                )}
+                                              </td>
+                                              <td className="px-6 py-4">
+                                                <p className="font-bold text-slate-900 text-sm">{p.name}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{p.unit}</p>
+                                              </td>
+                                              <td className="px-6 py-4 font-black text-primary-green text-sm">₹{p.price.toFixed(2)}</td>
+                                              <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                                  <button
+                                                    onClick={() => {
+                                                      setEditingProduct(p);
+                                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                    }}
+                                                    className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                                                    title="Edit"
+                                                  >
+                                                    <Plus className="w-4 h-4 rotate-45" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => deleteProduct(p.id)}
+                                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                    title="Delete"
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : adminTab === 'categories' ? (
+                      <div className="grid lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-slate-900">{editingCategory ? 'Edit Category' : 'Add Category'}</h3>
+                            {editingCategory && (
                               <button 
-                                onClick={() => setEditingProduct(null)}
+                                onClick={() => setEditingCategory(null)}
                                 className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
                               >
                                 Cancel
                               </button>
                             )}
-                            <span className="tag bg-emerald-100 text-emerald-700">Inventory</span>
                           </div>
+                          <CategoryForm 
+                            key={editingCategory?.id || 'new'}
+                            onAdd={addCategory}
+                            onUpdate={(c) => editingCategory && updateCategory(editingCategory.id, c)}
+                            initialData={editingCategory || undefined}
+                            nextOrder={categoryItems.length}
+                          />
                         </div>
-                        <ProductForm 
-                          key={editingProduct?.id || 'new'}
-                          onAdd={addProduct} 
-                          onUpdate={(p) => editingProduct && updateProduct(editingProduct.id, p)}
-                          initialData={editingProduct || undefined}
-                          availableCategories={categories.filter(c => c !== 'All')}
-                          availableUnits={units}
-                          onAddNewCategory={(cat) => updateCustomCategories([cat])}
-                          onAddNewUnit={(u) => updateCustomUnits([u])}
-                        />
-                      </div>
-                      
-                      <div className="lg:col-span-8 flex flex-col gap-6">
-                        <div className="grid grid-cols-2 gap-6">
-                          <div className="bento-card bg-emerald-50 p-6">
-                            <span className="tag bg-emerald-200 text-emerald-800 w-fit mb-4">Live</span>
-                            <div className="flex flex-col">
-                              <span className="text-4xl font-extrabold text-emerald-950 leading-none mb-1">{products.length}</span>
-                              <span className="text-xs text-emerald-700 uppercase font-bold tracking-wider">Total Products</span>
-                            </div>
-                          </div>
-                          <div className="bento-card bg-slate-900 p-6 text-white">
-                            <span className="tag bg-white/10 text-emerald-400 w-fit mb-4">System</span>
-                            <div className="flex flex-col">
-                              <span className="text-4xl font-extrabold text-emerald-400 leading-none mb-1">{new Set(products.map(p => p.category)).size}</span>
-                              <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Active Categories</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bento-card flex-1">
+                        
+                        <div className="lg:col-span-8 bento-card overflow-hidden">
                           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="font-bold text-slate-900">Product Directory</h3>
-                            <div className="text-xs text-slate-400 font-medium">Auto-synced to Cloud</div>
-                          </div>
-                          <div className="overflow-x-auto">
-                            <div className="divide-y divide-gray-100">
-                              {products.length === 0 ? (
-                                <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
-                                  No items found in your shop inventory.
-                                </div>
-                              ) : (
-                                Array.from(new Set(products.map(p => p.category))).sort().map(cat => (
-                                  <div key={cat} className="bg-white">
-                                    <div className="bg-slate-50/80 px-6 py-2 sticky top-0 z-10 border-y border-slate-100">
-                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{cat}</span>
-                                    </div>
-                                    <table className="w-full text-left border-collapse">
-                                      <tbody className="divide-y divide-slate-50">
-                                        {products.filter(p => p.category === cat).map((p) => (
-                                          <tr key={p.id} className="group hover:bg-emerald-50/30 transition-colors">
-                                            <td className="px-6 py-4 w-16">
-                                              {p.image ? (
-                                                <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
-                                              ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
-                                                  <ImageIcon className="w-5 h-5" />
-                                                </div>
-                                              )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                              <p className="font-bold text-slate-900 text-sm">{p.name}</p>
-                                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{p.unit}</p>
-                                            </td>
-                                            <td className="px-6 py-4 font-black text-primary-green text-sm">₹{p.price.toFixed(2)}</td>
-                                            <td className="px-6 py-4 text-right">
-                                              <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                  onClick={() => {
-                                                    setEditingProduct(p);
-                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                  }}
-                                                  className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                                  title="Edit"
-                                                >
-                                                  <Plus className="w-4 h-4 rotate-45" />
-                                                </button>
-                                                <button
-                                                  onClick={() => deleteProduct(p.id)}
-                                                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                  title="Delete"
-                                                >
-                                                  <Trash2 className="w-4 h-4" />
-                                                </button>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                ))
-                              )}
+                            <h3 className="font-bold text-slate-900">Category Directory</h3>
+                            <div className="flex gap-4">
+                              <button 
+                                onClick={syncCategories}
+                                className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                              >
+                                Sync from Products
+                              </button>
+                              <button 
+                                onClick={seedCategories}
+                                className="text-[10px] font-black text-primary-green uppercase tracking-widest hover:underline"
+                              >
+                                Seed Defaults
+                              </button>
                             </div>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {categoryItems.length === 0 ? (
+                              <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
+                                No categories defined.
+                              </div>
+                            ) : (
+                              categoryItems.map(cat => (
+                                <div key={cat.id} className="flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors">
+                                  <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
+                                    {cat.image ? (
+                                      <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                        <ImageIcon className="w-5 h-5" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-bold text-slate-900">{cat.name}</h4>
+                                    <p className="text-xs text-slate-500">{cat.gujaratiName || 'No Gujarati Name'}</p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory(cat);
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                      }}
+                                      className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                                    >
+                                      <Plus className="w-4 h-4 rotate-45" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteCategory(cat.id)}
+                                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ) : adminTab === 'categories' ? (
-                    <div className="grid lg:grid-cols-12 gap-6">
-                      <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
-                        <div className="flex items-center justify-between mb-6">
-                          <h3 className="text-lg font-bold text-slate-900">{editingCategory ? 'Edit Category' : 'Add Category'}</h3>
-                          {editingCategory && (
-                            <button 
-                              onClick={() => setEditingCategory(null)}
-                              className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
-                            >
-                              Cancel
-                            </button>
-                          )}
+                    ) : (
+                      <div className="bento-card p-12 text-center max-w-2xl mx-auto">
+                        <div className="mb-8">
+                          <span className="tag bg-emerald-100 text-emerald-700 mb-4 inline-block">Direct Access</span>
+                          <h3 className="text-3xl font-extrabold text-slate-950 mb-2">Grow Your Shop</h3>
+                          <p className="text-slate-500 max-w-sm mx-auto">Place this QR code at your shop counter. Customers can scan to order instantly.</p>
                         </div>
-                        <CategoryForm 
-                          key={editingCategory?.id || 'new'}
-                          onAdd={addCategory}
-                          onUpdate={(c) => editingCategory && updateCategory(editingCategory.id, c)}
-                          initialData={editingCategory || undefined}
-                          nextOrder={categoryItems.length}
+                        <div className="inline-block p-8 bg-white border border-emerald-100 rounded-[32px] shadow-2xl shadow-emerald-500/10 mb-8 border-dashed">
+                          <QRCodeSVG
+                            value={qrValue}
+                            size={256}
+                            level="H"
+                            includeMargin={true}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-4 max-w-sm mx-auto">
+                          <div className="text-left mb-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                              Quick Order Link
+                            </label>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
+                              <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
+                              <input
+                                type="text"
+                                value={qrValue}
+                                onChange={(e) => updateQrValue(e.target.value)}
+                                placeholder="https://..."
+                                className="w-full bg-transparent text-sm font-bold text-slate-900 border-none focus:ring-0 p-0"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <span className="text-emerald-600 font-bold">✓ Live Link Active:</span> This QR code redirects customers directly to your online shop. You can manually change this link anytime.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            } />
+            <Route path="*" element={
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="space-y-8 pb-32 lg:pb-12"
+              >
+                {/* Search Header - Sticky */}
+                <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
+                  <div className="flex flex-col gap-3 sm:gap-4">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900 px-2 tracking-tight">Products Collection</h2>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search Products..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Selection - Home View */}
+                {!selectedCategory ? (
+                  <div className="space-y-10 py-8">
+                    <div className="text-center space-y-3">
+                      <h2 className="text-4xl font-black text-slate-950 tracking-tight">Our Categories</h2>
+                      <p className="text-slate-500 font-medium">Select a department to start shopping</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                      <CategoryCard 
+                        name="All Products"
+                        isActive={selectedCategory === 'All Products'}
+                        onClick={() => setSelectedCategory('All Products')}
+                      />
+                      {allCategories.map(cat => (
+                        <CategoryCard 
+                          key={cat.name}
+                          item={cat.item}
+                          name={cat.name}
+                          isActive={selectedCategory === cat.name}
+                          onClick={() => setSelectedCategory(cat.name)}
                         />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Category Filter - List View */}
+                    <div className="sticky top-[132px] sm:top-[160px] z-30 bg-[#F8FAFB]/90 backdrop-blur-xl -mx-4 px-4 py-3 sm:py-4 border-b border-slate-200/50">
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={() => setSelectedCategory(null)}
+                          className="bg-white p-2.5 rounded-2xl border border-slate-200 text-slate-900 hover:text-primary-green hover:border-primary-green transition-all shadow-sm"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
+                          <button
+                            onClick={() => setSelectedCategory('All Products')}
+                            className={`px-6 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border flex items-center gap-2 ${selectedCategory === 'All Products' ? 'bg-[#00884F] text-white border-[#00884F] shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:border-primary-green'}`}
+                          >
+                            <Package className="w-3 h-3" />
+                            All Products
+                          </button>
+                          {allCategories.map(cat => (
+                            <button
+                              key={cat.name}
+                              onClick={() => setSelectedCategory(cat.name)}
+                              className={`px-6 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border ${selectedCategory === cat.name ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:border-primary-green'}`}
+                            >
+                              {cat.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-8">
+                      {/* View Header */}
+                      <div className="flex items-baseline gap-3">
+                        <h3 className="text-2xl font-black text-slate-900">
+                          {selectedCategory === 'All' ? 'Everything Fresh' : selectedCategory}
+                        </h3>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          {filteredProducts.length} Items Found
+                        </span>
+                      </div>
+
+                      {/* Product Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6">
+                        {filteredProducts.map((p: Product) => (
+                          <ProductCard key={p.id} product={p} onAdd={addToCart} />
+                        ))}
+                        {filteredProducts.length === 0 && (
+                          <div className="col-span-full py-20 text-center bento-card border-dashed bg-slate-50/50">
+                            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200 text-slate-300">
+                              <Package className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-slate-900 font-bold mb-1">Stocking up...</h3>
+                            <p className="text-slate-400 text-sm">We're adding fresh items to this section soon.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Cart Section */}
+                <div className="pt-8 border-t border-slate-200">
+                  <div id="customer-basket" className="grid lg:grid-cols-12 gap-8 items-start">
+                    <div className="lg:col-span-8 flex flex-col gap-6">
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="text-xl font-extrabold text-slate-900">Your Basket</h3>
+                        <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">{cart.length} ITEMS</span>
                       </div>
                       
-                      <div className="lg:col-span-8 bento-card overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                          <h3 className="font-bold text-slate-900">Category Directory</h3>
-                          <div className="flex gap-4">
-                            <button 
-                              onClick={syncCategories}
-                              className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
-                            >
-                              Sync from Products
-                            </button>
-                            <button 
-                              onClick={seedCategories}
-                              className="text-[10px] font-black text-primary-green uppercase tracking-widest hover:underline"
-                            >
-                              Seed Defaults
-                            </button>
+                      {cart.length === 0 ? (
+                        <div className="bento-card p-8 sm:p-16 text-center border-dashed bg-emerald-50/20">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-[24px] flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-sm border border-emerald-100">
+                            <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-200" />
                           </div>
+                          <h4 className="text-slate-900 font-bold text-base sm:text-lg mb-1 sm:mb-2">Hungry for more?</h4>
+                          <p className="text-slate-500 text-xs sm:text-sm max-w-[200px] sm:max-w-xs mx-auto">Explore our aisles and fill your basket with the freshest local produce.</p>
                         </div>
-                        <div className="divide-y divide-gray-100">
-                          {categoryItems.length === 0 ? (
-                            <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
-                              No categories defined.
-                            </div>
-                          ) : (
-                            categoryItems.map(cat => (
-                              <div key={cat.id} className="flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors">
-                                <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
-                                  {cat.image ? (
-                                    <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                      <ImageIcon className="w-5 h-5" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-bold text-slate-900">{cat.name}</h4>
-                                  <p className="text-xs text-slate-500">{cat.gujaratiName || 'No Gujarati Name'}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setEditingCategory(cat);
-                                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }}
-                                    className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                  >
-                                    <Plus className="w-4 h-4 rotate-45" />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteCategory(cat.id)}
-                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
+                      ) : (
+                        <div className="bento-card overflow-hidden divide-y divide-slate-100">
+                          {cart.map(item => (
+                            <div key={item.id} className="p-3 sm:p-5 flex items-center gap-3 sm:gap-4 hover:bg-slate-50 transition-colors">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-slate-100">
+                                {item.image ? (
+                                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-300">
+                                    <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                  </div>
+                                )}
                               </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bento-card p-12 text-center max-w-2xl mx-auto">
-                      <div className="mb-8">
-                        <span className="tag bg-emerald-100 text-emerald-700 mb-4 inline-block">Direct Access</span>
-                        <h3 className="text-3xl font-extrabold text-slate-950 mb-2">Grow Your Shop</h3>
-                        <p className="text-slate-500 max-w-sm mx-auto">Place this QR code at your shop counter. Customers can scan to order instantly.</p>
-                      </div>
-                      <div className="inline-block p-8 bg-white border border-emerald-100 rounded-[32px] shadow-2xl shadow-emerald-500/10 mb-8 border-dashed">
-                        <QRCodeSVG
-                          value={qrValue}
-                          size={256}
-                          level="H"
-                          includeMargin={true}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                        <div className="text-left mb-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
-                            Quick Order Link
-                          </label>
-                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
-                            <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <input
-                              type="text"
-                              value={qrValue}
-                              onChange={(e) => updateQrValue(e.target.value)}
-                              placeholder="https://..."
-                              className="w-full bg-transparent text-sm font-bold text-slate-900 border-none focus:ring-0 p-0"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <span className="text-emerald-600 font-bold">✓ Live Link Active:</span> This QR code redirects customers directly to your online shop. You can manually change this link anytime.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="customer"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8 pb-32 lg:pb-12"
-            >
-              {/* Search Header - Sticky */}
-              <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
-                <div className="flex flex-col gap-3 sm:gap-4">
-                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 px-2 tracking-tight">Products Collection</h2>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Search className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search Products..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Category Selection - Home View */}
-              {!selectedCategory ? (
-                <div className="space-y-10 py-8">
-                  <div className="text-center space-y-3">
-                    <h2 className="text-4xl font-black text-slate-950 tracking-tight">Our Categories</h2>
-                    <p className="text-slate-500 font-medium">Select a department to start shopping</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-                    <CategoryCard 
-                      name="All Products"
-                      isActive={selectedCategory === 'All Products'}
-                      onClick={() => setSelectedCategory('All Products')}
-                    />
-                    {allCategories.map(cat => (
-                      <CategoryCard 
-                        key={cat.name}
-                        item={cat.item}
-                        name={cat.name}
-                        isActive={selectedCategory === cat.name}
-                        onClick={() => setSelectedCategory(cat.name)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Category Filter - List View */}
-                  <div className="sticky top-[132px] sm:top-[160px] z-30 bg-[#F8FAFB]/90 backdrop-blur-xl -mx-4 px-4 py-3 sm:py-4 border-b border-slate-200/50">
-                    <div className="flex items-center gap-4">
-                      <button 
-                        onClick={() => setSelectedCategory(null)}
-                        className="bg-white p-2.5 rounded-2xl border border-slate-200 text-slate-900 hover:text-primary-green hover:border-primary-green transition-all shadow-sm"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1">
-                        <button
-                          onClick={() => setSelectedCategory('All Products')}
-                          className={`px-6 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border flex items-center gap-2 ${selectedCategory === 'All Products' ? 'bg-[#00884F] text-white border-[#00884F] shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:border-primary-green'}`}
-                        >
-                          <Package className="w-3 h-3" />
-                          All Products
-                        </button>
-                        {allCategories.map(cat => (
-                          <button
-                            key={cat.name}
-                            onClick={() => setSelectedCategory(cat.name)}
-                            className={`px-6 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border ${selectedCategory === cat.name ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-500 border-slate-200 hover:border-primary-green'}`}
-                          >
-                            {cat.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-8">
-                    {/* View Header */}
-                    <div className="flex items-baseline gap-3">
-                      <h3 className="text-2xl font-black text-slate-900">
-                        {selectedCategory === 'All' ? 'Everything Fresh' : selectedCategory}
-                      </h3>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        {filteredProducts.length} Items Found
-                      </span>
-                    </div>
-
-                    {/* Product Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6">
-                      {filteredProducts.map((p: Product) => (
-                        <ProductCard key={p.id} product={p} onAdd={addToCart} />
-                      ))}
-                      {filteredProducts.length === 0 && (
-                        <div className="col-span-full py-20 text-center bento-card border-dashed bg-slate-50/50">
-                          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200 text-slate-300">
-                            <Package className="w-8 h-8" />
-                          </div>
-                          <h3 className="text-slate-900 font-bold mb-1">Stocking up...</h3>
-                          <p className="text-slate-400 text-sm">We're adding fresh items to this section soon.</p>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase mb-0.5 block truncate">{item.category}</span>
+                                <h4 className="font-bold text-sm sm:text-base text-slate-900 truncate leading-tight">{item.name}</h4>
+                                <p className="text-xs sm:text-sm font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                              </div>
+                              <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-slate-100 rounded-lg sm:rounded-xl">
+                                <button
+                                  onClick={() => updateCartQuantity(item.id, -1)}
+                                  className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-danger hover:border-danger transition-all p-0"
+                                >
+                                  {item.quantity === 1 ? <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                                </button>
+                                <span className="w-6 sm:w-8 text-center font-black text-[10px] sm:text-xs text-slate-900">{item.quantity}</span>
+                                <button
+                                  onClick={() => updateCartQuantity(item.id, 1)}
+                                  className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-primary-green hover:border-primary-green transition-all"
+                                >
+                                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </button>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="font-black text-xs sm:text-base text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
-                  </div>
-                </>
-              )}
 
-              {/* Cart Section */}
-              <div className="pt-8 border-t border-slate-200">
-                <div id="customer-basket" className="grid lg:grid-cols-12 gap-8 items-start">
-                  <div className="lg:col-span-8 flex flex-col gap-6">
-                    <div className="flex items-center justify-between px-2">
-                      <h3 className="text-xl font-extrabold text-slate-900">Your Basket</h3>
-                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">{cart.length} ITEMS</span>
-                    </div>
-                    
-                    {cart.length === 0 ? (
-                      <div className="bento-card p-8 sm:p-16 text-center border-dashed bg-emerald-50/20">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-[24px] flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-sm border border-emerald-100">
-                          <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-200" />
-                        </div>
-                        <h4 className="text-slate-900 font-bold text-base sm:text-lg mb-1 sm:mb-2">Hungry for more?</h4>
-                        <p className="text-slate-500 text-xs sm:text-sm max-w-[200px] sm:max-w-xs mx-auto">Explore our aisles and fill your basket with the freshest local produce.</p>
-                      </div>
-                    ) : (
-                      <div className="bento-card overflow-hidden divide-y divide-slate-100">
-                        {cart.map(item => (
-                          <div key={item.id} className="p-3 sm:p-5 flex items-center gap-3 sm:gap-4 hover:bg-slate-50 transition-colors">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-slate-100">
-                              {item.image ? (
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-300">
-                                  <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                                </div>
-                              )}
+                    <div className="lg:col-span-4 sticky top-8">
+                      <div className="bento-card bg-emerald-50 border-emerald-100 p-6 shadow-xl shadow-emerald-900/5">
+                        <div className="mb-8">
+                          <span className="tag bg-emerald-200 text-emerald-800 mb-4 block w-fit">Checkout</span>
+                          <div className="space-y-3">
+                            <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
+                              <span>Subtotal</span>
+                              <span>₹{cartTotal.toFixed(2)}</span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase mb-0.5 block truncate">{item.category}</span>
-                              <h4 className="font-bold text-sm sm:text-base text-slate-900 truncate leading-tight">{item.name}</h4>
-                              <p className="text-xs sm:text-sm font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                            <div className="flex justify-between text-xs font-bold text-emerald-700 uppercase tracking-widest items-center">
+                              <span>Delivery</span>
+                              <span className="bg-emerald-200 px-2 py-0.5 rounded-full text-[10px]">FREE</span>
                             </div>
-                            <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-slate-100 rounded-lg sm:rounded-xl">
-                              <button
-                                onClick={() => updateCartQuantity(item.id, -1)}
-                                className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-danger hover:border-danger transition-all p-0"
-                              >
-                                {item.quantity === 1 ? <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                              </button>
-                              <span className="w-6 sm:w-8 text-center font-black text-[10px] sm:text-xs text-slate-900">{item.quantity}</span>
-                              <button
-                                onClick={() => updateCartQuantity(item.id, 1)}
-                                className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-primary-green hover:border-primary-green transition-all"
-                              >
-                                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                              </button>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="font-black text-xs sm:text-base text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
+                            <div className="pt-4 border-t border-emerald-200/50 flex justify-between items-baseline">
+                              <span className="font-extrabold text-emerald-950">Grand Total</span>
+                              <span className="text-3xl font-black text-emerald-950 leading-none">₹{cartTotal.toFixed(2)}</span>
                             </div>
                           </div>
-                        ))}
+                        </div>
+
+                        <CheckoutForm cart={cart} total={cartTotal} />
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Store Footer */}
+                <footer className="mt-16 pb-12 pt-8 border-t border-slate-200">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-2 grayscale opacity-50">
+                      <ShoppingCart className="w-5 h-5 text-primary-green" />
+                      <span className="text-sm font-black text-slate-900 uppercase">GGM&S Grocery</span>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
+                    
+                    {isUserAdmin ? (
+                      <div className="flex flex-col items-center gap-2 mt-4">
+                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Admin Access Granted</span>
+                        <button 
+                          onClick={() => navigate('/admin')}
+                          className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
+                        >
+                          Launch Admin Dashboard
+                        </button>
+                      </div>
+                    ) : !user && (
+                      <button 
+                        onClick={login}
+                        className="text-[10px] font-black text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] mt-4 border border-slate-200 px-6 py-2 rounded-full"
+                      >
+                        Store Manager Login
+                      </button>
                     )}
                   </div>
+                </footer>
 
-                  <div className="lg:col-span-4 sticky top-8">
-                    <div className="bento-card bg-emerald-50 border-emerald-100 p-6 shadow-xl shadow-emerald-900/5">
-                      <div className="mb-8">
-                        <span className="tag bg-emerald-200 text-emerald-800 mb-4 block w-fit">Checkout</span>
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            <span>Subtotal</span>
-                            <span>₹{cartTotal.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs font-bold text-emerald-700 uppercase tracking-widest items-center">
-                            <span>Delivery</span>
-                            <span className="bg-emerald-200 px-2 py-0.5 rounded-full text-[10px]">FREE</span>
-                          </div>
-                          <div className="pt-4 border-t border-emerald-200/50 flex justify-between items-baseline">
-                            <span className="font-extrabold text-emerald-950">Grand Total</span>
-                            <span className="text-3xl font-black text-emerald-950 leading-none">₹{cartTotal.toFixed(2)}</span>
-                          </div>
+                {/* Mobile Floating Cart - Modern Sticky Bar */}
+                {cart.length > 0 && selectedCategory && (
+                  <motion.div
+                    initial={{ y: 100 }}
+                    animate={{ y: 0 }}
+                    className="fixed bottom-4 left-4 right-4 z-50 lg:hidden"
+                  >
+                    <button
+                      onClick={() => {
+                        const basketElement = document.getElementById('customer-basket');
+                        basketElement?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="w-full bg-[#00884F] text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border-2 border-white/20 backdrop-blur-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-xl">
+                          <ShoppingCart className="w-5 h-5" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{cart.length} Items</p>
+                          <p className="text-sm font-black">₹{cartTotal.toFixed(0)} Total</p>
                         </div>
                       </div>
-
-                      <CheckoutForm cart={cart} total={cartTotal} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Store Footer */}
-              <footer className="mt-16 pb-12 pt-8 border-t border-slate-200">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex items-center gap-2 grayscale opacity-50">
-                    <ShoppingCart className="w-5 h-5 text-primary-green" />
-                    <span className="text-sm font-black text-slate-900 uppercase">GGM&S Grocery</span>
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
-                  
-                  {isUserAdmin ? (
-                    <div className="flex flex-col items-center gap-2 mt-4">
-                      <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Admin Access Granted</span>
-                      <button 
-                        onClick={() => setView('admin')}
-                        className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
-                      >
-                        Launch Admin Dashboard
-                      </button>
-                    </div>
-                  ) : !user && (
-                    <button 
-                      onClick={login}
-                      className="text-[10px] font-black text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] mt-4 border border-slate-200 px-6 py-2 rounded-full"
-                    >
-                      Store Manager Login
+                      <div className="flex items-center gap-2 font-black text-sm uppercase">
+                        View Cart
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
                     </button>
-                  )}
-                </div>
-              </footer>
-
-              {/* Mobile Floating Cart - Modern Sticky Bar */}
-              {cart.length > 0 && selectedCategory && (
-                <motion.div
-                  initial={{ y: 100 }}
-                  animate={{ y: 0 }}
-                  className="fixed bottom-4 left-4 right-4 z-50 lg:hidden"
-                >
-                  <button
-                    onClick={() => {
-                      const basketElement = document.getElementById('customer-basket');
-                      basketElement?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="w-full bg-[#00884F] text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border-2 border-white/20 backdrop-blur-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white/20 p-2 rounded-xl">
-                        <ShoppingCart className="w-5 h-5" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{cart.length} Items</p>
-                        <p className="text-sm font-black">₹{cartTotal.toFixed(0)} Total</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 font-black text-sm uppercase">
-                      View Cart
-                      <ChevronRight className="w-4 h-4" />
-                    </div>
-                  </button>
-                </motion.div>
-              )}
-            </motion.div>
-          )}
+                  </motion.div>
+                )}
+              </motion.div>
+            } />
+          </Routes>
         </AnimatePresence>
       </div>
     </div>
