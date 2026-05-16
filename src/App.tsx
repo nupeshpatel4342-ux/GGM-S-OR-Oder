@@ -119,38 +119,6 @@ export default function App() {
     return email === adminEmail || user?.uid === adminUid;
   }, [user]);
 
-  const view = useMemo(() => {
-    if (location.pathname === '/admin') return 'admin';
-    return 'customer';
-  }, [location.pathname]);
-
-  const setView = (v: 'admin' | 'customer') => {
-    if (v === 'admin') navigate('/admin');
-    else navigate('/');
-  };
-
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
-    return localStorage.getItem('isAdminUnlocked') === 'true';
-  });
-
-  const handleAdminUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminPassword === '1234') {
-      setIsAdminUnlocked(true);
-      localStorage.setItem('isAdminUnlocked', 'true');
-      setAdminPassword('');
-    } else {
-      alert('Incorrect Password');
-    }
-  };
-
-  const handleAdminLock = () => {
-    setIsAdminUnlocked(false);
-    localStorage.removeItem('isAdminUnlocked');
-    navigate('/');
-  };
-
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [categoryItems, setCategoryItems] = useState<CategoryItem[]>([]);
@@ -159,12 +127,15 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [qrValue, setQrValue] = useState<string>('https://ggm-s-or-oder.vercel.app/');
+  const [qrValue, setQrValue] = useState<string>(() => {
+    return localStorage.getItem('qrValue') || window.location.origin + '/';
+  });
 
   // Auth Sync
   useEffect(() => {
+    console.log("Current Path:", location.pathname);
     return onAuthStateChanged(auth, (u) => setUser(u));
-  }, []);
+  }, [location.pathname]);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -275,11 +246,8 @@ export default function App() {
     };
   }, []);
 
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-
   const login = async () => {
     try {
-      setIsLoggingIn(true);
       console.log("Starting login process...");
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -299,8 +267,6 @@ export default function App() {
     } catch (error) {
       console.error("Login failed:", error);
       alert("Login failed. Please make sure popups are allowed and you are using your authorized account.");
-    } finally {
-      setIsLoggingIn(false);
     }
   };
 
@@ -484,6 +450,368 @@ export default function App() {
     }));
   };
 
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+    return localStorage.getItem('isAdminUnlocked') === 'true';
+  });
+
+  const handleAdminUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === '1234') {
+      setIsAdminUnlocked(true);
+      localStorage.setItem('isAdminUnlocked', 'true');
+      setAdminPassword('');
+    } else {
+      alert('Incorrect Password');
+    }
+  };
+
+  const handleAdminLock = () => {
+    setIsAdminUnlocked(false);
+    localStorage.removeItem('isAdminUnlocked');
+    navigate('/');
+  };
+
+  const renderAdminContent = () => (
+    <div className="space-y-6">
+      {!isAdminUnlocked ? (
+        <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
+          <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
+            <LayoutDashboard className="w-10 h-10 text-primary-green -rotate-3" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Access</h2>
+          <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
+            Enter your store manager password to access inventory and categories.
+          </p>
+          
+          <form onSubmit={handleAdminUnlock} className="flex flex-col gap-4 w-full max-w-xs">
+            <input
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              placeholder="Enter Password"
+              className="w-full bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 text-center text-xl font-bold tracking-[0.5em] focus:border-primary-green focus:ring-0 transition-all outline-hidden"
+              autoFocus
+            />
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl"
+            >
+              Unlock Dashboard
+            </motion.button>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="w-full text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-600 py-2"
+            >
+              Cancel & Exit
+            </button>
+          </form>
+        </div>
+      ) : !user ? (
+        <div className="flex flex-col items-center justify-center py-16 bento-card bg-amber-50/50 border-amber-200">
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+            <LogIn className="w-8 h-8 text-amber-500" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Sync Required</h3>
+          <p className="text-slate-500 mb-8 max-w-xs text-center text-sm font-medium">
+            Password accepted! Now, please sign in with your Google account to enable saving changes to the database.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={login}
+            className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2"
+          >
+            <User className="w-4 h-4 text-emerald-400" />
+            Finalize Sync
+          </motion.button>
+        </div>
+      ) : !isUserAdmin ? (
+        <div className="flex flex-col items-center justify-center py-24 bento-card bg-red-50/50 backdrop-blur-sm border-dashed border-red-200">
+          <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-8">
+            <X className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Access Denied</h2>
+          <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
+            You are logged in as <span className="text-slate-900 font-bold">{user.email}</span>, but this account is not authorized to access the admin panel.
+          </p>
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 bg-red-600 text-white px-10 py-4 rounded-2xl font-bold text-lg"
+          >
+            Sign Out & Try Again
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between px-2 mb-2">
+            <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
+            <button
+              onClick={() => setAdminTab('products')}
+              className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Package className="w-3.5 h-3.5 inline mr-2" /> PRODUCTS
+            </button>
+            <button
+              onClick={() => setAdminTab('categories')}
+              className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'categories' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 inline mr-2" /> CATEGORIES
+            </button>
+            <button
+              onClick={() => setAdminTab('qr')}
+              className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'qr' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
+            </button>
+          </div>
+        </div>
+
+        {adminTab === 'products' ? (
+          <div className="grid lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-slate-900">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
+                <div className="flex gap-2">
+                  {editingProduct && (
+                    <button 
+                      onClick={() => setEditingProduct(null)}
+                      className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <span className="tag bg-emerald-100 text-emerald-700">Inventory</span>
+                </div>
+              </div>
+              <ProductForm 
+                key={editingProduct?.id || 'new'}
+                onAdd={addProduct} 
+                onUpdate={(p) => editingProduct && updateProduct(editingProduct.id, p)}
+                initialData={editingProduct || undefined}
+                availableCategories={categories.filter(c => c !== 'All')}
+                availableUnits={units}
+                onAddNewCategory={(cat) => updateCustomCategories([cat])}
+                onAddNewUnit={(u) => updateCustomUnits([u])}
+              />
+            </div>
+            
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bento-card bg-emerald-50 p-6">
+                  <span className="tag bg-emerald-200 text-emerald-800 w-fit mb-4">Live</span>
+                  <div className="flex flex-col">
+                    <span className="text-4xl font-extrabold text-emerald-950 leading-none mb-1">{products.length}</span>
+                    <span className="text-xs text-emerald-700 uppercase font-bold tracking-wider">Total Products</span>
+                  </div>
+                </div>
+                <div className="bento-card bg-slate-900 p-6 text-white">
+                  <span className="tag bg-white/10 text-emerald-400 w-fit mb-4">System</span>
+                  <div className="flex flex-col">
+                    <span className="text-4xl font-extrabold text-emerald-400 leading-none mb-1">{new Set(products.map(p => p.category)).size}</span>
+                    <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Active Categories</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bento-card flex-1">
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900">Product Directory</h3>
+                  <div className="text-xs text-slate-400 font-medium">Auto-synced to Cloud</div>
+                </div>
+                <div className="overflow-x-auto">
+                  <div className="divide-y divide-gray-100">
+                    {products.length === 0 ? (
+                      <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
+                        No items found in your shop inventory.
+                      </div>
+                    ) : (
+                      Array.from(new Set(products.map(p => p.category))).sort().map(cat => (
+                        <div key={cat} className="bg-white">
+                          <div className="bg-slate-50/80 px-6 py-2 sticky top-0 z-10 border-y border-slate-100">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{cat}</span>
+                          </div>
+                          <table className="w-full text-left border-collapse">
+                            <tbody className="divide-y divide-slate-50">
+                              {products.filter(p => p.category === cat).map((p) => (
+                                <tr key={p.id} className="group hover:bg-emerald-50/30 transition-colors">
+                                  <td className="px-6 py-4 w-16">
+                                    {p.image ? (
+                                      <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
+                                        <ImageIcon className="w-5 h-5" />
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <p className="font-bold text-slate-900 text-sm">{p.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{p.unit}</p>
+                                  </td>
+                                  <td className="px-6 py-4 font-black text-primary-green text-sm">₹{p.price.toFixed(2)}</td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={() => {
+                                          setEditingProduct(p);
+                                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }}
+                                        className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                                        title="Edit"
+                                      >
+                                        <Plus className="w-4 h-4 rotate-45" />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteProduct(p.id)}
+                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : adminTab === 'categories' ? (
+          <div className="grid lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-slate-900">{editingCategory ? 'Edit Category' : 'Add Category'}</h3>
+                {editingCategory && (
+                  <button 
+                    onClick={() => setEditingCategory(null)}
+                    className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+              <CategoryForm 
+                key={editingCategory?.id || 'new'}
+                onAdd={addCategory}
+                onUpdate={(c) => editingCategory && updateCategory(editingCategory.id, c)}
+                initialData={editingCategory || undefined}
+                nextOrder={categoryItems.length}
+              />
+            </div>
+            
+            <div className="lg:col-span-8 bento-card overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-900">Category Directory</h3>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={syncCategories}
+                    className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                  >
+                    Sync from Products
+                  </button>
+                  <button 
+                    onClick={seedCategories}
+                    className="text-[10px] font-black text-primary-green uppercase tracking-widest hover:underline"
+                  >
+                    Seed Defaults
+                  </button>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {categoryItems.length === 0 ? (
+                  <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
+                    No categories defined.
+                  </div>
+                ) : (
+                  categoryItems.map(cat => (
+                    <div key={cat.id} className="flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200" style={{ minWidth: '48px' }}>
+                        {cat.image ? (
+                          <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-slate-900">{cat.name}</h4>
+                        <p className="text-xs text-slate-500">{cat.gujaratiName || 'No Gujarati Name'}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                        >
+                          <Plus className="w-4 h-4 rotate-45" />
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(cat.id)}
+                          className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bento-card p-12 text-center max-w-2xl mx-auto">
+            <div className="mb-8">
+              <span className="tag bg-emerald-100 text-emerald-700 mb-4 inline-block">Direct Access</span>
+              <h3 className="text-3xl font-extrabold text-slate-950 mb-2">Grow Your Shop</h3>
+              <p className="text-slate-500 max-w-sm mx-auto">Place this QR code at your shop counter. Customers can scan to order instantly.</p>
+            </div>
+            <div className="inline-block p-8 bg-white border border-emerald-100 rounded-[32px] shadow-2xl shadow-emerald-500/10 mb-8 border-dashed">
+              <QRCodeSVG
+                value={qrValue}
+                size={256}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div className="flex flex-col gap-4 max-w-sm mx-auto">
+              <div className="text-left mb-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                  Quick Order Link
+                </label>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
+                  <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <input
+                    type="text"
+                    value={qrValue}
+                    onChange={(e) => updateQrValue(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full bg-transparent text-sm font-bold text-slate-900 border-none focus:ring-0 p-0"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <span className="text-emerald-600 font-bold">✓ Live Link Active:</span> This QR code redirects customers directly to your online shop. You can manually change this link anytime.
+              </p>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#F8FAFB]">
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -542,339 +870,9 @@ export default function App() {
             transition={{ duration: 0.2 }}
           >
             <Routes location={location}>
-              <Route path="/admin" element={
-                <div className="space-y-6">
-                  {!isAdminUnlocked ? (
-                    <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
-                      <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
-                        <LayoutDashboard className="w-10 h-10 text-primary-green -rotate-3" />
-                      </div>
-                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Access</h2>
-                      <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-                        Enter your store manager password to access inventory and categories.
-                      </p>
-                      
-                      <form onSubmit={handleAdminUnlock} className="flex flex-col gap-4 w-full max-w-xs">
-                        <input
-                          type="password"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
-                          placeholder="Enter Password"
-                          className="w-full bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 text-center text-xl font-bold tracking-[0.5em] focus:border-primary-green focus:ring-0 transition-all outline-hidden"
-                          autoFocus
-                        />
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          type="submit"
-                          className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl"
-                        >
-                          Unlock Dashboard
-                        </motion.button>
-                      </form>
-                    </div>
-                  ) : !user ? (
-                    <div className="flex flex-col items-center justify-center py-16 bento-card bg-amber-50/50 border-amber-200">
-                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                        <LogIn className="w-8 h-8 text-amber-500" />
-                      </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">Sync Required</h3>
-                      <p className="text-slate-500 mb-8 max-w-xs text-center text-sm font-medium">
-                        Password accepted! Now, please sign in with your Google account to enable saving changes to the database.
-                      </p>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={login}
-                        className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2"
-                      >
-                        <User className="w-4 h-4 text-emerald-400" />
-                        Finalize Sync
-                      </motion.button>
-                    </div>
-                  ) : !isUserAdmin ? (
-                    <div className="flex flex-col items-center justify-center py-24 bento-card bg-red-50/50 backdrop-blur-sm border-dashed border-red-200">
-                      <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-8">
-                        <X className="w-10 h-10 text-red-500" />
-                      </div>
-                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Access Denied</h2>
-                      <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-                        You are logged in as <span className="text-slate-900 font-bold">{user.email}</span>, but this account is not authorized to access the admin panel.
-                      </p>
-                      <button
-                        onClick={logout}
-                        className="flex items-center gap-3 bg-red-600 text-white px-10 py-4 rounded-2xl font-bold text-lg"
-                      >
-                        Sign Out & Try Again
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between px-2 mb-2">
-                        <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
-                        <button
-                          onClick={() => setAdminTab('products')}
-                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          <Package className="w-3.5 h-3.5 inline mr-2" /> PRODUCTS
-                        </button>
-                        <button
-                          onClick={() => setAdminTab('categories')}
-                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'categories' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          <LayoutDashboard className="w-3.5 h-3.5 inline mr-2" /> CATEGORIES
-                        </button>
-                        <button
-                          onClick={() => setAdminTab('qr')}
-                          className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'qr' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
-                        </button>
-                      </div>
-                    </div>
-
-                    {adminTab === 'products' ? (
-                      <div className="grid lg:grid-cols-12 gap-6">
-                        <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
-                          <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-slate-900">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
-                            <div className="flex gap-2">
-                              {editingProduct && (
-                                <button 
-                                  onClick={() => setEditingProduct(null)}
-                                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
-                                >
-                                  Cancel
-                                </button>
-                              )}
-                              <span className="tag bg-emerald-100 text-emerald-700">Inventory</span>
-                            </div>
-                          </div>
-                          <ProductForm 
-                            key={editingProduct?.id || 'new'}
-                            onAdd={addProduct} 
-                            onUpdate={(p) => editingProduct && updateProduct(editingProduct.id, p)}
-                            initialData={editingProduct || undefined}
-                            availableCategories={categories.filter(c => c !== 'All')}
-                            availableUnits={units}
-                            onAddNewCategory={(cat) => updateCustomCategories([cat])}
-                            onAddNewUnit={(u) => updateCustomUnits([u])}
-                          />
-                        </div>
-                        
-                        <div className="lg:col-span-8 flex flex-col gap-6">
-                          <div className="grid grid-cols-2 gap-6">
-                            <div className="bento-card bg-emerald-50 p-6">
-                              <span className="tag bg-emerald-200 text-emerald-800 w-fit mb-4">Live</span>
-                              <div className="flex flex-col">
-                                <span className="text-4xl font-extrabold text-emerald-950 leading-none mb-1">{products.length}</span>
-                                <span className="text-xs text-emerald-700 uppercase font-bold tracking-wider">Total Products</span>
-                              </div>
-                            </div>
-                            <div className="bento-card bg-slate-900 p-6 text-white">
-                              <span className="tag bg-white/10 text-emerald-400 w-fit mb-4">System</span>
-                              <div className="flex flex-col">
-                                <span className="text-4xl font-extrabold text-emerald-400 leading-none mb-1">{new Set(products.map(p => p.category)).size}</span>
-                                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Active Categories</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="bento-card flex-1">
-                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                              <h3 className="font-bold text-slate-900">Product Directory</h3>
-                              <div className="text-xs text-slate-400 font-medium">Auto-synced to Cloud</div>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <div className="divide-y divide-gray-100">
-                                {products.length === 0 ? (
-                                  <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
-                                    No items found in your shop inventory.
-                                  </div>
-                                ) : (
-                                  Array.from(new Set(products.map(p => p.category))).sort().map(cat => (
-                                    <div key={cat} className="bg-white">
-                                      <div className="bg-slate-50/80 px-6 py-2 sticky top-0 z-10 border-y border-slate-100">
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{cat}</span>
-                                      </div>
-                                      <table className="w-full text-left border-collapse">
-                                        <tbody className="divide-y divide-slate-50">
-                                          {products.filter(p => p.category === cat).map((p) => (
-                                            <tr key={p.id} className="group hover:bg-emerald-50/30 transition-colors">
-                                              <td className="px-6 py-4 w-16">
-                                                {p.image ? (
-                                                  <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
-                                                ) : (
-                                                  <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
-                                                    <ImageIcon className="w-5 h-5" />
-                                                  </div>
-                                                )}
-                                              </td>
-                                              <td className="px-6 py-4">
-                                                <p className="font-bold text-slate-900 text-sm">{p.name}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{p.unit}</p>
-                                              </td>
-                                              <td className="px-6 py-4 font-black text-primary-green text-sm">₹{p.price.toFixed(2)}</td>
-                                              <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                                                  <button
-                                                    onClick={() => {
-                                                      setEditingProduct(p);
-                                                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                    }}
-                                                    className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                                    title="Edit"
-                                                  >
-                                                    <Plus className="w-4 h-4 rotate-45" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => deleteProduct(p.id)}
-                                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                    title="Delete"
-                                                  >
-                                                    <Trash2 className="w-4 h-4" />
-                                                  </button>
-                                                </div>
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : adminTab === 'categories' ? (
-                      <div className="grid lg:grid-cols-12 gap-6">
-                        <div className="lg:col-span-4 bento-card p-6 h-fit shrink-0">
-                          <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-slate-900">{editingCategory ? 'Edit Category' : 'Add Category'}</h3>
-                            {editingCategory && (
-                              <button 
-                                onClick={() => setEditingCategory(null)}
-                                className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                          </div>
-                          <CategoryForm 
-                            key={editingCategory?.id || 'new'}
-                            onAdd={addCategory}
-                            onUpdate={(c) => editingCategory && updateCategory(editingCategory.id, c)}
-                            initialData={editingCategory || undefined}
-                            nextOrder={categoryItems.length}
-                          />
-                        </div>
-                        
-                        <div className="lg:col-span-8 bento-card overflow-hidden">
-                          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                            <h3 className="font-bold text-slate-900">Category Directory</h3>
-                            <div className="flex gap-4">
-                              <button 
-                                onClick={syncCategories}
-                                className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
-                              >
-                                Sync from Products
-                              </button>
-                              <button 
-                                onClick={seedCategories}
-                                className="text-[10px] font-black text-primary-green uppercase tracking-widest hover:underline"
-                              >
-                                Seed Defaults
-                              </button>
-                            </div>
-                          </div>
-                          <div className="divide-y divide-gray-100">
-                            {categoryItems.length === 0 ? (
-                              <div className="px-6 py-12 text-center text-slate-400 font-medium italic text-sm">
-                                No categories defined.
-                              </div>
-                            ) : (
-                              categoryItems.map(cat => (
-                                <div key={cat.id} className="flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors">
-                                  <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
-                                    {cat.image ? (
-                                      <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                        <ImageIcon className="w-5 h-5" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-bold text-slate-900">{cat.name}</h4>
-                                    <p className="text-xs text-slate-500">{cat.gujaratiName || 'No Gujarati Name'}</p>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setEditingCategory(cat);
-                                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                                      }}
-                                      className="p-2 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                    >
-                                      <Plus className="w-4 h-4 rotate-45" />
-                                    </button>
-                                    <button
-                                      onClick={() => deleteCategory(cat.id)}
-                                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bento-card p-12 text-center max-w-2xl mx-auto">
-                        <div className="mb-8">
-                          <span className="tag bg-emerald-100 text-emerald-700 mb-4 inline-block">Direct Access</span>
-                          <h3 className="text-3xl font-extrabold text-slate-950 mb-2">Grow Your Shop</h3>
-                          <p className="text-slate-500 max-w-sm mx-auto">Place this QR code at your shop counter. Customers can scan to order instantly.</p>
-                        </div>
-                        <div className="inline-block p-8 bg-white border border-emerald-100 rounded-[32px] shadow-2xl shadow-emerald-500/10 mb-8 border-dashed">
-                          <QRCodeSVG
-                            value={qrValue}
-                            size={256}
-                            level="H"
-                            includeMargin={true}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                          <div className="text-left mb-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
-                              Quick Order Link
-                            </label>
-                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
-                              <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
-                              <input
-                                type="text"
-                                value={qrValue}
-                                onChange={(e) => updateQrValue(e.target.value)}
-                                placeholder="https://..."
-                                className="w-full bg-transparent text-sm font-bold text-slate-900 border-none focus:ring-0 p-0"
-                              />
-                            </div>
-                          </div>
-                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                            <span className="text-emerald-600 font-bold">✓ Live Link Active:</span> This QR code redirects customers directly to your online shop. You can manually change this link anytime.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            } />
-            <Route path="*" element={
+              <Route path="/admin" element={renderAdminContent()} />
+              <Route path="/admin/" element={renderAdminContent()} />
+              <Route path="*" element={
               <div className="space-y-8 pb-32 lg:pb-12">
                 {/* Search Header - Sticky */}
                 <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
