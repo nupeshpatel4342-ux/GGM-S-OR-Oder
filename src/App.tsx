@@ -108,15 +108,16 @@ const DEFAULT_CATEGORIES = [
   { name: 'PAPAD & WAFERS', gujaratiName: 'પાપડ અને વેફર્સ', image: 'https://images.unsplash.com/photo-1606491956689-2ea8c5119c85?auto=format&fit=crop&q=60&w=400' }
 ];
 
+// Admin Configuration
+const ADMIN_EMAIL = 'nupeshpatel4342@gmail.com';
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(auth.currentUser);
   const isUserAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
-    const adminEmail = 'nupeshpatel4342@gmail.com';
-    const adminUid = '1LGGxE2EdbdVzBaGkIxHIaGgGBJ3';
-    return email === adminEmail || user?.uid === adminUid;
+    return email === ADMIN_EMAIL;
   }, [user]);
 
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
@@ -131,11 +132,13 @@ export default function App() {
     return localStorage.getItem('qrValue') || window.location.origin + '/';
   });
 
+  const [isAdminModeToggled, setIsAdminModeToggled] = useState(false);
+  const isAdminView = isAdminModeToggled || location.pathname.startsWith('/admin');
+
   // Auth Sync
   useEffect(() => {
-    console.log("Current Path:", location.pathname);
     return onAuthStateChanged(auth, (u) => setUser(u));
-  }, [location.pathname]);
+  }, []);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -255,27 +258,26 @@ export default function App() {
       console.log("Login successful:", result.user.email);
       
       const email = result.user.email?.toLowerCase().trim();
-      const adminEmail = 'nupeshpatel4342@gmail.com';
-      const adminUid = '1LGGxE2EdbdVzBaGkIxHIaGgGBJ3';
       
-      if (email === adminEmail || result.user.uid === adminUid) {
+      if (email === ADMIN_EMAIL) {
         console.log("User identified as Admin");
         // No need to navigate, the UI will update via state
       } else {
         console.warn("Unauthorized login attempted:", email);
         alert(`Access Denied: ${result.user.email} is not authorized as an admin. Please use the correct account.`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Full Login Error Object:", error);
+      const authError = error as { code?: string; message?: string };
       let message = "Login failed.";
-      if (error.code === 'auth/popup-blocked') {
+      if (authError.code === 'auth/popup-blocked') {
         message = "Popup was blocked by your browser. Please allow popups for this site.";
-      } else if (error.code === 'auth/operation-not-allowed') {
+      } else if (authError.code === 'auth/operation-not-allowed') {
         message = "Google Sign-In is not enabled in the Firebase Console. Please ask the project owner to enable it.";
-      } else if (error.code === 'auth/unauthorized-domain') {
+      } else if (authError.code === 'auth/unauthorized-domain') {
         message = `Domain ${window.location.hostname} is not authorized in Firebase Console. Please add it to "Authorized Domains" in the Authentication -> Settings tab of your Firebase project.`;
-      } else if (error.message) {
-        message = `Login failed: ${error.message}`;
+      } else if (authError.message) {
+        message = `Login failed: ${authError.message}`;
       }
       alert(message);
     }
@@ -845,7 +847,11 @@ export default function App() {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => {
+              navigate('/');
+              setIsAdminModeToggled(false);
+            }}
           >
             <div className="w-12 h-12 bg-primary-green rounded-2xl flex items-center justify-center shadow-lg shadow-primary-green/20">
               <ShoppingCart className="w-7 h-7 text-white" />
@@ -861,26 +867,46 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {isAdminUnlocked ? (
+            {isUserAdmin && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={handleAdminLock}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-950 text-white border-slate-950 px-8`}
+                onClick={() => setIsAdminModeToggled(!isAdminModeToggled)}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
+                  ${isAdminView 
+                    ? 'bg-white text-emerald-600 border-emerald-600' 
+                    : 'bg-emerald-600 text-white border-emerald-600'}`}
               >
-                <LogOut className="w-4 h-4" />
-                Lock Dashboard
+                {isAdminView ? <ShoppingCart className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
+                {isAdminView ? 'View Shop' : 'Manage Store'}
               </motion.button>
-            ) : (
+            )}
+
+            {!isAdminView && (
+              isAdminUnlocked ? (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/admin')}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600`}
+                  onClick={handleAdminLock}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-950 text-white border-slate-950"
                 >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Admin Panel
+                  <LogOut className="w-4 h-4" />
+                  Lock Admin
                 </motion.button>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    navigate('/admin');
+                    setIsAdminModeToggled(true);
+                  }}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
+                >
+                  <Lock className="w-4 h-4" />
+                  Admin
+                </motion.button>
+              )
             )}
           </div>
         </header>
@@ -888,16 +914,17 @@ export default function App() {
         {/* View Content */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={location.pathname}
+            key={isAdminView ? 'admin' : location.pathname}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <Routes location={location}>
-              <Route path="/admin" element={renderAdminContent()} />
-              <Route path="/admin/" element={renderAdminContent()} />
-              <Route path="*" element={
+            {isAdminView ? renderAdminContent() : (
+              <Routes location={location}>
+                <Route path="/admin" element={renderAdminContent()} />
+                <Route path="/admin/" element={renderAdminContent()} />
+                <Route path="*" element={
               <div className="space-y-8 pb-32 lg:pb-12">
                 {/* Search Header - Sticky */}
                 <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
@@ -1152,11 +1179,12 @@ export default function App() {
               </div>
             } />
           </Routes>
-        </motion.div>
-      </AnimatePresence>
-      </div>
+        )}
+      </motion.div>
+    </AnimatePresence>
     </div>
-  );
+  </div>
+);
 }
 
 interface CategoryFormProps {
