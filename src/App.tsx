@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
-import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogIn, LogOut, Heart } from 'lucide-react';
+import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogOut, Heart, CloudOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
@@ -510,45 +510,35 @@ export default function App() {
             </button>
           </form>
         </div>
-      ) : !user ? (
-        <div className="flex flex-col items-center justify-center py-16 bento-card bg-amber-50/50 border-amber-200">
-          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-            <LogIn className="w-8 h-8 text-amber-500" />
-          </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">Sync Required</h3>
-          <p className="text-slate-500 mb-8 max-w-xs text-center text-sm font-medium">
-            Password accepted! Now, please sign in with your Google account to enable saving changes to the database.
-          </p>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={login}
-            className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2"
-          >
-            <User className="w-4 h-4 text-emerald-400" />
-            Finalize Sync
-          </motion.button>
-        </div>
-      ) : !isUserAdmin ? (
-        <div className="flex flex-col items-center justify-center py-24 bento-card bg-red-50/50 backdrop-blur-sm border-dashed border-red-200">
-          <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-8">
-            <X className="w-10 h-10 text-red-500" />
-          </div>
-          <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Access Denied</h2>
-          <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-            You are logged in as <span className="text-slate-900 font-bold">{user.email}</span>, but this account is not authorized to access the admin panel.
-          </p>
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 bg-red-600 text-white px-10 py-4 rounded-2xl font-bold text-lg"
-          >
-            Sign Out & Try Again
-          </button>
-        </div>
       ) : (
         <>
-          <div className="flex items-center justify-between px-2 mb-2">
-            <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
+          {(!user || !isUserAdmin) && (
+            <div className="bg-amber-50 border-2 border-amber-200 p-4 sm:p-6 rounded-[32px] flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 shadow-sm border-dashed">
+              <div className="flex items-center gap-4 text-center sm:text-left">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                  <CloudOff className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">Persistence Login Required</h4>
+                  <p className="text-xs text-slate-500 font-medium max-w-xs">
+                    You've unlocked the UI with your password, but to <span className="font-bold text-slate-900">save changes to the database</span>, please sign in as Admin.
+                  </p>
+                </div>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={login}
+                className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xl whitespace-nowrap"
+              >
+                <User className="w-4 h-4 text-emerald-400" />
+                Sign in with Google
+              </motion.button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between px-2 mb-2 gap-4">
+            <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl overflow-x-auto max-w-full no-scrollbar flex-1">
             <button
               onClick={() => setAdminTab('products')}
               className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -568,6 +558,14 @@ export default function App() {
               <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
             </button>
           </div>
+          {user && (
+            <button
+              onClick={logout}
+              className="px-4 py-2 text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-xl transition-all"
+            >
+              Sign Out
+            </button>
+          )}
         </div>
 
         {adminTab === 'products' ? (
