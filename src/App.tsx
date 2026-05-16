@@ -486,7 +486,7 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {isUserAdmin && (
+            {user ? (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -504,23 +504,6 @@ export default function App() {
                 {view === 'admin' ? <User className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
                 {view === 'admin' ? 'Exit Admin Mode' : 'Open Admin Panel'}
               </motion.button>
-            )}
-            
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex flex-col items-end text-right">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Logged In As</span>
-                  <span className="text-xs font-bold text-slate-900 leading-none">{user.email}</span>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={logout}
-                  className="flex items-center gap-2 bg-slate-100 text-slate-600 px-4 py-2.5 rounded-full text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" /> Exit
-                </motion.button>
-              </div>
             ) : (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
