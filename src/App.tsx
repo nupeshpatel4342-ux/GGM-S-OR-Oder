@@ -253,21 +253,32 @@ export default function App() {
     };
   }, []);
 
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const login = async () => {
     try {
+      setIsLoggingIn(true);
       console.log("Starting login process...");
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       console.log("Login successful:", result.user.email);
-      if (result.user.email?.toLowerCase().trim() === 'nupeshpatel4342@gmail.com') {
+      
+      const email = result.user.email?.toLowerCase().trim();
+      const adminEmail = 'nupeshpatel4342@gmail.com';
+      const adminUid = '1LGGxE2EdbdVzBaGkIxHIaGgGBJ3';
+      
+      if (email === adminEmail || result.user.uid === adminUid) {
         console.log("User identified as Admin");
         navigate('/admin');
       } else {
         console.log("User logged in but is not admin:", result.user.email);
+        alert(`Logged in as ${result.user.email}. This account is not an authorized admin.`);
       }
     } catch (error) {
       console.error("Login failed:", error);
       alert("Login failed. Please make sure popups are allowed and you are using your authorized account.");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -511,51 +522,72 @@ export default function App() {
                 </motion.button>
               </div>
             ) : (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={login}
-                className="flex items-center gap-2 bg-primary-green text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary-green/20"
-              >
-                <LogIn className="w-4 h-4" /> Admin Login
-              </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={login}
+                  disabled={isLoggingIn}
+                  className="flex items-center gap-2 bg-primary-green text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary-green/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <LogIn className={`w-4 h-4 ${isLoggingIn ? 'animate-spin' : ''}`} />
+                  {isLoggingIn ? 'Authenticating...' : 'Admin Login'}
+                </motion.button>
             )}
           </div>
         </header>
 
         {/* View Content */}
         <AnimatePresence mode="wait">
-          <Routes location={location}>
-            <Route path="/admin" element={
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-6"
-              >
-                {!user ? (
-                  <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
-                    <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
-                      <LogIn className="w-10 h-10 text-primary-green -rotate-3" />
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Routes location={location}>
+              <Route path="/admin" element={
+                <div className="space-y-6">
+                  {!user ? (
+                    <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
+                      <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
+                        <LogIn className="w-10 h-10 text-primary-green -rotate-3" />
+                      </div>
+                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Portal</h2>
+                      <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
+                        Access inventory management and store settings by signing in with your authorized Google account.
+                      </p>
+                      <motion.button
+                        whileHover={{ scale: 1.02, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={login}
+                        disabled={isLoggingIn}
+                        className="flex items-center gap-3 bg-slate-950 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <User className={`w-5 h-5 text-emerald-400 ${isLoggingIn ? 'animate-spin' : ''}`} />
+                        {isLoggingIn ? 'AUTHENTICATING...' : 'AUTHENTICATE AS ADMIN'}
+                      </motion.button>
                     </div>
-                    <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Portal</h2>
-                    <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-                      Access inventory management and store settings by signing in with your authorized Google account.
-                    </p>
-                    <motion.button
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={login}
-                      className="flex items-center gap-3 bg-slate-950 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/20"
-                    >
-                      <User className="w-5 h-5 text-emerald-400" />
-                      AUTHENTICATE AS ADMIN
-                    </motion.button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between px-2 mb-2">
-                      <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
+                  ) : !isUserAdmin ? (
+                    <div className="flex flex-col items-center justify-center py-24 bento-card bg-red-50/50 backdrop-blur-sm border-dashed border-red-200">
+                      <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-8">
+                        <X className="w-10 h-10 text-red-500" />
+                      </div>
+                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Access Denied</h2>
+                      <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
+                        You are logged in as <span className="text-slate-900 font-bold">{user.email}</span>, but this account is not authorized to access the admin panel.
+                      </p>
+                      <button
+                        onClick={logout}
+                        className="flex items-center gap-3 bg-red-600 text-white px-10 py-4 rounded-2xl font-bold text-lg"
+                      >
+                        Sign Out & Try Again
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between px-2 mb-2">
+                        <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl">
                         <button
                           onClick={() => setAdminTab('products')}
                           className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all ${adminTab === 'products' ? 'bg-white text-primary-green shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -816,15 +848,10 @@ export default function App() {
                     )}
                   </>
                 )}
-              </motion.div>
+              </div>
             } />
             <Route path="*" element={
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-8 pb-32 lg:pb-12"
-              >
+              <div className="space-y-8 pb-32 lg:pb-12">
                 {/* Search Header - Sticky */}
                 <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
                   <div className="flex flex-col gap-3 sm:gap-4">
@@ -1076,10 +1103,11 @@ export default function App() {
                     </button>
                   </motion.div>
                 )}
-              </motion.div>
+              </div>
             } />
           </Routes>
-        </AnimatePresence>
+        </motion.div>
+      </AnimatePresence>
       </div>
     </div>
   );
