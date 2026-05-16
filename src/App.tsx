@@ -129,6 +129,28 @@ export default function App() {
     else navigate('/');
   };
 
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+    return localStorage.getItem('isAdminUnlocked') === 'true';
+  });
+
+  const handleAdminUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === '1234') {
+      setIsAdminUnlocked(true);
+      localStorage.setItem('isAdminUnlocked', 'true');
+      setAdminPassword('');
+    } else {
+      alert('Incorrect Password');
+    }
+  };
+
+  const handleAdminLock = () => {
+    setIsAdminUnlocked(false);
+    localStorage.removeItem('isAdminUnlocked');
+    navigate('/');
+  };
+
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [categoryItems, setCategoryItems] = useState<CategoryItem[]>([]);
@@ -486,34 +508,25 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {user ? (
+            {isAdminUnlocked ? (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  const nextView = view === 'admin' ? 'customer' : 'admin';
-                  console.log("Switching view to:", nextView);
-                  setView(nextView);
-                }}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 ${
-                  view === 'admin' 
-                    ? 'bg-slate-950 text-white border-slate-950 px-8' 
-                    : 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
-                }`}
+                onClick={handleAdminLock}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-950 text-white border-slate-950 px-8`}
               >
-                {view === 'admin' ? <User className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
-                {view === 'admin' ? 'Exit Admin Mode' : 'Open Admin Panel'}
+                <LogOut className="w-4 h-4" />
+                Lock Dashboard
               </motion.button>
             ) : (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={login}
-                  disabled={isLoggingIn}
-                  className="flex items-center gap-2 bg-primary-green text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary-green/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => navigate('/admin')}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600`}
                 >
-                  <LogIn className={`w-4 h-4 ${isLoggingIn ? 'animate-spin' : ''}`} />
-                  {isLoggingIn ? 'Authenticating...' : 'Admin Login'}
+                  <LayoutDashboard className="w-4 h-4" />
+                  Admin Panel
                 </motion.button>
             )}
           </div>
@@ -531,24 +544,52 @@ export default function App() {
             <Routes location={location}>
               <Route path="/admin" element={
                 <div className="space-y-6">
-                  {!user ? (
+                  {!isAdminUnlocked ? (
                     <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
                       <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
-                        <LogIn className="w-10 h-10 text-primary-green -rotate-3" />
+                        <LayoutDashboard className="w-10 h-10 text-primary-green -rotate-3" />
                       </div>
-                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Portal</h2>
+                      <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Access</h2>
                       <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-                        Access inventory management and store settings by signing in with your authorized Google account.
+                        Enter your store manager password to access inventory and categories.
+                      </p>
+                      
+                      <form onSubmit={handleAdminUnlock} className="flex flex-col gap-4 w-full max-w-xs">
+                        <input
+                          type="password"
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          placeholder="Enter Password"
+                          className="w-full bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 text-center text-xl font-bold tracking-[0.5em] focus:border-primary-green focus:ring-0 transition-all outline-hidden"
+                          autoFocus
+                        />
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="submit"
+                          className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl"
+                        >
+                          Unlock Dashboard
+                        </motion.button>
+                      </form>
+                    </div>
+                  ) : !user ? (
+                    <div className="flex flex-col items-center justify-center py-16 bento-card bg-amber-50/50 border-amber-200">
+                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                        <LogIn className="w-8 h-8 text-amber-500" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">Sync Required</h3>
+                      <p className="text-slate-500 mb-8 max-w-xs text-center text-sm font-medium">
+                        Password accepted! Now, please sign in with your Google account to enable saving changes to the database.
                       </p>
                       <motion.button
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={login}
-                        disabled={isLoggingIn}
-                        className="flex items-center gap-3 bg-slate-950 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2"
                       >
-                        <User className={`w-5 h-5 text-emerald-400 ${isLoggingIn ? 'animate-spin' : ''}`} />
-                        {isLoggingIn ? 'AUTHENTICATING...' : 'AUTHENTICATE AS ADMIN'}
+                        <User className="w-4 h-4 text-emerald-400" />
+                        Finalize Sync
                       </motion.button>
                     </div>
                   ) : !isUserAdmin ? (
@@ -1035,24 +1076,23 @@ export default function App() {
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
                     
-                    {isUserAdmin ? (
-                      <div className="flex flex-col items-center gap-2 mt-4">
-                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Admin Access Granted</span>
+                    <div className="flex flex-col items-center gap-2 mt-4">
+                      {isAdminUnlocked ? (
                         <button 
                           onClick={() => navigate('/admin')}
                           className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
                         >
-                          Launch Admin Dashboard
+                          Manage Shop
                         </button>
-                      </div>
-                    ) : !user && (
-                      <button 
-                        onClick={login}
-                        className="text-[10px] font-black text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] mt-4 border border-slate-200 px-6 py-2 rounded-full"
-                      >
-                        Store Manager Login
-                      </button>
-                    )}
+                      ) : (
+                        <button 
+                          onClick={() => navigate('/admin')}
+                          className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
+                        >
+                          Store Manager Login
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </footer>
 
