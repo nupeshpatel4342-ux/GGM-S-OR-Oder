@@ -250,6 +250,7 @@ export default function App() {
     try {
       console.log("Starting login process...");
       const provider = new GoogleAuthProvider();
+      // Using popup for better compatibility in this environment
       const result = await signInWithPopup(auth, provider);
       console.log("Login successful:", result.user.email);
       
@@ -259,14 +260,24 @@ export default function App() {
       
       if (email === adminEmail || result.user.uid === adminUid) {
         console.log("User identified as Admin");
-        navigate('/admin');
+        // No need to navigate, the UI will update via state
       } else {
-        console.log("User logged in but is not admin:", result.user.email);
-        alert(`Logged in as ${result.user.email}. This account is not an authorized admin.`);
+        console.warn("Unauthorized login attempted:", email);
+        alert(`Access Denied: ${result.user.email} is not authorized as an admin. Please use the correct account.`);
       }
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed. Please make sure popups are allowed and you are using your authorized account.");
+    } catch (error: any) {
+      console.error("Full Login Error Object:", error);
+      let message = "Login failed.";
+      if (error.code === 'auth/popup-blocked') {
+        message = "Popup was blocked by your browser. Please allow popups for this site.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        message = "Google Sign-In is not enabled in the Firebase Console. Please ask the project owner to enable it.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = `Domain ${window.location.hostname} is not authorized in Firebase Console. Please add it to "Authorized Domains" in the Authentication -> Settings tab of your Firebase project.`;
+      } else if (error.message) {
+        message = `Login failed: ${error.message}`;
+      }
+      alert(message);
     }
   };
 
@@ -512,7 +523,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {(!user || !isUserAdmin) && (
+          {isAdminUnlocked && (!user || !isUserAdmin) && (
             <div className="bg-amber-50 border-2 border-amber-200 p-4 sm:p-6 rounded-[32px] flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 shadow-sm border-dashed">
               <div className="flex items-center gap-4 text-center sm:text-left">
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
@@ -521,19 +532,35 @@ export default function App() {
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">Persistence Login Required</h4>
                   <p className="text-xs text-slate-500 font-medium max-w-xs">
-                    You've unlocked the UI with your password, but to <span className="font-bold text-slate-900">save changes to the database</span>, please sign in as Admin.
+                    {user ? (
+                      <>Logged in as <span className="font-bold">{user.email}</span> but not authorized. Use the correct admin account.</>
+                    ) : (
+                      <>You've unlocked the UI, but to <span className="font-bold text-slate-900">save changes</span>, please sign in with your Admin account.</>
+                    )}
                   </p>
+                  {user && (
+                    <div className="mt-1 text-[10px] text-slate-400 font-mono">
+                      UID: {user.uid}
+                    </div>
+                  )}
                 </div>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={login}
-                className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xl whitespace-nowrap"
-              >
-                <User className="w-4 h-4 text-emerald-400" />
-                Sign in with Google
-              </motion.button>
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={login}
+                  className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl whitespace-nowrap"
+                >
+                  <User className="w-4 h-4 text-emerald-400" />
+                  {user ? 'Switch Account' : 'Sign in with Google'}
+                </motion.button>
+                {user && (
+                  <button onClick={() => signOut(auth)} className="text-[10px] font-bold text-slate-400 hover:text-red-500 underline">
+                    Sign Out
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
