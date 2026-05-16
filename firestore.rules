@@ -14,7 +14,8 @@ service cloud.firestore {
     function isAdmin() { 
       return isSignedIn() && (
         request.auth.uid == '1LGGxE2EdbdVzBaGkIxHIaGgGBJ3' ||
-        (request.auth.token.keys().contains('email') && request.auth.token.email.lower() == 'nupeshpatel4342@gmail.com') || 
+        (request.auth.token.email.lower() == 'nupeshpatel4342@gmail.com' && 
+         request.auth.token.email_verified == true) ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -32,30 +33,19 @@ service cloud.firestore {
     match /products/{productId} {
       function isValidProduct(data) {
         return data.keys().hasAll(['name', 'category', 'price', 'unit']) &&
-               data.keys().size() >= 4 && data.keys().size() <= 8 &&
                data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
                data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
                data.price is number && data.price >= 0 &&
-               (!('mrp' in data) || (data.mrp is number)) &&
-               data.unit is string && data.unit.size() > 0 && data.unit.size() <= 50 &&
-               (!('image' in data) || (data.image is string && data.image.size() <= 1048576)) &&
-               (!('createdAt' in data) || data.createdAt is timestamp);
+               data.unit is string && data.unit.size() > 0 && data.unit.size() <= 50;
       }
 
       // Public can see all products
       allow get: if true;
       allow list: if true;
 
-      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) && (
-        !('createdAt' in incoming()) || incoming().createdAt == request.time
-      );
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
 
-      allow update: if isAdmin() && isValidProduct(incoming()) && (
-        // Action: Generic Update
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'price', 'mrp', 'unit', 'image', 'updatedAt']) &&
-        // Immutability Check
-        incoming().get('createdAt', existing().get('createdAt', null)) == existing().get('createdAt', null)
-      );
+      allow update: if isAdmin() && isValidProduct(incoming());
 
       allow delete: if isAdmin();
     }
@@ -64,26 +54,15 @@ service cloud.firestore {
     match /categories/{categoryId} {
       function isValidCategory(data) {
         return data.keys().hasAll(['name']) &&
-               data.keys().size() >= 1 && data.keys().size() <= 10 &&
-               data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-               (!('gujaratiName' in data) || (data.gujaratiName is string && data.gujaratiName.size() <= 200)) &&
-               (!('image' in data) || (data.image is string && data.image.size() <= 4096)) &&
-               (!('order' in data) || (data.order is number)) &&
-               (!('createdAt' in data) || data.createdAt is timestamp) &&
-               (!('updatedAt' in data) || data.updatedAt is timestamp);
+               data.name is string && data.name.size() > 0 && data.name.size() <= 200;
       }
 
       allow get: if true;
       allow list: if true;
 
-      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) && (
-        !('createdAt' in incoming()) || incoming().createdAt == request.time
-      );
+      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
 
-      allow update: if isAdmin() && isValidCategory(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'gujaratiName', 'image', 'order', 'updatedAt']) &&
-        incoming().get('createdAt', existing().get('createdAt', null)) == existing().get('createdAt', null)
-      );
+      allow update: if isAdmin() && isValidCategory(incoming());
 
       allow delete: if isAdmin();
     }

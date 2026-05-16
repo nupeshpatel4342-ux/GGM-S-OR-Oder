@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
-import { ShoppingCart, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogIn, LogOut, Heart } from 'lucide-react';
+import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogIn, LogOut, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CategoryItem, Product, CartItem, CustomerDetails } from './types.ts';
@@ -132,7 +132,7 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [qrValue, setQrValue] = useState<string>(`${window.location.origin}${window.location.pathname}?customer=true`);
+  const [qrValue, setQrValue] = useState<string>('https://ggm-s-or-oder.vercel.app/');
 
   // Auth Sync
   useEffect(() => {
@@ -460,42 +460,51 @@ export default function App() {
             </div>
           </motion.div>
 
-          {!window.location.search.includes('customer=true') && (
-            <div className="flex items-center gap-4">
-              {isUserAdmin && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setView(view === 'admin' ? 'customer' : 'admin');
-                  }}
-                  className="flex items-center gap-2 bg-white border border-border-slate px-6 py-2.5 rounded-full text-slate-900 text-sm font-bold shadow-sm hover:border-primary-green hover:text-primary-green transition-all"
-                >
-                  {view === 'admin' ? <User className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
-                  {view === 'admin' ? 'Customer View' : 'Admin Panel'}
-                </motion.button>
-              )}
-              {user ? (
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            {isUserAdmin && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setView(view === 'admin' ? 'customer' : 'admin');
+                }}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm transition-all border-2 ${
+                  view === 'admin' 
+                    ? 'bg-slate-900 text-white border-slate-900' 
+                    : 'bg-white text-primary-green border-primary-green'
+                }`}
+              >
+                {view === 'admin' ? <User className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
+                {view === 'admin' ? 'Customer View' : 'Admin Panel'}
+              </motion.button>
+            )}
+            
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex flex-col items-end text-right">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Logged In As</span>
+                  <span className="text-xs font-bold text-slate-900 leading-none">{user.email}</span>
+                </div>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={logout}
-                  className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg"
+                  className="flex items-center gap-2 bg-slate-100 text-slate-600 px-4 py-2.5 rounded-full text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" /> Exit 
+                  <LogOut className="w-3.5 h-3.5" /> Exit
                 </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={login}
-                  className="flex items-center gap-2 bg-primary-green text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg"
-                >
-                  <LogIn className="w-4 h-4" /> Admin Login
-                </motion.button>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={login}
+                className="flex items-center gap-2 bg-primary-green text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-primary-green/20"
+              >
+                <LogIn className="w-4 h-4" /> Admin Login
+              </motion.button>
+            )}
+          </div>
         </header>
 
         {/* View Content */}
@@ -768,17 +777,23 @@ export default function App() {
                         />
                       </div>
                       <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                          <input
-                            type="text"
-                            value={qrValue}
-                            onChange={(e) => updateQrValue(e.target.value)}
-                            placeholder="Manual QR Link..."
-                            className="w-full bg-transparent text-xs font-bold text-slate-900 border-none focus:ring-0 p-0 text-center"
-                          />
+                        <div className="text-left mb-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                            Quick Order Link
+                          </label>
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center gap-3">
+                            <Smartphone className="w-5 h-5 text-emerald-500 shrink-0" />
+                            <input
+                              type="text"
+                              value={qrValue}
+                              onChange={(e) => updateQrValue(e.target.value)}
+                              placeholder="https://..."
+                              className="w-full bg-transparent text-sm font-bold text-slate-900 border-none focus:ring-0 p-0"
+                            />
+                          </div>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-                          Pro Tip: You can point this to a custom domain or specific campaign link.
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          <span className="text-emerald-600 font-bold">✓ Live Link Active:</span> This QR code redirects customers directly to your online shop. You can manually change this link anytime.
                         </p>
                       </div>
                     </div>
@@ -792,22 +807,22 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
+              className="space-y-8 pb-32 lg:pb-12"
             >
               {/* Search Header - Sticky */}
-              <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-4 pt-6">
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-xl font-bold text-slate-900 px-2 tracking-tight">Products Collection</h2>
+              <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
+                <div className="flex flex-col gap-3 sm:gap-4">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 px-2 tracking-tight">Products Collection</h2>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <ShoppingCart className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
+                      <Search className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
                     </div>
                     <input
                       type="text"
                       placeholder="Search Products..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-sm"
+                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-sm"
                     />
                   </div>
                 </div>
@@ -841,7 +856,7 @@ export default function App() {
               ) : (
                 <>
                   {/* Category Filter - List View */}
-                  <div className="sticky top-[160px] z-30 bg-[#F8FAFB]/90 backdrop-blur-xl -mx-4 px-4 py-4 border-b border-slate-200/50">
+                  <div className="sticky top-[132px] sm:top-[160px] z-30 bg-[#F8FAFB]/90 backdrop-blur-xl -mx-4 px-4 py-3 sm:py-4 border-b border-slate-200/50">
                     <div className="flex items-center gap-4">
                       <button 
                         onClick={() => setSelectedCategory(null)}
@@ -910,48 +925,48 @@ export default function App() {
                     </div>
                     
                     {cart.length === 0 ? (
-                      <div className="bento-card p-16 text-center border-dashed bg-emerald-50/20">
-                        <div className="w-20 h-20 bg-white rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-sm border border-emerald-100">
-                          <ShoppingCart className="w-10 h-10 text-emerald-200" />
+                      <div className="bento-card p-8 sm:p-16 text-center border-dashed bg-emerald-50/20">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-[24px] flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-sm border border-emerald-100">
+                          <ShoppingCart className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-200" />
                         </div>
-                        <h4 className="text-slate-900 font-bold text-lg mb-2">Hungry for more?</h4>
-                        <p className="text-slate-500 text-sm max-w-xs mx-auto">Explore our aisles and fill your basket with the freshest local produce.</p>
+                        <h4 className="text-slate-900 font-bold text-base sm:text-lg mb-1 sm:mb-2">Hungry for more?</h4>
+                        <p className="text-slate-500 text-xs sm:text-sm max-w-[200px] sm:max-w-xs mx-auto">Explore our aisles and fill your basket with the freshest local produce.</p>
                       </div>
                     ) : (
                       <div className="bento-card overflow-hidden divide-y divide-slate-100">
                         {cart.map(item => (
-                          <div key={item.id} className="p-5 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-slate-100">
+                          <div key={item.id} className="p-3 sm:p-5 flex items-center gap-3 sm:gap-4 hover:bg-slate-50 transition-colors">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-slate-100">
                               {item.image ? (
                                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-300">
-                                  <ImageIcon className="w-5 h-5" />
+                                  <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                                 </div>
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="tag bg-slate-100 text-slate-500 mb-1 inline-block">{item.category}</span>
-                              <h4 className="font-bold text-slate-900 truncate">{item.name}</h4>
-                              <p className="text-sm font-black text-primary-green mt-0.5">₹{item.price.toFixed(2)} / {item.unit}</p>
+                              <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase mb-0.5 block truncate">{item.category}</span>
+                              <h4 className="font-bold text-sm sm:text-base text-slate-900 truncate leading-tight">{item.name}</h4>
+                              <p className="text-xs sm:text-sm font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
                             </div>
-                            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                            <div className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 bg-slate-100 rounded-lg sm:rounded-xl">
                               <button
                                 onClick={() => updateCartQuantity(item.id, -1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:text-danger hover:border-danger transition-all p-0"
+                                className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-danger hover:border-danger transition-all p-0"
                               >
-                                {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <ChevronLeft className="w-4 h-4" />}
+                                {item.quantity === 1 ? <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                               </button>
-                              <span className="w-8 text-center font-black text-xs text-slate-900">{item.quantity}</span>
+                              <span className="w-6 sm:w-8 text-center font-black text-[10px] sm:text-xs text-slate-900">{item.quantity}</span>
                               <button
                                 onClick={() => updateCartQuantity(item.id, 1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:text-primary-green hover:border-primary-green transition-all"
+                                className="w-7 h-7 sm:w-8 h-8 flex items-center justify-center rounded-md sm:rounded-lg bg-white border border-slate-200 hover:text-primary-green hover:border-primary-green transition-all"
                               >
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="font-black text-slate-900">₹{(item.price * item.quantity).toFixed(2)}</p>
+                              <p className="font-black text-xs sm:text-base text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
                             </div>
                           </div>
                         ))}
@@ -985,26 +1000,55 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Mobile Floating Cart */}
-              {cart.length > 0 && (
-                <motion.button
-                  initial={{ y: 100, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    const basketElement = document.getElementById('customer-basket');
-                    basketElement?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="fixed bottom-6 right-6 z-50 lg:hidden bg-primary-green text-white p-4 rounded-full shadow-2xl flex items-center gap-3 border-4 border-white"
-                >
-                  <div className="relative">
-                    <ShoppingCart className="w-6 h-6" />
-                    <span className="absolute -top-2 -right-2 bg-slate-900 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
-                      {cart.length}
-                    </span>
+              {/* Store Footer */}
+              <footer className="mt-16 pb-12 pt-8 border-t border-slate-200">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 grayscale opacity-50">
+                    <ShoppingCart className="w-5 h-5 text-primary-green" />
+                    <span className="text-sm font-black text-slate-900 uppercase">GGM&S Grocery</span>
                   </div>
-                  <span className="font-black text-sm pr-2">₹{cartTotal.toFixed(0)}</span>
-                </motion.button>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
+                  
+                  {!user && (
+                    <button 
+                      onClick={login}
+                      className="text-[9px] font-black text-slate-300 hover:text-emerald-500 transition-colors uppercase tracking-widest mt-4"
+                    >
+                      Store Manager Login
+                    </button>
+                  )}
+                </div>
+              </footer>
+
+              {/* Mobile Floating Cart - Modern Sticky Bar */}
+              {cart.length > 0 && selectedCategory && (
+                <motion.div
+                  initial={{ y: 100 }}
+                  animate={{ y: 0 }}
+                  className="fixed bottom-4 left-4 right-4 z-50 lg:hidden"
+                >
+                  <button
+                    onClick={() => {
+                      const basketElement = document.getElementById('customer-basket');
+                      basketElement?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full bg-[#00884F] text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border-2 border-white/20 backdrop-blur-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white/20 p-2 rounded-xl">
+                        <ShoppingCart className="w-5 h-5" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">{cart.length} Items</p>
+                        <p className="text-sm font-black">₹{cartTotal.toFixed(0)} Total</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 font-black text-sm uppercase">
+                      View Cart
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+                  </button>
+                </motion.div>
               )}
             </motion.div>
           )}
@@ -1137,18 +1181,18 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ item, name, isActive, onCli
           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
         ) : name === 'All Products' ? (
           <div className="w-full h-full bg-[#00884F] flex items-center justify-center text-white">
-            <Package className="w-6 h-6 sm:w-10 sm:h-10" />
+            <Package className="w-5 h-5 sm:w-10 sm:h-10" />
           </div>
         ) : (
-          <ImageIcon className="w-6 h-6 sm:w-10 sm:h-10 text-slate-200" />
+          <ImageIcon className="w-5 h-5 sm:w-10 sm:h-10 text-slate-200" />
         )}
       </div>
-      <div className="text-center overflow-hidden w-full">
-        <h4 className={`text-[10px] sm:text-base font-black uppercase tracking-tight line-clamp-1 ${isActive ? 'text-primary-green' : 'text-slate-800'}`}>
+      <div className="text-center overflow-hidden w-full flex-1 flex flex-col justify-center">
+        <h4 className={`text-[9px] sm:text-base font-black uppercase tracking-tight leading-tight line-clamp-2 ${isActive ? 'text-primary-green' : 'text-slate-800'}`}>
           {name || item?.name}
         </h4>
         {item?.gujaratiName && (
-          <p className="text-[9px] sm:text-sm font-medium text-slate-500 mt-0.5 line-clamp-1">({item.gujaratiName})</p>
+          <p className="text-[8px] sm:text-sm font-medium text-slate-500 mt-0.5 line-clamp-1">({item.gujaratiName})</p>
         )}
       </div>
     </motion.button>
@@ -1425,8 +1469,16 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
   const discount = product.mrp && product.mrp > product.price ? ((product.mrp - product.price) / product.mrp * 100).toFixed(2) : '0';
   const hasDiscount = parseFloat(discount) > 0;
+
+  const handleAdd = () => {
+    onAdd(product, qty);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+    setQty(1);
+  };
 
   return (
     <motion.div
@@ -1434,68 +1486,78 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
       animate={{ opacity: 1, scale: 1 }}
       className="bg-white rounded-[24px] overflow-hidden flex flex-col h-full group border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300"
     >
-      <div className="aspect-[4/5] relative overflow-hidden bg-white">
+      <div className="aspect-square relative overflow-hidden bg-white">
         {product.image ? (
-          <img src={product.image} alt={product.name} className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-105" />
+          <img src={product.image} alt={product.name} className="w-full h-full object-contain p-2 sm:p-4 transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-200">
-            <ImageIcon className="w-12 h-12" />
+            <ImageIcon className="w-10 h-10 sm:w-12 sm:h-12" />
           </div>
         )}
-        <div className="absolute top-3 left-3">
-          <span className="tag bg-white shadow-sm text-slate-600 font-bold text-[10px] py-1 px-2 uppercase tracking-tight">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
+          <span className="tag bg-white shadow-sm text-slate-600 font-bold text-[8px] sm:text-[10px] py-0.5 px-1.5 sm:py-1 sm:px-2 uppercase tracking-tight">
             {product.category}
           </span>
         </div>
       </div>
 
-      <div className="p-3 sm:p-5 flex-1 flex flex-col">
-        <h4 className="text-sm sm:text-lg font-bold text-slate-900 mb-1 sm:mb-2 leading-tight group-hover:text-primary-green transition-colors line-clamp-2 min-h-[2.5rem] uppercase">{product.name}</h4>
+      <div className="p-2.5 sm:p-5 flex-1 flex flex-col">
+        <h4 className="text-[11px] sm:text-base font-black text-slate-900 mb-0.5 leading-tight group-hover:text-primary-green transition-colors line-clamp-2 min-h-[1.75rem] sm:min-h-[2.5rem] uppercase">{product.name}</h4>
         
-        <div className="flex flex-col mb-3">
-          <div className="flex items-center gap-2">
+        {product.gujaratiName && (
+          <p className="text-[9px] sm:text-xs text-slate-400 font-bold mb-2 line-clamp-1">
+            {product.gujaratiName}
+          </p>
+        )}
+        
+        <div className="flex flex-col mb-2 sm:mb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {product.mrp && product.mrp > product.price && (
-              <span className="text-sm text-slate-400 line-through font-medium">₹{product.mrp.toFixed(2)}</span>
+              <span className="text-[9px] sm:text-sm text-slate-400 line-through font-medium">₹{product.mrp.toFixed(0)}</span>
             )}
-            <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-black text-[#00884F]">₹{product.price.toFixed(0)}</span>
-              <span className="text-xs sm:text-sm text-slate-400 font-bold lowercase">/ {product.unit}</span>
+            <div className="flex items-baseline gap-0.5 sm:gap-1">
+              <span className="text-sm sm:text-xl font-black text-[#00884F]">₹{product.price.toFixed(0)}</span>
+              <span className="text-[8px] sm:text-sm text-slate-400 font-bold lowercase">/ {product.unit}</span>
             </div>
           </div>
           {hasDiscount && (
-            <div className="mt-1">
-              <span className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-tight">
-                {discount}% Off
+            <div className="mt-0.5 sm:mt-1">
+              <span className="bg-red-500 text-white text-[8px] sm:text-[10px] font-black px-1 py-0.5 sm:px-2 sm:py-1 rounded-md sm:rounded-lg uppercase tracking-tight">
+                {Math.round(parseFloat(discount))}% Off
               </span>
             </div>
           )}
         </div>
 
-        <div className="mt-auto space-y-4">
-          <div className="flex items-center justify-center bg-slate-50 border border-slate-200 rounded-2xl p-1.5 gap-4">
+        <div className="mt-auto space-y-2 sm:space-y-4">
+          <div className="flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-0.5 sm:p-1.5 gap-1.5 sm:gap-4">
             <button
               onClick={() => setQty(Math.max(1, qty - 1))}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-900 font-bold border border-slate-100 shadow-sm active:scale-90 transition-all"
+              className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white text-slate-900 font-bold border border-slate-100 shadow-sm active:scale-90 transition-all font-mono"
             >
               -
             </button>
-            <span className="w-8 text-center font-black text-slate-900 text-lg">{qty}</span>
+            <span className="w-6 sm:w-8 text-center font-black text-slate-900 text-sm sm:text-lg">{qty}</span>
             <button
               onClick={() => setQty(Math.min(99, qty + 1))}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-900 font-bold border border-slate-100 shadow-sm active:scale-90 transition-all"
+              className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl bg-white text-slate-900 font-bold border border-slate-100 shadow-sm active:scale-90 transition-all font-mono"
             >
               +
             </button>
           </div>
 
           <button
-            onClick={() => {
-              onAdd(product, qty);
-              setQty(1);
-            }}
-            className="w-full bg-[#FFB800] text-slate-900 py-3.5 rounded-2xl font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-yellow-500/10 active:scale-[0.98]"
+            onClick={handleAdd}
+            className={`w-full py-2.5 sm:py-3.5 rounded-2xl font-bold text-xs sm:text-sm hover:opacity-90 transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 ${added ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-[#FFB800] text-slate-900 shadow-yellow-500/10'}`}
           >
-            Add to Cart
+            {added ? (
+              <>
+                <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
+                  <Plus className="w-3 h-3 text-emerald-600" />
+                </div>
+                Added!
+              </>
+            ) : 'Add to Cart'}
           </button>
           
           <div className="flex justify-center">
@@ -1543,36 +1605,35 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ cart, total }) => {
     <div className="space-y-4">
       <div className="space-y-3">
         <div className="relative">
-          <User className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             required
             type="text"
             placeholder="Full Name"
             value={details.name}
             onChange={e => setDetails({ ...details, name: e.target.value })}
-            className="w-full bg-white/50 border border-emerald-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium"
+            className="w-full bg-white/50 border border-emerald-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-base sm:text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium"
           />
         </div>
         <div className="relative">
-          <Phone className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             required
             type="tel"
             placeholder="Mobile Number"
             value={details.phone}
             onChange={e => setDetails({ ...details, phone: e.target.value })}
-            className="w-full bg-white/50 border border-emerald-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium"
+            className="w-full bg-white/50 border border-emerald-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-base sm:text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium"
           />
         </div>
         <div className="relative">
           <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
-          <input
+          <textarea
             required
-            type="text"
             placeholder="Delivery Address"
             value={details.address}
             onChange={e => setDetails({ ...details, address: e.target.value })}
-            className="w-full bg-white/50 border border-emerald-200 rounded-2xl pl-12 pr-4 py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium"
+            className="w-full bg-white/50 border border-emerald-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-base sm:text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 focus:outline-hidden transition-all placeholder:text-slate-400 font-medium min-h-[80px] resize-none"
           />
         </div>
       </div>
