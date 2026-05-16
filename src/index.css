@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary-green: #10B981; /* Emerald 500 */
+  --color-secondary-green: #059669; /* Emerald 600 */
+  --color-light-green: #ECFDF5; /* Emerald 50 */
+  --color-accent-orange: #F59E0B; /* Amber 500 */
+  --color-dark-text: #0F172A; /* Slate 900 */
+  --color-light-text: #64748B; /* Slate 500 */
+  --color-danger: #EF4444; /* Red 500 */
+  --color-border-slate: #E2E8F0; /* Slate 200 */
+}
+
+@layer base {
+  body {
+    @apply bg-[#F0F2F5] text-dark-text font-sans;
+  }
+}
+
+.bento-card {
+  @apply bg-white border border-border-slate rounded-[24px] transition-all duration-200 hover:border-primary-green hover:shadow-lg hover:shadow-black/5 flex flex-col overflow-hidden;
+}
+
+.tag {
+  @apply text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full;
+}
+

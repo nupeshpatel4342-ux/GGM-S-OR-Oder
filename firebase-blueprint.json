@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A grocery product in the shop",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the product"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category name"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price per unit"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g. kg, L)"
+        },
+        "image": {
+          "type": "string",
+          "description": "Base64 or URL of product image"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "category",
+        "price",
+        "unit"
+      ]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Global shop configuration including custom options",
+      "type": "object",
+      "properties": {
+        "customCategories": {
+          "type": "array"
+        },
+        "customUnits": {
+          "type": "array"
+        },
+        "qrValue": {
+          "type": "string"
+        }
+      }
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A product category with image and gujarati name",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "gujaratiName": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "order": {
+          "type": "number"
+        }
+      },
+      "required": ["name"]
+    }
+  },
+  "firestore": {
+    "products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all items available in the shop"
+    },
+    "categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of shop categories"
+    },
+    "settings/global": {
+      "schema": "GlobalSettings",
+      "description": "Singleton document for shop-wide configuration"
+    }
+  }
+}

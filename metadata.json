@@ -1,0 +1,8 @@
+{
+  "name": "GGM&S - Grocery Ordering",
+  "description": "A quick and easy grocery ordering application for local shops with WhatsApp integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
