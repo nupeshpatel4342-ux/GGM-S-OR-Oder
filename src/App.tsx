@@ -109,16 +109,26 @@ const DEFAULT_CATEGORIES = [
 
 export default function App() {
   const [user, setUser] = useState(auth.currentUser);
-  const isUserAdmin = useMemo(() => user?.email?.toLowerCase() === 'nupeshpatel4342@gmail.com', [user]);
+  const isUserAdmin = useMemo(() => {
+    const email = user?.email?.toLowerCase().trim();
+    const adminEmail = 'nupeshpatel4342@gmail.com';
+    const adminUid = '1LGGxE2EdbdVzBaGkIxHIaGgGBJ3';
+    return email === adminEmail || user?.uid === adminUid;
+  }, [user]);
 
   const [viewToggle, setViewToggle] = useState<'admin' | 'customer' | null>(null);
   
   const view = useMemo(() => {
     if (viewToggle) return viewToggle;
+    
+    // Check URL params first
     if (typeof window !== 'undefined' && window.location.search.includes('customer=true')) {
       return 'customer';
     }
+    
+    // Auto-switch to admin if logged in as admin
     if (isUserAdmin) return 'admin';
+    
     return 'customer';
   }, [viewToggle, isUserAdmin]);
 
@@ -250,10 +260,19 @@ export default function App() {
 
   const login = async () => {
     try {
+      console.log("Starting login process...");
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      console.log("Login successful:", result.user.email);
+      if (result.user.email?.toLowerCase().trim() === 'nupeshpatel4342@gmail.com') {
+        console.log("User identified as Admin");
+        setView('admin');
+      } else {
+        console.log("User logged in but is not admin:", result.user.email);
+      }
     } catch (error) {
       console.error("Login failed:", error);
+      alert("Login failed. Please make sure popups are allowed and you are using your authorized account.");
     }
   };
 
@@ -466,16 +485,18 @@ export default function App() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
-                  setView(view === 'admin' ? 'customer' : 'admin');
+                  const nextView = view === 'admin' ? 'customer' : 'admin';
+                  console.log("Switching view to:", nextView);
+                  setView(nextView);
                 }}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm transition-all border-2 ${
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 ${
                   view === 'admin' 
-                    ? 'bg-slate-900 text-white border-slate-900' 
-                    : 'bg-white text-primary-green border-primary-green'
+                    ? 'bg-slate-950 text-white border-slate-950 px-8' 
+                    : 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
                 }`}
               >
                 {view === 'admin' ? <User className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
-                {view === 'admin' ? 'Customer View' : 'Admin Panel'}
+                {view === 'admin' ? 'Exit Admin Mode' : 'Open Admin Panel'}
               </motion.button>
             )}
             
@@ -1009,10 +1030,20 @@ export default function App() {
                   </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
                   
-                  {!user && (
+                  {isUserAdmin ? (
+                    <div className="flex flex-col items-center gap-2 mt-4">
+                      <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Admin Access Granted</span>
+                      <button 
+                        onClick={() => setView('admin')}
+                        className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
+                      >
+                        Launch Admin Dashboard
+                      </button>
+                    </div>
+                  ) : !user && (
                     <button 
                       onClick={login}
-                      className="text-[9px] font-black text-slate-300 hover:text-emerald-500 transition-colors uppercase tracking-widest mt-4"
+                      className="text-[10px] font-black text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] mt-4 border border-slate-200 px-6 py-2 rounded-full"
                     >
                       Store Manager Login
                     </button>
