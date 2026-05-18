@@ -266,7 +266,7 @@ export default function App() {
           'auth/popup-closed-by-user': 'Login popup બંધ થઇ ગયો. ફરીથી Google sign-in કરો.',
           'auth/popup-blocked': 'Browser popup block કરતો હોઈ શકે. Popup allow કરીને ફરી પ્રયાસ કરો.',
           'auth/network-request-failed': 'Internet connection issue છે. Network check કરીને ફરી પ્રયાસ કરો.',
-          'auth/unauthorized-domain': 'આ website domain Firebase Auth માં allow નથી. Firebase Console > Authentication > Settings > Authorized domains માં domain add કરો.',
+          'auth/unauthorized-domain': `આ website domain Firebase Auth માં allow નથી. Firebase Console > Authentication > Settings > Authorized domains માં "${window.location.hostname}" add કરો.`,
           'auth/operation-not-allowed': 'Google Sign-in Firebase Console માં enable નથી. Authentication > Sign-in method માં Google enable કરો.',
         };
 
