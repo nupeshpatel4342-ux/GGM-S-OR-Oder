@@ -14,6 +14,7 @@ export interface Product {
   mrp?: number;
   unit: string;
   image?: string;
+  gujaratiName?: string;
 }
 
 export interface CartItem extends Product {

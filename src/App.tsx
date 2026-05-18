@@ -434,12 +434,13 @@ export default function App() {
   };
 
   const updateCartQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
+    setCart(prev => prev.flatMap(item => {
+      if (item.id !== id) return item;
+
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) return [];
+
+      return { ...item, quantity: newQty };
     }));
   };
 
@@ -878,14 +879,14 @@ export default function App() {
         {/* View Content */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={isAdminView ? 'admin' : location.pathname}
+            key={isAdminView ? 'admin' : 'customer'}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
             {isAdminView ? renderAdminContent() : (
-              <Routes location={location}>
+              <Routes>
                 <Route path="*" element={
               <div className="space-y-8 pb-32 lg:pb-12">
                 {/* Search Header - Sticky */}
