@@ -447,6 +447,7 @@ export default function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     return localStorage.getItem('isAdminUnlocked') === 'true';
   });
+  const canAccessAdminPanel = isUserAdmin || isAdminUnlocked;
 
   const handleAdminUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,9 +466,12 @@ export default function App() {
     navigate('/');
   };
 
+  const openAdminPanel = () => navigate('/admin');
+  const openCustomerPanel = () => navigate('/');
+
   const renderAdminContent = () => (
     <div className="space-y-6">
-      {!isAdminUnlocked && !isUserAdmin ? (
+      {!canAccessAdminPanel ? (
         <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
           <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
             <LayoutDashboard className="w-10 h-10 text-primary-green -rotate-3" />
@@ -831,9 +835,9 @@ export default function App() {
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 if (isAdminView) {
-                  navigate('/');
+                  openCustomerPanel();
                 } else {
-                  navigate('/admin');
+                  openAdminPanel();
                 }
               }}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
@@ -849,7 +853,7 @@ export default function App() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/admin')}
+                onClick={openAdminPanel}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
               >
                 <Lock className="w-4 h-4" />
@@ -882,8 +886,6 @@ export default function App() {
           >
             {isAdminView ? renderAdminContent() : (
               <Routes location={location}>
-                <Route path="/admin" element={renderAdminContent()} />
-                <Route path="/admin/" element={renderAdminContent()} />
                 <Route path="*" element={
               <div className="space-y-8 pb-32 lg:pb-12">
                 {/* Search Header - Sticky */}
@@ -1738,4 +1740,3 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ cart, total }) => {
     </div>
   );
 }
-
