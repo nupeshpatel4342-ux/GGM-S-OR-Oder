@@ -132,8 +132,7 @@ export default function App() {
     return localStorage.getItem('qrValue') || window.location.origin + '/';
   });
 
-  const [isAdminModeToggled, setIsAdminModeToggled] = useState(false);
-  const isAdminView = isAdminModeToggled || location.pathname.startsWith('/admin');
+  const isAdminView = location.pathname.startsWith('/admin');
 
   // Auth Sync
   useEffect(() => {
@@ -468,7 +467,7 @@ export default function App() {
 
   const renderAdminContent = () => (
     <div className="space-y-6">
-      {!isAdminUnlocked ? (
+      {!isAdminUnlocked && !isUserAdmin ? (
         <div className="flex flex-col items-center justify-center py-24 bento-card bg-white/50 backdrop-blur-sm border-dashed">
           <div className="w-24 h-24 bg-emerald-50 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
             <LayoutDashboard className="w-10 h-10 text-primary-green -rotate-3" />
@@ -811,10 +810,7 @@ export default function App() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => {
-              navigate('/');
-              setIsAdminModeToggled(false);
-            }}
+            onClick={() => navigate('/')}
           >
             <div className="w-12 h-12 bg-primary-green rounded-2xl flex items-center justify-center shadow-lg shadow-primary-green/20">
               <ShoppingCart className="w-7 h-7 text-white" />
@@ -833,7 +829,13 @@ export default function App() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsAdminModeToggled(!isAdminModeToggled)}
+              onClick={() => {
+                if (isAdminView) {
+                  navigate('/');
+                } else {
+                  navigate('/admin');
+                }
+              }}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
                 ${isAdminView 
                   ? 'bg-white text-emerald-600 border-emerald-600' 
@@ -847,10 +849,7 @@ export default function App() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  navigate('/admin');
-                  setIsAdminModeToggled(true);
-                }}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
               >
                 <Lock className="w-4 h-4" />
