@@ -4,25 +4,11 @@
  */
 
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
-import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogOut, Heart, Lock } from 'lucide-react';
+import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogOut, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { CategoryItem, Product, CartItem, CustomerDetails } from './types.ts';
-import { db, auth } from './firebase';
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  setDoc,
-  query,
-  orderBy,
-  serverTimestamp
-} from 'firebase/firestore';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app';
 import { useCallback } from 'react';
 
 enum OperationType {
@@ -34,29 +20,13 @@ enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
+function handleLocalDataError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo = {
     error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-    },
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  console.error('Local Data Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -109,18 +79,11 @@ const DEFAULT_CATEGORIES = [
   { name: 'PAPAD & WAFERS', gujaratiName: 'પાપડ અને વેફર્સ', image: 'https://images.unsplash.com/photo-1606491956689-2ea8c5119c85?auto=format&fit=crop&q=60&w=400' }
 ];
 
-// Admin Configuration
-const ADMIN_EMAIL = 'nupeshpatel4342@gmail.com';
-const NORMALIZED_ADMIN_EMAIL = ADMIN_EMAIL.toLowerCase().trim();
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState(auth.currentUser);
-  const isUserAdmin = useMemo(() => {
-    const email = user?.email?.toLowerCase().trim();
-    return email === NORMALIZED_ADMIN_EMAIL;
-  }, [user]);
+  const isUserAdmin = true;
 
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
   const [products, setProducts] = useState<Product[]>([]);
@@ -136,10 +99,6 @@ export default function App() {
 
   const isAdminView = location.pathname.startsWith('/admin');
 
-  // Auth Sync
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => setUser(u));
-  }, []);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -152,12 +111,17 @@ export default function App() {
       const cleanCat = Object.fromEntries(
         Object.entries(cat).filter(([, v]) => v !== undefined)
       );
-      await setDoc(doc(db, 'categories', id), {
-        ...cleanCat,
-        createdAt: serverTimestamp()
-      }, { merge: true });
+      setCategoryItems(prev => {
+        const existingIndex = prev.findIndex(item => item.id === id);
+        const next = [...prev];
+        const payload = { ...cleanCat, id } as CategoryItem;
+        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], ...payload };
+        else next.push(payload);
+        localStorage.setItem('categories', JSON.stringify(next));
+        return next;
+      });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleLocalDataError(error, OperationType.CREATE, path);
     }
   };
 
@@ -206,78 +170,44 @@ export default function App() {
     }
   }, [isUserAdmin, categoryItems, seedCategories]);
 
-  // Firebase Real-time Sync
+  // Local data sync
   useEffect(() => {
-    const productsPath = 'products';
-    const unsubscribeProducts = onSnapshot(
-      query(collection(db, productsPath), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, productsPath)
-    );
+    const storedProducts = localStorage.getItem('products');
+    const storedCategories = localStorage.getItem('categories');
+    const storedSettings = localStorage.getItem('settings');
 
-    const categoriesPath = 'categories';
-    const unsubscribeCategories = onSnapshot(
-      collection(db, categoriesPath),
-      (snapshot) => {
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CategoryItem));
-        // Sort by order if available
+    if (storedProducts) setProducts(JSON.parse(storedProducts));
+    if (storedCategories) {
+      const items = JSON.parse(storedCategories) as CategoryItem[];
+      items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      setCategoryItems(items);
+    }
+    if (storedSettings) {
+      const data = JSON.parse(storedSettings);
+      if (data.customCategories) setCustomCategories(data.customCategories);
+      if (data.customUnits) setCustomUnits(data.customUnits);
+      if (data.qrValue) setQrValue(data.qrValue);
+    }
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'products' && event.newValue) setProducts(JSON.parse(event.newValue));
+      if (event.key === 'categories' && event.newValue) {
+        const items = JSON.parse(event.newValue) as CategoryItem[];
         items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setCategoryItems(items);
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, categoriesPath)
-    );
-
-    const settingsPath = 'settings/global';
-    const unsubscribeSettings = onSnapshot(
-      doc(db, settingsPath),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          if (data.customCategories) setCustomCategories(data.customCategories);
-          if (data.customUnits) setCustomUnits(data.customUnits);
-          if (data.qrValue) setQrValue(data.qrValue);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, settingsPath)
-    );
-
-    return () => {
-      unsubscribeProducts();
-      unsubscribeCategories();
-      unsubscribeSettings();
+      }
+      if (event.key === 'settings' && event.newValue) {
+        const data = JSON.parse(event.newValue);
+        if (data.customCategories) setCustomCategories(data.customCategories);
+        if (data.customUnits) setCustomUnits(data.customUnits);
+        if (data.qrValue) setQrValue(data.qrValue);
+      }
     };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const login = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user.email?.toLowerCase().trim();
-      if (email !== NORMALIZED_ADMIN_EMAIL) {
-        alert(`Access Denied: ${result.user.email} is not authorized.`);
-        await signOut(auth);
-      }
-    } catch (error: unknown) {
-      console.error("Login Error:", error);
-      if (error instanceof FirebaseError) {
-        const messageByCode: Record<string, string> = {
-          'auth/popup-closed-by-user': 'Login popup બંધ થઇ ગયો. ફરીથી Google sign-in કરો.',
-          'auth/popup-blocked': 'Browser popup block કરતો હોઈ શકે. Popup allow કરીને ફરી પ્રયાસ કરો.',
-          'auth/network-request-failed': 'Internet connection issue છે. Network check કરીને ફરી પ્રયાસ કરો.',
-          'auth/unauthorized-domain': `આ website domain Firebase Auth માં allow નથી. Firebase Console > Authentication > Settings > Authorized domains માં "${window.location.hostname}" add કરો.`,
-          'auth/operation-not-allowed': 'Google Sign-in Firebase Console માં enable નથી. Authentication > Sign-in method માં Google enable કરો.',
-        };
-
-        alert(messageByCode[error.code] || `Login failed: ${error.message}`);
-      } else {
-        alert('Login failed. Please check your connection and try again.');
-      }
-    }
-  };
-
-  const logout = () => signOut(auth);
 
   const allCategories = useMemo(() => {
     const fromItems = categoryItems.map(c => c.name);
@@ -328,12 +258,10 @@ export default function App() {
       const cleanProduct = Object.fromEntries(
         Object.entries(product).filter(([, v]) => v !== undefined)
       );
-      await addDoc(collection(db, path), {
-        ...cleanProduct,
-        createdAt: serverTimestamp()
-      });
+      const newProduct: Product = { ...cleanProduct as Omit<Product, 'id'>, id: Date.now().toString() };
+      setProducts(prev => { const next = [newProduct, ...prev]; localStorage.setItem('products', JSON.stringify(next)); return next; });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleLocalDataError(error, OperationType.CREATE, path);
     }
   };
 
@@ -343,22 +271,19 @@ export default function App() {
       const cleanProduct = Object.fromEntries(
         Object.entries(product).filter(([, v]) => v !== undefined)
       );
-      await setDoc(doc(db, 'products', id), {
-        ...cleanProduct,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      setProducts(prev => { const next = prev.map(item => item.id === id ? { ...item, ...cleanProduct } as Product : item); localStorage.setItem('products', JSON.stringify(next)); return next; });
       setEditingProduct(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, path);
+      handleLocalDataError(error, OperationType.UPDATE, path);
     }
   };
 
   const deleteProduct = async (id: string) => {
     const path = `products/${id}`;
     try {
-      await deleteDoc(doc(db, 'products', id));
+      setProducts(prev => { const next = prev.filter(item => item.id !== id); localStorage.setItem('products', JSON.stringify(next)); return next; });
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
+      handleLocalDataError(error, OperationType.DELETE, path);
     }
   };
 
@@ -369,37 +294,26 @@ export default function App() {
       const cleanCat = Object.fromEntries(
         Object.entries(cat).filter(([, v]) => v !== undefined)
       );
-      await setDoc(doc(db, 'categories', id), {
-        ...cleanCat,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      setCategoryItems(prev => { const next = prev.map(item => item.id === id ? { ...item, ...cleanCat } as CategoryItem : item); localStorage.setItem('categories', JSON.stringify(next)); return next; });
       setEditingCategory(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, path);
+      handleLocalDataError(error, OperationType.UPDATE, path);
     }
   };
 
   const deleteCategory = async (id: string) => {
     const path = `categories/${id}`;
     try {
-      await deleteDoc(doc(db, 'categories', id));
+      setCategoryItems(prev => { const next = prev.filter(item => item.id !== id); localStorage.setItem('categories', JSON.stringify(next)); return next; });
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
+      handleLocalDataError(error, OperationType.DELETE, path);
     }
   };
 
-  const updateQrValue = async (val: string) => {
+  const updateQrValue = (val: string) => {
     setQrValue(val);
-    const path = 'settings/global';
-    try {
-      await setDoc(doc(db, path), { 
-        qrValue: val,
-        customCategories,
-        customUnits
-      }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+    const settings = { qrValue: val, customCategories, customUnits };
+    localStorage.setItem('settings', JSON.stringify(settings));
   };
 
   const updateCustomCategories = async (cats: string[]) => {
@@ -410,12 +324,7 @@ export default function App() {
     }
     setCustomCategories(prev => {
       const newCats = Array.from(new Set([...prev, ...cats]));
-      const path = 'settings/global';
-      setDoc(doc(db, path), { 
-        customCategories: newCats,
-        customUnits,
-        qrValue
-      }, { merge: true }).catch(error => handleFirestoreError(error, OperationType.WRITE, path));
+      localStorage.setItem('settings', JSON.stringify({ customCategories: newCats, customUnits, qrValue }));
       return newCats;
     });
   };
@@ -423,12 +332,7 @@ export default function App() {
   const updateCustomUnits = async (u: string[]) => {
     setCustomUnits(prev => {
       const newUnits = Array.from(new Set([...prev, ...u]));
-      const path = 'settings/global';
-      setDoc(doc(db, path), { 
-        customUnits: newUnits,
-        customCategories,
-        qrValue
-      }, { merge: true }).catch(error => handleFirestoreError(error, OperationType.WRITE, path));
+      localStorage.setItem('settings', JSON.stringify({ customUnits: newUnits, customCategories, qrValue }));
       return newUnits;
     });
   };
@@ -462,7 +366,7 @@ export default function App() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
     return localStorage.getItem('isAdminUnlocked') === 'true';
   });
-  const canAccessAdminPanel = isUserAdmin || isAdminUnlocked;
+  const canAccessAdminPanel = true;
 
   const handleAdminUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -481,7 +385,6 @@ export default function App() {
     navigate('/');
   };
 
-  const openAdminPanel = () => navigate('/admin');
   const openCustomerPanel = () => navigate('/');
 
   const renderAdminContent = () => (
@@ -524,28 +427,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {!isUserAdmin && isAdminUnlocked && (
-            <div className="bg-amber-50 border-2 border-amber-200 p-6 rounded-[32px] flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 shadow-sm border-dashed">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-                  <User className="w-6 h-6 text-amber-500" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">Admin Authentication</h4>
-                  <p className="text-xs text-slate-500 font-medium">To sync your data securely, please sign in with your primary email.</p>
-                </div>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={login}
-                className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xl whitespace-nowrap"
-              >
-                <User className="w-4 h-4 text-emerald-400" />
-                Sign in with Google
-              </motion.button>
-            </div>
-          )}
 
           <div className="flex items-center justify-between px-2 mb-2 gap-4">
             <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl overflow-x-auto max-w-full no-scrollbar flex-1">
@@ -568,14 +449,6 @@ export default function App() {
               <Smartphone className="w-3.5 h-3.5 inline mr-2" /> SHOP QR
             </button>
           </div>
-          {user && (
-            <button
-              onClick={logout}
-              className="px-4 py-2 text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-xl transition-all"
-            >
-              <LogOut className="w-3.5 h-3.5 inline mr-1" /> Sign Out
-            </button>
-          )}
         </div>
 
         {adminTab === 'products' ? (
@@ -845,38 +718,19 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                if (isAdminView) {
-                  openCustomerPanel();
-                } else {
-                  openAdminPanel();
-                }
-              }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
-                ${isAdminView 
-                  ? 'bg-white text-emerald-600 border-emerald-600' 
-                  : (isUserAdmin ? 'bg-emerald-600 text-white border-emerald-600' : 'hidden')}`}
-            >
-              {isAdminView ? <ShoppingCart className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
-              {isAdminView ? 'View Shop' : 'Manage Store'}
-            </motion.button>
-
-            {!isAdminView && !isUserAdmin && (
+            {isAdminView && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={openAdminPanel}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
+                onClick={openCustomerPanel}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 bg-white text-emerald-600 border-emerald-600"
               >
-                <Lock className="w-4 h-4" />
-                Admin
+                <ShoppingCart className="w-4 h-4" />
+                View Shop
               </motion.button>
             )}
 
-            {isAdminUnlocked && (
+            {isAdminView && isAdminUnlocked && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -1102,24 +956,6 @@ export default function App() {
                       <span className="text-sm font-black text-slate-900 uppercase">GGM&S Grocery</span>
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">© 2024 Wholesale & Retail</p>
-                    
-                    <div className="flex flex-col items-center gap-2 mt-4">
-                      {isAdminUnlocked ? (
-                        <button 
-                          onClick={() => navigate('/admin')}
-                          className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
-                        >
-                          Manage Shop
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => navigate('/admin')}
-                          className="text-[11px] font-black text-slate-800 hover:text-emerald-500 transition-colors uppercase tracking-[0.2em] bg-slate-100 px-6 py-2 rounded-full"
-                        >
-                          Store Manager Login
-                        </button>
-                      )}
-                    </div>
                   </div>
                 </footer>
 
