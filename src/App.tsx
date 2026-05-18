@@ -364,50 +364,25 @@ export default function App() {
 
   const [adminUsername, setAdminUsername] = useState('admin');
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminOtp, setAdminOtp] = useState('');
-  const [challengeId, setChallengeId] = useState<string | null>(null);
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => Boolean(localStorage.getItem('adminToken')));
-  const adminToken = localStorage.getItem('adminToken');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => Boolean(localStorage.getItem('adminSession')));
   const canAccessAdminPanel = isAdminUnlocked;
-
-  const isStrongPassword = (password: string) => password.length >= 12 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
 
   const handleAdminUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isStrongPassword(adminPassword)) {
-      alert('Password policy: min 12 chars with uppercase, lowercase, number, and symbol.');
-      return;
-    }
     try {
       const res = await fetch('/api/auth/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: adminUsername, password: adminPassword }) });
       if (!res.ok) throw new Error('Invalid username/password');
-      const data = await res.json();
-      setChallengeId(data.challengeId);
-      alert('Password verified. Enter Authenticator OTP to complete login.');
+      localStorage.setItem('adminSession', 'unlocked');
+      setIsAdminUnlocked(true);
+      setAdminPassword('');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Login failed');
     }
   };
 
-  const handleOtpVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/auth/admin/otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId, otp: adminOtp }) });
-      if (!res.ok) throw new Error('Invalid OTP');
-      const data = await res.json();
-      localStorage.setItem('adminToken', data.token);
-      setIsAdminUnlocked(true);
-      setAdminPassword('');
-      setAdminOtp('');
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'OTP verification failed');
-    }
-  };
-
   const handleAdminLock = () => {
     setIsAdminUnlocked(false);
-    localStorage.removeItem('adminToken');
-    setChallengeId(null);
+    localStorage.removeItem('adminSession');
     navigate('/');
   };
 
@@ -422,16 +397,16 @@ export default function App() {
           </div>
           <h2 className="text-3xl font-black text-slate-950 mb-3 tracking-tight">Admin Access</h2>
           <p className="text-slate-500 mb-10 max-w-xs text-center font-medium leading-relaxed">
-            Enter your store manager password to access inventory and categories.
+            Enter admin username and password to access inventory and categories.
           </p>
           
-          <form onSubmit={challengeId ? handleOtpVerify : handleAdminUnlock} className="flex flex-col gap-4 w-full max-w-xs">
+          <form onSubmit={handleAdminUnlock} className="flex flex-col gap-4 w-full max-w-xs">
             <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} placeholder="Admin Username" className="w-full bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 text-center text-sm font-bold focus:border-primary-green focus:ring-0 transition-all outline-hidden" />
             <input
-              type={challengeId ? 'text' : 'password'}
-              value={challengeId ? adminOtp : adminPassword}
-              onChange={(e) => challengeId ? setAdminOtp(e.target.value) : setAdminPassword(e.target.value)}
-              placeholder="Strong Password"
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              placeholder="Admin Password"
               className="w-full bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 text-center text-xl font-bold tracking-[0.5em] focus:border-primary-green focus:ring-0 transition-all outline-hidden"
               autoFocus
             />
@@ -441,7 +416,7 @@ export default function App() {
               type="submit"
               className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl"
             >
-              {challengeId ? 'Verify OTP' : 'Continue'}
+              Continue
             </motion.button>
             <button
               type="button"
@@ -682,7 +657,7 @@ export default function App() {
             </div>
           </div>
         ) : adminTab === 'orders' || adminTab === 'settings' || adminTab === 'reports' ? (
-          <div className="bento-card p-12 text-center max-w-2xl mx-auto"><h3 className="text-2xl font-extrabold mb-2">{adminTab.toUpperCase()}</h3><p className="text-slate-500">This admin module is protected by password + OTP and backend auth middleware.</p></div>
+          <div className="bento-card p-12 text-center max-w-2xl mx-auto"><h3 className="text-2xl font-extrabold mb-2">{adminTab.toUpperCase()}</h3><p className="text-slate-500">This admin module is protected by username/password authentication.</p></div>
         ) : (
           <div className="bento-card p-12 text-center max-w-2xl mx-auto">
             <div className="mb-8">
