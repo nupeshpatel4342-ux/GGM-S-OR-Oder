@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
-import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogOut, Heart, CloudOff, Lock } from 'lucide-react';
+import { ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Image as ImageIcon, LogOut, Heart, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
@@ -21,7 +21,7 @@ import {
   orderBy,
   serverTimestamp
 } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { useCallback } from 'react';
 
 enum OperationType {
@@ -251,35 +251,16 @@ export default function App() {
 
   const login = async () => {
     try {
-      console.log("Starting login process...");
       const provider = new GoogleAuthProvider();
-      // Using popup for better compatibility in this environment
       const result = await signInWithPopup(auth, provider);
-      console.log("Login successful:", result.user.email);
-      
       const email = result.user.email?.toLowerCase().trim();
-      
-      if (email === ADMIN_EMAIL) {
-        console.log("User identified as Admin");
-        // No need to navigate, the UI will update via state
-      } else {
-        console.warn("Unauthorized login attempted:", email);
-        alert(`Access Denied: ${result.user.email} is not authorized as an admin. Please use the correct account.`);
+      if (email !== ADMIN_EMAIL) {
+        alert(`Access Denied: ${result.user.email} is not authorized.`);
+        await signOut(auth);
       }
     } catch (error: unknown) {
-      console.error("Full Login Error Object:", error);
-      const authError = error as { code?: string; message?: string };
-      let message = "Login failed.";
-      if (authError.code === 'auth/popup-blocked') {
-        message = "Popup was blocked by your browser. Please allow popups for this site.";
-      } else if (authError.code === 'auth/operation-not-allowed') {
-        message = "Google Sign-In is not enabled in the Firebase Console. Please ask the project owner to enable it.";
-      } else if (authError.code === 'auth/unauthorized-domain') {
-        message = `Domain ${window.location.hostname} is not authorized in Firebase Console. Please add it to "Authorized Domains" in the Authentication -> Settings tab of your Firebase project.`;
-      } else if (authError.message) {
-        message = `Login failed: ${authError.message}`;
-      }
-      alert(message);
+      console.error("Login Error:", error);
+      alert("Login failed. Please check your connection and try again.");
     }
   };
 
@@ -525,44 +506,26 @@ export default function App() {
         </div>
       ) : (
         <>
-          {isAdminUnlocked && (!user || !isUserAdmin) && (
-            <div className="bg-amber-50 border-2 border-amber-200 p-4 sm:p-6 rounded-[32px] flex flex-col sm:flex-row items-center justify-between gap-4 mb-2 shadow-sm border-dashed">
-              <div className="flex items-center gap-4 text-center sm:text-left">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                  <CloudOff className="w-6 h-6 text-amber-500" />
+          {!isUserAdmin && isAdminUnlocked && (
+            <div className="bg-amber-50 border-2 border-amber-200 p-6 rounded-[32px] flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 shadow-sm border-dashed">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                  <User className="w-6 h-6 text-amber-500" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900 text-sm">Persistence Login Required</h4>
-                  <p className="text-xs text-slate-500 font-medium max-w-xs">
-                    {user ? (
-                      <>Logged in as <span className="font-bold">{user.email}</span> but not authorized. Use the correct admin account.</>
-                    ) : (
-                      <>You've unlocked the UI, but to <span className="font-bold text-slate-900">save changes</span>, please sign in with your Admin account.</>
-                    )}
-                  </p>
-                  {user && (
-                    <div className="mt-1 text-[10px] text-slate-400 font-mono">
-                      UID: {user.uid}
-                    </div>
-                  )}
+                  <h4 className="font-bold text-slate-900 text-sm">Admin Authentication</h4>
+                  <p className="text-xs text-slate-500 font-medium">To sync your data securely, please sign in with your primary email.</p>
                 </div>
               </div>
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={login}
-                  className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl whitespace-nowrap"
-                >
-                  <User className="w-4 h-4 text-emerald-400" />
-                  {user ? 'Switch Account' : 'Sign in with Google'}
-                </motion.button>
-                {user && (
-                  <button onClick={() => signOut(auth)} className="text-[10px] font-bold text-slate-400 hover:text-red-500 underline">
-                    Sign Out
-                  </button>
-                )}
-              </div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={login}
+                className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 shadow-xl whitespace-nowrap"
+              >
+                <User className="w-4 h-4 text-emerald-400" />
+                Sign in with Google
+              </motion.button>
             </div>
           )}
 
@@ -592,7 +555,7 @@ export default function App() {
               onClick={logout}
               className="px-4 py-2 text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 rounded-xl transition-all"
             >
-              Sign Out
+              <LogOut className="w-3.5 h-3.5 inline mr-1" /> Sign Out
             </button>
           )}
         </div>
@@ -867,46 +830,44 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {isUserAdmin && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsAdminModeToggled(!isAdminModeToggled)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
+                ${isAdminView 
+                  ? 'bg-white text-emerald-600 border-emerald-600' 
+                  : (isUserAdmin ? 'bg-emerald-600 text-white border-emerald-600' : 'hidden')}`}
+            >
+              {isAdminView ? <ShoppingCart className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
+              {isAdminView ? 'View Shop' : 'Manage Store'}
+            </motion.button>
+
+            {!isAdminView && !isUserAdmin && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setIsAdminModeToggled(!isAdminModeToggled)}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-black shadow-lg transition-all border-2 
-                  ${isAdminView 
-                    ? 'bg-white text-emerald-600 border-emerald-600' 
-                    : 'bg-emerald-600 text-white border-emerald-600'}`}
+                onClick={() => {
+                  navigate('/admin');
+                  setIsAdminModeToggled(true);
+                }}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
               >
-                {isAdminView ? <ShoppingCart className="w-4 h-4" /> : <LayoutDashboard className="w-4 h-4" />}
-                {isAdminView ? 'View Shop' : 'Manage Store'}
+                <Lock className="w-4 h-4" />
+                Admin
               </motion.button>
             )}
 
-            {!isAdminView && (
-              isAdminUnlocked ? (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleAdminLock}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-950 text-white border-slate-950"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Lock Admin
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    navigate('/admin');
-                    setIsAdminModeToggled(true);
-                  }}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
-                >
-                  <Lock className="w-4 h-4" />
-                  Admin
-                </motion.button>
-              )
+            {isAdminUnlocked && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleAdminLock}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg transition-all border-2 bg-slate-950 text-white border-slate-950"
+              >
+                <LogOut className="w-4 h-4" />
+                {isAdminView ? 'Logout' : 'Lock'}
+              </motion.button>
             )}
           </div>
         </header>
