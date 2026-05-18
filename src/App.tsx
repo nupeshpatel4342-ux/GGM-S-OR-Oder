@@ -22,6 +22,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { useCallback } from 'react';
 
 enum OperationType {
@@ -110,6 +111,7 @@ const DEFAULT_CATEGORIES = [
 
 // Admin Configuration
 const ADMIN_EMAIL = 'nupeshpatel4342@gmail.com';
+const NORMALIZED_ADMIN_EMAIL = ADMIN_EMAIL.toLowerCase().trim();
 
 export default function App() {
   const navigate = useNavigate();
@@ -117,7 +119,7 @@ export default function App() {
   const [user, setUser] = useState(auth.currentUser);
   const isUserAdmin = useMemo(() => {
     const email = user?.email?.toLowerCase().trim();
-    return email === ADMIN_EMAIL;
+    return email === NORMALIZED_ADMIN_EMAIL;
   }, [user]);
 
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'qr'>('products');
@@ -253,13 +255,25 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email?.toLowerCase().trim();
-      if (email !== ADMIN_EMAIL) {
+      if (email !== NORMALIZED_ADMIN_EMAIL) {
         alert(`Access Denied: ${result.user.email} is not authorized.`);
         await signOut(auth);
       }
     } catch (error: unknown) {
       console.error("Login Error:", error);
-      alert("Login failed. Please check your connection and try again.");
+      if (error instanceof FirebaseError) {
+        const messageByCode: Record<string, string> = {
+          'auth/popup-closed-by-user': 'Login popup બંધ થઇ ગયો. ફરીથી Google sign-in કરો.',
+          'auth/popup-blocked': 'Browser popup block કરતો હોઈ શકે. Popup allow કરીને ફરી પ્રયાસ કરો.',
+          'auth/network-request-failed': 'Internet connection issue છે. Network check કરીને ફરી પ્રયાસ કરો.',
+          'auth/unauthorized-domain': 'આ website domain Firebase Auth માં allow નથી. Firebase Console > Authentication > Settings > Authorized domains માં domain add કરો.',
+          'auth/operation-not-allowed': 'Google Sign-in Firebase Console માં enable નથી. Authentication > Sign-in method માં Google enable કરો.',
+        };
+
+        alert(messageByCode[error.code] || `Login failed: ${error.message}`);
+      } else {
+        alert('Login failed. Please check your connection and try again.');
+      }
     }
   };
 
