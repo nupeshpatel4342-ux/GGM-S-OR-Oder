@@ -53,6 +53,16 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.post("/api/auth/admin/login", (req, res) => {
+    const { username, password } = req.body || {};
+    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    const token = crypto.randomUUID();
+    sessions.set(token, { expiresAt: Date.now() + SESSION_TTL_MS });
+    return res.json({ token, expiresInMs: SESSION_TTL_MS });
+  });
+
   app.post("/api/auth/admin/password", (req, res) => {
     const { username, password } = req.body || {};
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
@@ -65,6 +75,7 @@ async function startServer() {
     pendingChallenges.set(challengeId, { expiresAt: Date.now() + 5 * 60 * 1000 });
     return res.json({ challengeId, requires2FA: true });
   });
+
 
   app.post("/api/auth/admin/otp", (req, res) => {
     const { challengeId, otp } = req.body || {};

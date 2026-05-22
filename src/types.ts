@@ -26,3 +26,15 @@ export interface CustomerDetails {
   phone: string;
   address: string;
 }
+
+export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
+
+export interface Order {
+  id: string;
+  items: CartItem[];
+  customer: CustomerDetails;
+  total: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+

@@ -29,3 +29,52 @@
   @apply text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full;
 }
 
+.admin-sidebar-btn {
+  @apply flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200 w-full text-left;
+}
+.admin-sidebar-btn.active {
+  @apply bg-emerald-50 text-emerald-700 shadow-sm;
+}
+.admin-sidebar-btn:not(.active) {
+  @apply text-slate-500 hover:bg-slate-50 hover:text-slate-700;
+}
+
+.admin-stat-card {
+  @apply bg-white border border-border-slate rounded-2xl p-5 flex flex-col gap-1 transition-all hover:shadow-md;
+}
+
+.admin-table th {
+  @apply text-[10px] font-black text-slate-400 uppercase tracking-widest px-5 py-3 text-left bg-slate-50/80;
+}
+.admin-table td {
+  @apply px-5 py-4 text-sm;
+}
+.admin-table tr {
+  @apply border-b border-slate-100 hover:bg-slate-50/50 transition-colors;
+}
+
+.status-badge {
+  @apply text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full;
+}
+.status-pending {
+  @apply bg-amber-100 text-amber-700;
+}
+.status-processing {
+  @apply bg-blue-100 text-blue-700;
+}
+.status-delivered {
+  @apply bg-emerald-100 text-emerald-700;
+}
+.status-cancelled {
+  @apply bg-red-100 text-red-700;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
