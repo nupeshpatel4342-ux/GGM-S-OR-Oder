@@ -1367,7 +1367,13 @@ export default function App() {
                 <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
                   <div className="flex flex-col gap-3 sm:gap-4">
                     <div className="flex justify-between items-baseline px-2">
-                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Our Aisles & Products</h2>
+                      <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+                        <span className="relative inline-block">
+                          <span className="absolute -inset-1 rounded-lg bg-emerald-100/60 -skew-y-2"></span>
+                          <span className="relative text-emerald-700 font-black px-1.5">GGM&S</span>
+                        </span>
+                        <span className="text-slate-900 ml-2">Grocery Store</span>
+                      </h2>
                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Fast WhatsApp Delivery</span>
                     </div>
                     <div className="relative group">
