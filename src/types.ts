@@ -38,3 +38,12 @@ export interface Order {
   createdAt: string;
 }
 
+export interface Banner {
+  id: string;
+  imageUrl: string;
+  title?: string;
+  linkUrl?: string;
+  isActive: boolean;
+  order?: number;
+}
+

@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus } from './types.ts';
+import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner } from './types.ts';
 
 enum OperationType {
   CREATE = 'create',
@@ -34,6 +34,48 @@ function handleLocalDataError(error: unknown, operationType: OperationType, path
   };
   console.error('Local Data Error: ', JSON.stringify(errInfo));
 }
+
+const compressImage = (
+  file: File,
+  maxWidth: number,
+  maxHeight: number,
+  quality: number,
+  callback: (base64: string) => void
+) => {
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const img = new Image();
+    img.src = reader.result as string;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        callback(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        callback(reader.result as string);
+      }
+    };
+  };
+  reader.readAsDataURL(file);
+};
 
 const DEFAULT_CATEGORIES = [
   { name: 'KARIYANU', gujaratiName: 'કરિયાણું', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=60&w=400' },
@@ -183,11 +225,48 @@ export default function App() {
     return localStorage.getItem('qrValue') || window.location.origin + '/';
   });
 
+  const [banners, setBanners] = useState<Banner[]>(() => {
+    const stored = localStorage.getItem('banners');
+    if (stored) {
+      return JSON.parse(stored);
+    } else {
+      const defaultBanners = [
+        {
+          id: 'default-1',
+          imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1200&h=400',
+          title: 'Premium Grocery / પ્રીમિયમ કરિયાણું',
+          linkUrl: '',
+          isActive: true,
+          order: 0
+        },
+        {
+          id: 'default-2',
+          imageUrl: 'https://images.unsplash.com/photo-1573244514399-904ec1120a14?auto=format&fit=crop&q=80&w=1200&h=400',
+          title: 'Fresh Vegetables / તાજા શાકભાજી',
+          linkUrl: '',
+          isActive: true,
+          order: 1
+        },
+        {
+          id: 'default-3',
+          imageUrl: 'https://images.unsplash.com/photo-1596591606975-97ee5cef3a1e?auto=format&fit=crop&q=80&w=1200&h=400',
+          title: 'Dry Fruits / ડ્રાય ફ્રૂટ્સ',
+          linkUrl: '',
+          isActive: true,
+          order: 2
+        }
+      ];
+      localStorage.setItem('banners', JSON.stringify(defaultBanners));
+      return defaultBanners;
+    }
+  });
+
   // Admin tab navigation state
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners'>('dashboard');
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
   // Admin Auth state
@@ -362,6 +441,49 @@ export default function App() {
     }
   };
 
+  const addBanner = async (banner: Omit<Banner, 'id'>) => {
+    try {
+      const newBanner: Banner = { 
+        ...banner, 
+        id: Date.now().toString(),
+        order: banners.length
+      };
+      setBanners(prev => {
+        const next = [...prev, newBanner];
+        localStorage.setItem('banners', JSON.stringify(next));
+        return next;
+      });
+    } catch (error) {
+      handleLocalDataError(error, OperationType.CREATE, 'banners');
+    }
+  };
+
+  const updateBanner = async (id: string, banner: Omit<Banner, 'id'>) => {
+    try {
+      setBanners(prev => {
+        const next = prev.map(item => item.id === id ? { ...item, ...banner } as Banner : item);
+        localStorage.setItem('banners', JSON.stringify(next));
+        return next;
+      });
+      setEditingBanner(null);
+    } catch (error) {
+      handleLocalDataError(error, OperationType.UPDATE, `banners/${id}`);
+    }
+  };
+
+  const deleteBanner = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this banner?')) return;
+    try {
+      setBanners(prev => {
+        const next = prev.filter(item => item.id !== id);
+        localStorage.setItem('banners', JSON.stringify(next));
+        return next;
+      });
+    } catch (error) {
+      handleLocalDataError(error, OperationType.DELETE, `banners/${id}`);
+    }
+  };
+
   const updateQrValue = (val: string) => {
     setQrValue(val);
     localStorage.setItem('qrValue', val);
@@ -529,6 +651,7 @@ export default function App() {
           categories: categoryItems,
           orders: orders,
           shopSettings: shopSettings,
+          banners: banners,
           settings: {
             customCategories,
             customUnits,
@@ -601,6 +724,12 @@ export default function App() {
         if (data.orders && Array.isArray(data.orders)) {
           setOrders(data.orders);
           localStorage.setItem('orders', JSON.stringify(data.orders));
+        }
+
+        // Update Banners
+        if (data.banners && Array.isArray(data.banners)) {
+          setBanners(data.banners);
+          localStorage.setItem('banners', JSON.stringify(data.banners));
         }
 
         // Update Shop Settings
@@ -743,6 +872,9 @@ export default function App() {
             </button>
             <button onClick={() => setAdminTab('categories')} className={`admin-sidebar-btn ${adminTab === 'categories' ? 'active' : ''}`}>
               <LayoutDashboard className="w-4 h-4" /> CATEGORIES ({categoryItems.length})
+            </button>
+            <button onClick={() => setAdminTab('banners')} className={`admin-sidebar-btn ${adminTab === 'banners' ? 'active' : ''}`}>
+              <ImageIcon className="w-4 h-4" /> AD SLIDER BANNERS ({banners.length})
             </button>
             <button onClick={() => setAdminTab('qr')} className={`admin-sidebar-btn ${adminTab === 'qr' ? 'active' : ''}`}>
               <Smartphone className="w-4 h-4" /> COUNTER QR
@@ -1279,6 +1411,97 @@ export default function App() {
               </div>
             )}
 
+            {/* Banners Tab */}
+            {adminTab === 'banners' && (
+              <div className="grid lg:grid-cols-12 gap-8">
+                {/* Form column */}
+                <div className="lg:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6 shadow-xs h-fit">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-black text-slate-900 text-base">{editingBanner ? 'Edit Banner' : 'New Ad Banner'}</h3>
+                    {editingBanner && (
+                      <button onClick={() => setEditingBanner(null)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+
+                  <BannerForm 
+                    key={editingBanner?.id || 'new'}
+                    onAdd={addBanner} 
+                    onUpdate={(b) => editingBanner && updateBanner(editingBanner.id, b)}
+                    initialData={editingBanner || undefined}
+                    availableCategories={categories.filter(c => c !== 'All Products')}
+                  />
+                </div>
+
+                {/* Listing column */}
+                <div className="lg:col-span-8 bg-white border border-slate-200 rounded-[24px] overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-black text-slate-900 text-base">Active Ad Banners</h3>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{banners.length} Banners</span>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 overflow-y-auto no-scrollbar max-h-[600px]">
+                    {banners.length === 0 ? (
+                      <p className="text-center py-12 italic text-slate-400 text-sm">No banners created yet.</p>
+                    ) : (
+                      banners.map(b => (
+                        <div key={b.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-all gap-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-20 h-10 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                              {b.imageUrl ? (
+                                <img src={b.imageUrl} alt={b.title || 'Banner'} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-5 h-5 text-slate-300" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-slate-900 text-sm truncate">{b.title || 'No Title'}</h4>
+                              <div className="flex gap-2 items-center mt-0.5">
+                                {b.linkUrl && (
+                                  <span className="text-[8px] font-black text-primary-green uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                    Links to: {b.linkUrl}
+                                  </span>
+                                )}
+                                <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${b.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>
+                                  {b.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1.5 shrink-0 items-center">
+                            <button
+                              onClick={() => {
+                                // Toggle active status
+                                const updated = { ...b, isActive: !b.isActive };
+                                updateBanner(b.id, updated);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${b.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                            >
+                              {b.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button
+                              onClick={() => { setEditingBanner(b); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteBanner(b.id)}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </>
       )}
@@ -1390,6 +1613,14 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Banner Ad Slider - Mobile Friendly */}
+                {!selectedCategory && (
+                  <BannerSlider 
+                    banners={banners} 
+                    onSelectCategory={setSelectedCategory} 
+                  />
+                )}
 
                 {/* Categories Layout */}
                 {!selectedCategory ? (
@@ -1609,6 +1840,293 @@ export default function App() {
     </div>
   );
 }
+
+// Banner Ad Slider Sub-Component
+interface BannerSliderProps {
+  banners: Banner[];
+  onSelectCategory: (catName: string) => void;
+}
+
+const BannerSlider: React.FC<BannerSliderProps> = ({ banners, onSelectCategory }) => {
+  const activeBanners = useMemo(() => banners.filter(b => b.isActive), [banners]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Auto rotation
+  React.useEffect(() => {
+    if (activeBanners.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % activeBanners.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [activeBanners]);
+
+  // Safety guard against index out of range (e.g. if activeBanners changes size)
+  React.useEffect(() => {
+    if (currentIndex >= activeBanners.length) {
+      setCurrentIndex(0);
+    }
+  }, [activeBanners, currentIndex]);
+
+  if (activeBanners.length === 0) return null;
+
+  const currentBanner = activeBanners[currentIndex];
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(prev => (prev - 1 + activeBanners.length) % activeBanners.length);
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(prev => (prev + 1) % activeBanners.length);
+  };
+
+  const handleBannerClick = () => {
+    if (currentBanner.linkUrl) {
+      onSelectCategory(currentBanner.linkUrl);
+    }
+  };
+
+  return (
+    <div 
+      className="relative w-full bg-slate-100 rounded-3xl overflow-hidden shadow-xs group border border-slate-200/50"
+      style={{ aspectRatio: '1600/430' }}
+    >
+      <div 
+        onClick={handleBannerClick}
+        className={`w-full h-full relative ${currentBanner.linkUrl ? 'cursor-pointer' : ''}`}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentBanner.id}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.4 }}
+            className="w-full h-full absolute inset-0"
+          >
+            <img 
+              src={currentBanner.imageUrl} 
+              alt={currentBanner.title || 'Promo Banner'} 
+              className="w-full h-full object-cover"
+            />
+            {currentBanner.title && (
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 md:p-6 flex flex-col justify-end text-white">
+                <h3 className="text-sm md:text-xl font-black uppercase tracking-wide leading-tight">
+                  {currentBanner.title}
+                </h3>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Navigation Arrows */}
+      {activeBanners.length > 1 && (
+        <>
+          <button 
+            onClick={handlePrev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </>
+      )}
+
+      {/* Dots Indicator */}
+      {activeBanners.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {activeBanners.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentIndex(idx);
+              }}
+              className={`w-2 h-2 rounded-full transition-all ${currentIndex === idx ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Banner Manage/Edit Form Sub-Component
+interface BannerFormProps {
+  onAdd: (b: Omit<Banner, 'id'>) => void;
+  onUpdate?: (b: Omit<Banner, 'id'>) => void;
+  initialData?: Banner;
+  availableCategories: string[];
+}
+
+const BannerForm: React.FC<BannerFormProps> = ({ 
+  onAdd, 
+  onUpdate, 
+  initialData, 
+  availableCategories 
+}) => {
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || '');
+  const [linkUrl, setLinkUrl] = useState(initialData?.linkUrl || '');
+  const [isActive, setIsActive] = useState(initialData?.isActive ?? true);
+  const [uploadType, setUploadType] = useState<'url' | 'file'>(initialData?.imageUrl?.startsWith('data:') ? 'file' : 'url');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageUrl) {
+      alert('Please provide a banner image URL or file. / કૃપા કરીને બેનર ઈમેજ URL અથવા ફાઈલ આપો.');
+      return;
+    }
+
+    const payload = {
+      title: title || undefined,
+      imageUrl,
+      linkUrl: linkUrl || undefined,
+      isActive,
+      order: initialData?.order ?? 0
+    };
+
+    if (initialData && onUpdate) {
+      onUpdate(payload);
+    } else {
+      onAdd(payload);
+      setTitle('');
+      setImageUrl('');
+      setLinkUrl('');
+      setIsActive(true);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      compressImage(file, 1600, 430, 0.7, (compressedBase64) => {
+        setImageUrl(compressedBase64);
+      });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ad Title / Banner Text</label>
+        <input
+          type="text"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="e.g. Special Discount on Spices"
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Image Source Type</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setUploadType('url');
+              setImageUrl('');
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'url' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Image URL
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUploadType('file');
+              setImageUrl('');
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'file' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Upload File
+          </button>
+        </div>
+      </div>
+
+      {uploadType === 'url' ? (
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Banner Image URL</label>
+          <input
+            type="text"
+            value={imageUrl.startsWith('data:') ? '' : imageUrl}
+            onChange={e => setImageUrl(e.target.value)}
+            placeholder="https://images.unsplash.com/..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
+          />
+        </div>
+      ) : (
+        <div className="space-y-1.5 flex flex-col items-center">
+          <label className="relative cursor-pointer group w-full">
+            <div className="w-full h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 group-hover:border-primary-green group-hover:bg-emerald-50 transition-all overflow-hidden text-center p-2">
+              {imageUrl && imageUrl.startsWith('data:') ? (
+                <>
+                  <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <X className="text-white w-5 h-5" onClick={(e) => {
+                      e.preventDefault();
+                      setImageUrl('');
+                    }} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-6 h-6 mb-1 text-slate-400" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Choose Image File (Auto Resized / ઓટો સાઇઝ સેટ થશે)</span>
+                </>
+              )}
+            </div>
+            <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </label>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Link to Department / Category (Optional)</label>
+        <select
+          value={linkUrl}
+          onChange={e => setLinkUrl(e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden cursor-pointer"
+        >
+          <option value="">Do not link (Static Banner)</option>
+          {availableCategories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2 pl-1 py-1">
+        <input 
+          type="checkbox" 
+          id="banner-is-active"
+          checked={isActive} 
+          onChange={e => setIsActive(e.target.checked)} 
+          className="rounded text-primary-green focus:ring-primary-green cursor-pointer"
+        />
+        <label htmlFor="banner-is-active" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+          Active (Show in slider)
+        </label>
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        type="submit"
+        className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 mt-2"
+      >
+        <Plus className="w-4 h-4" /> {initialData ? 'Update Banner' : 'Create Banner'}
+      </motion.button>
+    </form>
+  );
+};
 
 // Product detail view sub-page
 interface ProductDetailPageProps {
@@ -1877,13 +2395,9 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) {
-        alert('Image too large. Please select an image under 1MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result as string);
-      reader.readAsDataURL(file);
+      compressImage(file, 600, 600, 0.7, (compressedBase64) => {
+        setImage(compressedBase64);
+      });
     }
   };
 
@@ -1985,15 +2499,9 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) {
-        alert('Image too large. Please select an image under 1MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      compressImage(file, 600, 600, 0.7, (compressedBase64) => {
+        setImage(compressedBase64);
+      });
     }
   };
 
