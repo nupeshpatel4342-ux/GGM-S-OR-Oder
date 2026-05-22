@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, ChangeEvent, FormEvent, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, ChangeEvent, FormEvent, useCallback } from 'react';
 import { 
   ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, 
   ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, 
@@ -16,6 +16,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner } from './types.ts';
+import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from './firebase.ts';
 
 enum OperationType {
   CREATE = 'create',
@@ -276,21 +278,180 @@ export default function App() {
 
   const isAdminView = location.pathname.startsWith('/admin');
 
+  // Real-time Firestore synchronization listeners
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
+      if (snapshot.empty) {
+        // Seed if empty in Firestore and we have seed/stored products
+        const saved = localStorage.getItem('products');
+        const initial: Product[] = saved ? JSON.parse(saved) : SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}` }));
+        initial.forEach((p) => {
+          setDoc(doc(db, 'products', p.id), p).catch(err => console.error("Error seeding product:", err));
+        });
+      } else {
+        const list: Product[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ ...doc.data(), id: doc.id } as Product);
+        });
+        setProducts(list);
+        localStorage.setItem('products', JSON.stringify(list));
+      }
+    }, (error) => {
+      console.error("Firestore products read error:", error);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'categories'), (snapshot) => {
+      if (snapshot.empty) {
+        // Seed if empty
+        const saved = localStorage.getItem('categories');
+        const formatted: CategoryItem[] = saved ? JSON.parse(saved) : DEFAULT_CATEGORIES.map((cat, idx) => ({
+          id: cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'),
+          name: cat.name,
+          gujaratiName: cat.gujaratiName,
+          image: cat.image,
+          order: idx
+        }));
+        formatted.forEach((cat) => {
+          setDoc(doc(db, 'categories', cat.id), cat).catch(err => console.error("Error seeding category:", err));
+        });
+      } else {
+        const list: CategoryItem[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ ...doc.data(), id: doc.id } as CategoryItem);
+        });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        setCategoryItems(list);
+        localStorage.setItem('categories', JSON.stringify(list));
+      }
+    }, (error) => {
+      console.error("Firestore categories read error:", error);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      if (snapshot.empty) {
+        // Seed if empty
+        const saved = localStorage.getItem('banners');
+        const defaultBanners: Banner[] = saved ? JSON.parse(saved) : [
+          {
+            id: 'default-1',
+            imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=1200&h=400',
+            title: 'Premium Grocery / પ્રીમિયમ કરિયાણું',
+            linkUrl: '',
+            isActive: true,
+            order: 0
+          },
+          {
+            id: 'default-2',
+            imageUrl: 'https://images.unsplash.com/photo-1573244514399-904ec1120a14?auto=format&fit=crop&q=80&w=1200&h=400',
+            title: 'Fresh Vegetables / તાજા શાકભાજી',
+            linkUrl: '',
+            isActive: true,
+            order: 1
+          },
+          {
+            id: 'default-3',
+            imageUrl: 'https://images.unsplash.com/photo-1596591606975-97ee5cef3a1e?auto=format&fit=crop&q=80&w=1200&h=400',
+            title: 'Dry Fruits / ડ્રાય ફ્રૂટ્સ',
+            linkUrl: '',
+            isActive: true,
+            order: 2
+          }
+        ];
+        defaultBanners.forEach((b) => {
+          setDoc(doc(db, 'banners', b.id), b).catch(err => console.error("Error seeding banner:", err));
+        });
+      } else {
+        const list: Banner[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ ...doc.data(), id: doc.id } as Banner);
+        });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        setBanners(list);
+        localStorage.setItem('banners', JSON.stringify(list));
+      }
+    }, (error) => {
+      console.error("Firestore banners read error:", error);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'orders'), (snapshot) => {
+      const list: Order[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as Order);
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(list);
+      localStorage.setItem('orders', JSON.stringify(list));
+    }, (error) => {
+      console.error("Firestore orders read error:", error);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.shopSettings) {
+          setShopSettings(data.shopSettings);
+          localStorage.setItem('shopSettings', JSON.stringify(data.shopSettings));
+        }
+        if (data.customCategories) {
+          setCustomCategories(data.customCategories);
+        }
+        if (data.customUnits) {
+          setCustomUnits(data.customUnits);
+        }
+        if (data.qrValue) {
+          setQrValue(data.qrValue);
+          localStorage.setItem('qrValue', data.qrValue);
+        }
+        localStorage.setItem('settings', JSON.stringify({
+          customCategories: data.customCategories || [],
+          customUnits: data.customUnits || [],
+          qrValue: data.qrValue || ''
+        }));
+      } else {
+        const savedShop = localStorage.getItem('shopSettings');
+        const shopSettingsInit = savedShop ? JSON.parse(savedShop) : {
+          shopName: 'GGM&S Grocery',
+          tagline: 'Wholesale & Retail',
+          mobile: '+91 97245 5778',
+          whatsapp: '91972455778',
+          address: '123 Market Road, Rajkot, Gujarat',
+        };
+        const savedSettings = localStorage.getItem('settings');
+        const settingsInit = savedSettings ? JSON.parse(savedSettings) : {};
+        const defaultSettings = {
+          shopSettings: shopSettingsInit,
+          customCategories: settingsInit.customCategories || [],
+          customUnits: settingsInit.customUnits || [],
+          qrValue: settingsInit.qrValue || localStorage.getItem('qrValue') || (window.location.origin + '/')
+        };
+        setDoc(doc(db, 'settings', 'global'), defaultSettings).catch(err => console.error("Error seeding settings:", err));
+      }
+    }, (error) => {
+      console.error("Firestore settings read error:", error);
+    });
+    return () => unsub();
+  }, [customCategories, customUnits, qrValue]);
+
   const addCategory = async (cat: Omit<CategoryItem, 'id'>) => {
     const id = cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
     try {
       const cleanCat = Object.fromEntries(
         Object.entries(cat).filter(([, v]) => v !== undefined)
       );
-      setCategoryItems(prev => {
-        const existingIndex = prev.findIndex(item => item.id === id);
-        const next = [...prev];
-        const payload = { ...cleanCat, id } as CategoryItem;
-        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], ...payload };
-        else next.push(payload);
-        localStorage.setItem('categories', JSON.stringify(next));
-        return next;
-      });
+      const payload = { ...cleanCat, id } as CategoryItem;
+      await setDoc(doc(db, 'categories', id), payload);
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, `categories/${id}`);
     }
@@ -372,12 +533,9 @@ export default function App() {
       const cleanProduct = Object.fromEntries(
         Object.entries(product).filter(([, v]) => v !== undefined)
       );
-      const newProduct: Product = { ...cleanProduct as Omit<Product, 'id'>, id: Date.now().toString() };
-      setProducts(prev => { 
-        const next = [newProduct, ...prev]; 
-        localStorage.setItem('products', JSON.stringify(next)); 
-        return next; 
-      });
+      const id = Date.now().toString();
+      const newProduct: Product = { ...cleanProduct as Omit<Product, 'id'>, id };
+      await setDoc(doc(db, 'products', id), newProduct);
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, 'products');
     }
@@ -388,11 +546,7 @@ export default function App() {
       const cleanProduct = Object.fromEntries(
         Object.entries(product).filter(([, v]) => v !== undefined)
       );
-      setProducts(prev => { 
-        const next = prev.map(item => item.id === id ? { ...item, ...cleanProduct } as Product : item); 
-        localStorage.setItem('products', JSON.stringify(next)); 
-        return next; 
-      });
+      await setDoc(doc(db, 'products', id), { ...cleanProduct, id }, { merge: true });
       setEditingProduct(null);
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `products/${id}`);
@@ -402,11 +556,7 @@ export default function App() {
   const deleteProduct = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      setProducts(prev => { 
-        const next = prev.filter(item => item.id !== id); 
-        localStorage.setItem('products', JSON.stringify(next)); 
-        return next; 
-      });
+      await deleteDoc(doc(db, 'products', id));
     } catch (error) {
       handleLocalDataError(error, OperationType.DELETE, `products/${id}`);
     }
@@ -417,11 +567,7 @@ export default function App() {
       const cleanCat = Object.fromEntries(
         Object.entries(cat).filter(([, v]) => v !== undefined)
       );
-      setCategoryItems(prev => { 
-        const next = prev.map(item => item.id === id ? { ...item, ...cleanCat } as CategoryItem : item); 
-        localStorage.setItem('categories', JSON.stringify(next)); 
-        return next; 
-      });
+      await setDoc(doc(db, 'categories', id), { ...cleanCat, id }, { merge: true });
       setEditingCategory(null);
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `categories/${id}`);
@@ -431,11 +577,7 @@ export default function App() {
   const deleteCategory = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
     try {
-      setCategoryItems(prev => { 
-        const next = prev.filter(item => item.id !== id); 
-        localStorage.setItem('categories', JSON.stringify(next)); 
-        return next; 
-      });
+      await deleteDoc(doc(db, 'categories', id));
     } catch (error) {
       handleLocalDataError(error, OperationType.DELETE, `categories/${id}`);
     }
@@ -443,16 +585,13 @@ export default function App() {
 
   const addBanner = async (banner: Omit<Banner, 'id'>) => {
     try {
+      const id = Date.now().toString();
       const newBanner: Banner = { 
         ...banner, 
-        id: Date.now().toString(),
+        id,
         order: banners.length
       };
-      setBanners(prev => {
-        const next = [...prev, newBanner];
-        localStorage.setItem('banners', JSON.stringify(next));
-        return next;
-      });
+      await setDoc(doc(db, 'banners', id), newBanner);
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, 'banners');
     }
@@ -460,11 +599,7 @@ export default function App() {
 
   const updateBanner = async (id: string, banner: Omit<Banner, 'id'>) => {
     try {
-      setBanners(prev => {
-        const next = prev.map(item => item.id === id ? { ...item, ...banner } as Banner : item);
-        localStorage.setItem('banners', JSON.stringify(next));
-        return next;
-      });
+      await setDoc(doc(db, 'banners', id), { ...banner, id }, { merge: true });
       setEditingBanner(null);
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `banners/${id}`);
@@ -474,21 +609,18 @@ export default function App() {
   const deleteBanner = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this banner?')) return;
     try {
-      setBanners(prev => {
-        const next = prev.filter(item => item.id !== id);
-        localStorage.setItem('banners', JSON.stringify(next));
-        return next;
-      });
+      await deleteDoc(doc(db, 'banners', id));
     } catch (error) {
       handleLocalDataError(error, OperationType.DELETE, `banners/${id}`);
     }
   };
 
-  const updateQrValue = (val: string) => {
-    setQrValue(val);
-    localStorage.setItem('qrValue', val);
-    const settings = { qrValue: val, customCategories, customUnits };
-    localStorage.setItem('settings', JSON.stringify(settings));
+  const updateQrValue = async (val: string) => {
+    try {
+      await setDoc(doc(db, 'settings', 'global'), { qrValue: val }, { merge: true });
+    } catch (error) {
+      handleLocalDataError(error, OperationType.WRITE, 'settings/global');
+    }
   };
 
   const updateCustomCategories = async (cats: string[]) => {
@@ -497,19 +629,21 @@ export default function App() {
         await addCategory({ name, gujaratiName: '', order: categoryItems.length });
       }
     }
-    setCustomCategories(prev => {
-      const newCats = Array.from(new Set([...prev, ...cats]));
-      localStorage.setItem('settings', JSON.stringify({ customCategories: newCats, customUnits, qrValue }));
-      return newCats;
-    });
+    try {
+      const newCats = Array.from(new Set([...customCategories, ...cats]));
+      await setDoc(doc(db, 'settings', 'global'), { customCategories: newCats }, { merge: true });
+    } catch (error) {
+      handleLocalDataError(error, OperationType.WRITE, 'settings/global');
+    }
   };
 
   const updateCustomUnits = async (u: string[]) => {
-    setCustomUnits(prev => {
-      const newUnits = Array.from(new Set([...prev, ...u]));
-      localStorage.setItem('settings', JSON.stringify({ customUnits: newUnits, customCategories, qrValue }));
-      return newUnits;
-    });
+    try {
+      const newUnits = Array.from(new Set([...customUnits, ...u]));
+      await setDoc(doc(db, 'settings', 'global'), { customUnits: newUnits }, { merge: true });
+    } catch (error) {
+      handleLocalDataError(error, OperationType.WRITE, 'settings/global');
+    }
   };
 
   const addToCart = (product: Product, quantity: number) => {
@@ -573,25 +707,29 @@ export default function App() {
   };
 
   // Order state functions
-  const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    const updated = orders.map(ord => ord.id === orderId ? { ...ord, status: newStatus } : ord);
-    setOrders(updated);
-    localStorage.setItem('orders', JSON.stringify(updated));
-    if (viewingOrder && viewingOrder.id === orderId) {
-      setViewingOrder({ ...viewingOrder, status: newStatus });
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      await setDoc(doc(db, 'orders', orderId), { status: newStatus }, { merge: true });
+      if (viewingOrder && viewingOrder.id === orderId) {
+        setViewingOrder({ ...viewingOrder, status: newStatus });
+      }
+    } catch (error) {
+      handleLocalDataError(error, OperationType.UPDATE, `orders/${orderId}`);
     }
   };
 
-  const handleDeleteOrder = (orderId: string) => {
+  const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Delete this order permanently?')) return;
-    const updated = orders.filter(ord => ord.id !== orderId);
-    setOrders(updated);
-    localStorage.setItem('orders', JSON.stringify(updated));
-    setViewingOrder(null);
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      setViewingOrder(null);
+    } catch (error) {
+      handleLocalDataError(error, OperationType.DELETE, `orders/${orderId}`);
+    }
   };
 
   // Place Order function linking customer checkout
-  const handleCreateOrder = (customerDetails: CustomerDetails) => {
+  const handleCreateOrder = async (customerDetails: CustomerDetails) => {
     if (cart.length === 0) return;
 
     const newOrder: Order = {
@@ -603,9 +741,11 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+    try {
+      await setDoc(doc(db, 'orders', newOrder.id), newOrder);
+    } catch (error) {
+      handleLocalDataError(error, OperationType.CREATE, 'orders');
+    }
 
     // Construct WhatsApp message
     let msg = `*📦 NEW ORDER: ${shopSettings.shopName}*\n\n`;
@@ -635,10 +775,14 @@ export default function App() {
     window.open(url, '_blank');
   };
 
-  const saveSettings = (updated: typeof shopSettings) => {
-    setShopSettings(updated);
-    localStorage.setItem('shopSettings', JSON.stringify(updated));
-    alert('Shop settings updated successfully!');
+  const saveSettings = async (updated: typeof shopSettings) => {
+    try {
+      await setDoc(doc(db, 'settings', 'global'), { shopSettings: updated }, { merge: true });
+      alert('Shop settings updated successfully!');
+    } catch (error) {
+      handleLocalDataError(error, OperationType.WRITE, 'settings/global');
+      alert('Error updating shop settings: ' + (error instanceof Error ? error.message : String(error)));
+    }
   };
 
   const handleDownloadBackup = () => {
@@ -679,7 +823,7 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    fileReader.onload = (e) => {
+    fileReader.onload = async (e) => {
       try {
         const content = e.target?.result;
         if (typeof content !== 'string') {
@@ -712,49 +856,48 @@ export default function App() {
           return;
         }
 
-        // Update Products
-        setProducts(data.products);
-        localStorage.setItem('products', JSON.stringify(data.products));
+        // Upload Products
+        for (const p of data.products) {
+          await setDoc(doc(db, 'products', p.id), p);
+        }
 
-        // Update Categories
-        setCategoryItems(data.categories);
-        localStorage.setItem('categories', JSON.stringify(data.categories));
+        // Upload Categories
+        for (const cat of data.categories) {
+          await setDoc(doc(db, 'categories', cat.id), cat);
+        }
 
-        // Update Orders
+        // Upload Orders
         if (data.orders && Array.isArray(data.orders)) {
-          setOrders(data.orders);
-          localStorage.setItem('orders', JSON.stringify(data.orders));
+          for (const ord of data.orders) {
+            await setDoc(doc(db, 'orders', ord.id), ord);
+          }
         }
 
-        // Update Banners
+        // Upload Banners
         if (data.banners && Array.isArray(data.banners)) {
-          setBanners(data.banners);
-          localStorage.setItem('banners', JSON.stringify(data.banners));
+          for (const b of data.banners) {
+            await setDoc(doc(db, 'banners', b.id), b);
+          }
         }
 
-        // Update Shop Settings
+        // Upload Shop Settings
+        const settingsPayload: any = {};
         if (data.shopSettings) {
-          setShopSettings(data.shopSettings);
-          localStorage.setItem('shopSettings', JSON.stringify(data.shopSettings));
+          settingsPayload.shopSettings = data.shopSettings;
         }
-
-        // Update Settings
         if (data.settings) {
           if (data.settings.customCategories) {
-            setCustomCategories(data.settings.customCategories);
+            settingsPayload.customCategories = data.settings.customCategories;
           }
           if (data.settings.customUnits) {
-            setCustomUnits(data.settings.customUnits);
+            settingsPayload.customUnits = data.settings.customUnits;
           }
           if (data.settings.qrValue) {
-            setQrValue(data.settings.qrValue);
-            localStorage.setItem('qrValue', data.settings.qrValue);
+            settingsPayload.qrValue = data.settings.qrValue;
           }
-          localStorage.setItem('settings', JSON.stringify({
-            customCategories: data.settings.customCategories || customCategories,
-            customUnits: data.settings.customUnits || customUnits,
-            qrValue: data.settings.qrValue || qrValue
-          }));
+        }
+        if (Object.keys(settingsPayload).length > 0) {
+          await setDoc(doc(db, 'settings', 'global'), settingsPayload, { merge: true });
         }
 
         alert(

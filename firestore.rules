@@ -1,101 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 0. Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
+    match /products/{id} {
+      allow read, write: if true;
     }
-
-    // --- Helpers ---
-    function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; } 
-    
-    function isAdmin() { 
-      return isVerified() && (
-        request.auth.token.email.lower() == 'nupeshpatel4342@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+    match /categories/{id} {
+      allow read, write: if true;
     }
-    
-    function isValidId(id) { 
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    match /banners/{id} {
+      allow read, write: if true;
     }
-    
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-
-    // --- Collections ---
-
-    // 1. Products: The core shop items
-    match /products/{productId} {
-      function isValidProduct(data) {
-        return data.keys().hasAll(['name', 'category', 'price', 'unit']) &&
-               data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-               data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
-               data.price is number && data.price >= 0 &&
-               data.unit is string && data.unit.size() > 0 && data.unit.size() <= 50 &&
-               (data.get('mrp', null) == null || data.mrp is number) &&
-               (data.get('image', null) == null || (data.image is string && data.image.size() <= 1048576)) &&
-               (data.get('gujaratiName', null) == null || (data.gujaratiName is string && data.gujaratiName.size() <= 200));
-      }
-
-      // Public can see all products
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) && 
-                    incoming().createdAt == request.time;
-
-      allow update: if isAdmin() && isValidProduct(incoming()) && 
-                    incoming().createdAt == existing().createdAt &&
-                    incoming().updatedAt == request.time;
-
-      allow delete: if isAdmin();
+    match /settings/{id} {
+      allow read, write: if true;
     }
-
-    // 2. Categories: Collection of shop categories
-    match /categories/{categoryId} {
-      function isValidCategory(data) {
-        return data.keys().hasAll(['name']) &&
-               data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-               (data.get('gujaratiName', null) == null || (data.gujaratiName is string && data.gujaratiName.size() <= 200)) &&
-               (data.get('image', null) == null || (data.image is string && data.image.size() <= 1048576)) &&
-               (data.get('order', null) == null || data.order is number);
-      }
-
-      allow get: if true;
-      allow list: if true;
-
-      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) &&
-                    incoming().createdAt == request.time;
-
-      allow update: if isAdmin() && isValidCategory(incoming()) &&
-                    incoming().updatedAt == request.time;
-
-      allow delete: if isAdmin();
-    }
-
-    // 3. Settings: Global shop configuration
-    match /settings/global {
-      function isValidSettings(data) {
-        return data.keys().hasAll(['customCategories', 'customUnits', 'qrValue']) &&
-               data.keys().size() <= 10 &&
-               data.customCategories is list && data.customCategories.size() <= 200 &&
-               data.customUnits is list && data.customUnits.size() <= 100 &&
-               data.qrValue is string && data.qrValue.size() <= 2048;
-      }
-
-      allow get: if true;
-      allow list: if false; 
-
-      allow write: if isAdmin() && isValidSettings(incoming());
-    }
-
-    // 4. Admins: Managed roles
-    match /admins/{userId} {
-      allow read: if isVerified();
-      allow write: if false; // Strict: Console only management
+    match /orders/{id} {
+      allow read, write: if true;
     }
   }
 }
