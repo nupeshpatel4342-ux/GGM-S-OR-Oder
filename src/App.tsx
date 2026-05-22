@@ -9,7 +9,8 @@ import {
   ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, 
   Image as ImageIcon, LogOut, ArrowLeft, 
   CheckCircle, Settings, ClipboardList, 
-  TrendingUp, IndianRupee, AlertCircle, Edit, Store
+  TrendingUp, IndianRupee, AlertCircle, Edit, Store,
+  Download, Upload, Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -516,6 +517,130 @@ export default function App() {
     setShopSettings(updated);
     localStorage.setItem('shopSettings', JSON.stringify(updated));
     alert('Shop settings updated successfully!');
+  };
+
+  const handleDownloadBackup = () => {
+    try {
+      const backupData = {
+        version: "1.0",
+        backupDate: new Date().toISOString(),
+        data: {
+          products: products,
+          categories: categoryItems,
+          orders: orders,
+          shopSettings: shopSettings,
+          settings: {
+            customCategories,
+            customUnits,
+            qrValue
+          }
+        }
+      };
+
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+      const exportFileDefaultName = `ggms_store_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    } catch (error) {
+      alert('Error exporting data: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  const handleUploadBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    fileReader.onload = (e) => {
+      try {
+        const content = e.target?.result;
+        if (typeof content !== 'string') {
+          throw new Error('Could not read file content / ફાઈલ વાંચી શકાઈ નથી');
+        }
+
+        const parsed = JSON.parse(content);
+        
+        if (!parsed || typeof parsed !== 'object') {
+          throw new Error('Invalid file format / ખોટું ફાઈલ ફોર્મેટ');
+        }
+
+        const data = parsed.data || parsed;
+
+        if (!data.products || !Array.isArray(data.products)) {
+          throw new Error('Backup file must contain products array / બેકઅપ ફાઇલમાં પ્રોડક્ટ્સ લિસ્ટ હોવું જરૂરી છે');
+        }
+        if (!data.categories || !Array.isArray(data.categories)) {
+          throw new Error('Backup file must contain categories array / બેકઅપ ફાઇલમાં કેટેગરીઝ લિસ્ટ હોવું જરૂરી છે');
+        }
+
+        const confirmRestore = window.confirm(
+          "WARNING: This will overwrite all your current products, categories, orders, and shop settings! This action cannot be undone.\n\n" +
+          "ચેતવણી: આ તમારા વર્તમાન તમામ ઉત્પાદનો, કેટેગરીઝ, ઓર્ડર્સ અને સ્ટોર સેટિંગ્સને બદલી નાખશે! આ ક્રિયા પાછી વાળી શકાશે નહીં.\n\n" +
+          "Do you want to proceed? / શું તમે આગળ વધવા માંગો છો?"
+        );
+
+        if (!confirmRestore) {
+          event.target.value = '';
+          return;
+        }
+
+        // Update Products
+        setProducts(data.products);
+        localStorage.setItem('products', JSON.stringify(data.products));
+
+        // Update Categories
+        setCategoryItems(data.categories);
+        localStorage.setItem('categories', JSON.stringify(data.categories));
+
+        // Update Orders
+        if (data.orders && Array.isArray(data.orders)) {
+          setOrders(data.orders);
+          localStorage.setItem('orders', JSON.stringify(data.orders));
+        }
+
+        // Update Shop Settings
+        if (data.shopSettings) {
+          setShopSettings(data.shopSettings);
+          localStorage.setItem('shopSettings', JSON.stringify(data.shopSettings));
+        }
+
+        // Update Settings
+        if (data.settings) {
+          if (data.settings.customCategories) {
+            setCustomCategories(data.settings.customCategories);
+          }
+          if (data.settings.customUnits) {
+            setCustomUnits(data.settings.customUnits);
+          }
+          if (data.settings.qrValue) {
+            setQrValue(data.settings.qrValue);
+            localStorage.setItem('qrValue', data.settings.qrValue);
+          }
+          localStorage.setItem('settings', JSON.stringify({
+            customCategories: data.settings.customCategories || customCategories,
+            customUnits: data.settings.customUnits || customUnits,
+            qrValue: data.settings.qrValue || qrValue
+          }));
+        }
+
+        alert(
+          "Data restored successfully! / ડેટા સફળતાપૂર્વક રીસ્ટોર કરવામાં આવ્યો છે!\n\n" +
+          "The application will reload to apply all changes."
+        );
+        window.location.reload();
+
+      } catch (err) {
+        alert('Restore failed / રીસ્ટોર નિષ્ફળ ગયું: ' + (err instanceof Error ? err.message : String(err)));
+        event.target.value = '';
+      }
+    };
+
+    fileReader.readAsText(file);
   };
 
   // Admin Stats Calculations
@@ -1107,6 +1232,50 @@ export default function App() {
                     Save Store Settings
                   </motion.button>
                 </form>
+
+                <div className="border-t border-slate-100 my-8"></div>
+
+                <div className="space-y-4">
+                  <h4 className="font-black text-slate-900 text-md flex items-center gap-2">
+                    <Database className="w-5 h-5 text-emerald-600" />
+                    Backup & Restore / ડેટા બેકઅપ અને રીસ્ટોર
+                  </h4>
+                  <p className="text-xs text-slate-500 leading-relaxed pl-1">
+                    Download all products, categories, orders, and settings as a file to prevent data loss. You can upload it here to restore everything if the app is reset.
+                    <br />
+                    ડેટા ગુમાવવાથી બચવા માટે તમામ પ્રોડક્ટ્સ, કેટેગરીઝ, ઓર્ડર્સ અને સેટિંગ્સને ફાઈલ તરીકે ડાઉનલોડ કરો. જો એપ્લિકેશન રીસેટ થઈ જાય તો બધું પુનઃસ્થાપિત કરવા માટે તમે તેને અહીં અપલોડ કરી શકો છો.
+                  </p>
+
+                  <div className="grid sm:grid-cols-2 gap-4 pt-2">
+                    {/* Download Button */}
+                    <button
+                      type="button"
+                      onClick={handleDownloadBackup}
+                      className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      <div>
+                        Download Backup
+                        <span className="block text-[9px] font-normal lowercase">(ડાઉનલોડ બેકઅપ)</span>
+                      </div>
+                    </button>
+
+                    {/* Upload / Restore Button */}
+                    <label className="flex items-center justify-center gap-2 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-center">
+                      <Upload className="w-4 h-4" />
+                      <div>
+                        Upload Backup
+                        <span className="block text-[9px] font-normal lowercase">(અપલોડ બેકઅપ)</span>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleUploadBackup}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             )}
 
