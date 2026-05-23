@@ -15,6 +15,7 @@ export interface Product {
   unit: string;
   image?: string;
   gujaratiName?: string;
+  order?: number;
 }
 
 export interface CartItem extends Product {

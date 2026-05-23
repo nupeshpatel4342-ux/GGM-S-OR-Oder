@@ -77,4 +77,28 @@
   scrollbar-width: none;
 }
 
+/* Drag & Drop Reorder Styles */
+.drag-item {
+  transition: background-color 0.2s, opacity 0.2s, transform 0.15s;
+  cursor: default;
+}
+.drag-item.dragging {
+  opacity: 0.4;
+  background: #f1f5f9 !important;
+  transform: scale(0.98);
+}
+.drag-item.drag-over-top {
+  box-shadow: 0 -3px 0 0 #10B981 inset;
+}
+.drag-item.drag-over-bottom {
+  box-shadow: 0 3px 0 0 #10B981 inset;
+}
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
 

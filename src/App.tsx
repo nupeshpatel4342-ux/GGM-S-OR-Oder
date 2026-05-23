@@ -10,7 +10,7 @@ import {
   Image as ImageIcon, LogOut, ArrowLeft, 
   CheckCircle, Settings, ClipboardList, 
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
-  Download, Upload, Database
+  Download, Upload, Database, GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -284,7 +284,7 @@ export default function App() {
       if (snapshot.empty) {
         // Seed if empty in Firestore and we have seed/stored products
         const saved = localStorage.getItem('products');
-        const initial: Product[] = saved ? JSON.parse(saved) : SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}` }));
+        const initial: Product[] = saved ? JSON.parse(saved) : SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}`, order: idx }));
         initial.forEach((p) => {
           setDoc(doc(db, 'products', p.id), p).catch(err => console.error("Error seeding product:", err));
         });
@@ -293,6 +293,7 @@ export default function App() {
         snapshot.forEach((doc) => {
           list.push({ ...doc.data(), id: doc.id } as Product);
         });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setProducts(list);
         localStorage.setItem('products', JSON.stringify(list));
       }
@@ -582,6 +583,87 @@ export default function App() {
       handleLocalDataError(error, OperationType.DELETE, `categories/${id}`);
     }
   };
+
+  // ─── Drag & Drop Reorder ───────────────────────────────────────────────────
+  // We store the dragging index in a ref (avoids stale-closure bugs) and use
+  // a separate dragOver state for the visual drop indicator.
+  const dragCatRef = useRef<number | null>(null);
+  const [dragOverCatIndex, setDragOverCatIndex] = useState<number | null>(null);
+
+  const dragProdRef = useRef<number | null>(null);
+  const [dragOverProdIndex, setDragOverProdIndex] = useState<number | null>(null);
+
+  // Categories
+  const onCatDragStart = (idx: number, e: React.DragEvent) => {
+    dragCatRef.current = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    // small timeout so the dragged element still renders before going ghost
+    setTimeout(() => setDragOverCatIndex(idx), 0);
+  };
+  const onCatDragOver = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCatIndex(idx);
+  };
+  const onCatDrop = async (targetIdx: number) => {
+    const fromIdx = dragCatRef.current;
+    setDragOverCatIndex(null);
+    dragCatRef.current = null;
+    if (fromIdx === null || fromIdx === targetIdx) return;
+    // Optimistic local update
+    const newList = [...categoryItems];
+    const [moved] = newList.splice(fromIdx, 1);
+    newList.splice(targetIdx, 0, moved);
+    setCategoryItems(newList);
+    // Persist to Firestore
+    for (let i = 0; i < newList.length; i++) {
+      try {
+        await setDoc(doc(db, 'categories', newList[i].id), { order: i }, { merge: true });
+      } catch (error) {
+        handleLocalDataError(error, OperationType.UPDATE, `categories/${newList[i].id}`);
+      }
+    }
+  };
+  const onCatDragEnd = () => {
+    dragCatRef.current = null;
+    setDragOverCatIndex(null);
+  };
+
+  // Products
+  const onProdDragStart = (idx: number, e: React.DragEvent) => {
+    dragProdRef.current = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => setDragOverProdIndex(idx), 0);
+  };
+  const onProdDragOver = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverProdIndex(idx);
+  };
+  const onProdDrop = async (targetIdx: number) => {
+    const fromIdx = dragProdRef.current;
+    setDragOverProdIndex(null);
+    dragProdRef.current = null;
+    if (fromIdx === null || fromIdx === targetIdx) return;
+    // Optimistic local update
+    const newList = [...products];
+    const [moved] = newList.splice(fromIdx, 1);
+    newList.splice(targetIdx, 0, moved);
+    setProducts(newList);
+    // Persist to Firestore
+    for (let i = 0; i < newList.length; i++) {
+      try {
+        await setDoc(doc(db, 'products', newList[i].id), { order: i }, { merge: true });
+      } catch (error) {
+        handleLocalDataError(error, OperationType.UPDATE, `products/${newList[i].id}`);
+      }
+    }
+  };
+  const onProdDragEnd = () => {
+    dragProdRef.current = null;
+    setDragOverProdIndex(null);
+  };
+  // ──────────────────────────────────────────────────────────────────────────
 
   const addBanner = async (banner: Omit<Banner, 'id'>) => {
     try {
@@ -1294,17 +1376,38 @@ export default function App() {
 
                 {/* Listing column */}
                 <div className="lg:col-span-8 bg-white border border-slate-200 rounded-[24px] overflow-hidden">
-                  <div className="p-6 border-b border-slate-100">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-black text-slate-900 text-base">Active Products</h3>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">↕ Drag to reorder position</span>
                   </div>
 
                   <div className="divide-y divide-slate-100 overflow-y-auto no-scrollbar max-h-[600px]">
                     {products.length === 0 ? (
                       <p className="text-center py-12 italic text-slate-400 text-sm">No items in shop inventory.</p>
                     ) : (
-                      products.map(p => (
-                        <div key={p.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-all gap-4">
-                          <div className="flex items-center gap-3 min-w-0">
+                      products.map((p, idx) => (
+                        <div
+                          key={p.id}
+                          className={[
+                            'drag-item p-4 flex items-center gap-3 hover:bg-slate-50',
+                            dragProdRef.current === idx ? 'dragging' : '',
+                            dragOverProdIndex === idx && dragProdRef.current !== null && dragProdRef.current !== idx
+                              ? (dragProdRef.current > idx ? 'drag-over-top' : 'drag-over-bottom')
+                              : ''
+                          ].join(' ')}
+                          draggable
+                          onDragStart={(e) => onProdDragStart(idx, e)}
+                          onDragOver={(e) => onProdDragOver(idx, e)}
+                          onDrop={() => onProdDrop(idx)}
+                          onDragEnd={onProdDragEnd}
+                        >
+                          {/* Drag Handle */}
+                          <div className="drag-handle flex flex-col items-center shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 transition-all">
+                            <GripVertical className="w-5 h-5" />
+                            <span className="text-[8px] font-black select-none leading-none mt-0.5">{idx + 1}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                               {p.image ? (
                                 <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
@@ -1367,7 +1470,10 @@ export default function App() {
                 {/* Listing column */}
                 <div className="lg:col-span-8 bg-white border border-slate-200 rounded-[24px] overflow-hidden">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-black text-slate-900 text-base">Categories</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-black text-slate-900 text-base">Categories</h3>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">↕ Reorder</span>
+                    </div>
                     <div className="flex gap-4">
                       <button onClick={syncCategories} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">
                         Sync
@@ -1382,9 +1488,29 @@ export default function App() {
                     {categoryItems.length === 0 ? (
                       <p className="text-center py-12 italic text-slate-400 text-sm">No categories registered.</p>
                     ) : (
-                      categoryItems.map(cat => (
-                        <div key={cat.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-all gap-4">
-                          <div className="flex items-center gap-3 min-w-0">
+                      categoryItems.map((cat, idx) => (
+                        <div
+                          key={cat.id}
+                          className={[
+                            'drag-item p-4 flex items-center gap-3 hover:bg-slate-50',
+                            dragCatRef.current === idx ? 'dragging' : '',
+                            dragOverCatIndex === idx && dragCatRef.current !== null && dragCatRef.current !== idx
+                              ? (dragCatRef.current > idx ? 'drag-over-top' : 'drag-over-bottom')
+                              : ''
+                          ].join(' ')}
+                          draggable
+                          onDragStart={(e) => onCatDragStart(idx, e)}
+                          onDragOver={(e) => onCatDragOver(idx, e)}
+                          onDrop={() => onCatDrop(idx)}
+                          onDragEnd={onCatDragEnd}
+                        >
+                          {/* Drag Handle */}
+                          <div className="drag-handle flex flex-col items-center shrink-0 p-1.5 rounded-lg text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 transition-all">
+                            <GripVertical className="w-5 h-5" />
+                            <span className="text-[8px] font-black select-none leading-none mt-0.5">{idx + 1}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                               {cat.image ? (
                                 <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
