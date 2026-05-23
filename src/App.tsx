@@ -2158,71 +2158,75 @@ const BannerSlider: React.FC<BannerSliderProps> = ({ banners, onSelectCategory }
 
   return (
     <div 
-      className="relative w-full bg-slate-100 rounded-3xl overflow-hidden shadow-xs group border border-slate-200/50"
-      style={{ aspectRatio: '1600/430' }}
+      className="relative w-full bg-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm group border border-slate-200/50"
     >
-      <div 
-        onClick={handleBannerClick}
-        className={`w-full h-full relative ${currentBanner.linkUrl ? 'cursor-pointer' : ''}`}
-      >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentBanner.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.4 }}
-            className="w-full h-full absolute inset-0"
+      {/* Mobile: 16:9, Tablet+: wide cinematic */}
+      <div style={{ paddingBottom: 'clamp(56.25%, 56.25%, 26.875%)' }} className="relative w-full">
+        <div className="absolute inset-0">
+          <div 
+            onClick={handleBannerClick}
+            className={`w-full h-full relative ${currentBanner.linkUrl ? 'cursor-pointer' : ''}`}
           >
-            <img 
-              src={currentBanner.imageUrl} 
-              alt={currentBanner.title || 'Promo Banner'} 
-              className="w-full h-full object-cover"
-            />
-            {currentBanner.title && (
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 md:p-6 flex flex-col justify-end text-white">
-                <h3 className="text-sm md:text-xl font-black uppercase tracking-wide leading-tight">
-                  {currentBanner.title}
-                </h3>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentBanner.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.4 }}
+                className="w-full h-full absolute inset-0"
+              >
+                <img 
+                  src={currentBanner.imageUrl} 
+                  alt={currentBanner.title || 'Promo Banner'} 
+                  className="w-full h-full object-cover"
+                />
+                {currentBanner.title && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4 md:p-6 flex flex-col justify-end text-white">
+                    <h3 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-wide leading-tight">
+                      {currentBanner.title}
+                    </h3>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-      {/* Navigation Arrows */}
-      {activeBanners.length > 1 && (
-        <>
-          <button 
-            onClick={handlePrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </>
-      )}
+          {/* Navigation Arrows - always visible on mobile */}
+          {activeBanners.length > 1 && (
+            <>
+              <button 
+                onClick={handlePrev}
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md sm:opacity-0 sm:group-hover:opacity-100 opacity-80 transition-opacity duration-200 z-10"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={handleNext}
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white/90 hover:bg-white text-slate-800 rounded-full flex items-center justify-center shadow-md sm:opacity-0 sm:group-hover:opacity-100 opacity-80 transition-opacity duration-200 z-10"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
+          )}
 
-      {/* Dots Indicator */}
-      {activeBanners.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-          {activeBanners.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentIndex(idx);
-              }}
-              className={`w-2 h-2 rounded-full transition-all ${currentIndex === idx ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'}`}
-            />
-          ))}
+          {/* Dots Indicator */}
+          {activeBanners.length > 1 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {activeBanners.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(idx);
+                  }}
+                  className={`w-2 h-2 rounded-full transition-all ${currentIndex === idx ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
