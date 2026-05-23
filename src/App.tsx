@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, ChangeEvent, FormEvent, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, ChangeEvent, FormEvent, useCallback, useRef } from 'react';
 import { 
   ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, 
   ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, 
