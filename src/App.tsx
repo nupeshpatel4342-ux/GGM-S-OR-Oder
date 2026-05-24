@@ -2160,8 +2160,8 @@ const BannerSlider: React.FC<BannerSliderProps> = ({ banners, onSelectCategory }
     <div 
       className="relative w-full bg-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm group border border-slate-200/50"
     >
-      {/* Mobile: fixed height 200px → tablet 260px → desktop max 380px */}
-      <div className="relative w-full h-[200px] sm:h-[260px] md:h-[320px] lg:h-[380px]">
+      {/* Same cinematic height on all devices — mobile matches desktop */}
+      <div className="relative w-full h-[320px] md:h-[350px] lg:h-[380px]">
         <div className="absolute inset-0">
           <div 
             onClick={handleBannerClick}
