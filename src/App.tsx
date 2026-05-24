@@ -2160,8 +2160,8 @@ const BannerSlider: React.FC<BannerSliderProps> = ({ banners, onSelectCategory }
     <div 
       className="relative w-full bg-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm group border border-slate-200/50"
     >
-      {/* Mobile: 16:9, Tablet+: wide cinematic */}
-      <div style={{ paddingBottom: 'clamp(56.25%, 56.25%, 26.875%)' }} className="relative w-full">
+      {/* Balanced height — perfect on mobile & desktop */}
+      <div className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px]">
         <div className="absolute inset-0">
           <div 
             onClick={handleBannerClick}
