@@ -2160,8 +2160,8 @@ const BannerSlider: React.FC<BannerSliderProps> = ({ banners, onSelectCategory }
     <div 
       className="relative w-full bg-slate-100 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm group border border-slate-200/50"
     >
-      {/* 16:5 ratio — 1280×500 banner size */}
-      <div className="relative w-full aspect-[16/5]">
+      {/* 16:7 ratio — 1280×700 banner size */}
+      <div className="relative w-full aspect-[16/7]">
         <div className="absolute inset-0">
           <div 
             onClick={handleBannerClick}
