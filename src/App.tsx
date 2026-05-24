@@ -544,13 +544,25 @@ export default function App() {
 
   const updateProduct = async (id: string, product: Omit<Product, 'id'>) => {
     try {
-      const cleanProduct = Object.fromEntries(
-        Object.entries(product).filter(([, v]) => v !== undefined)
-      );
-      await setDoc(doc(db, 'products', id), { ...cleanProduct, id }, { merge: true });
+      // Build a complete document – replace undefined with empty/null so fields are cleared
+      const fullProduct: Record<string, any> = {
+        id,
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        unit: product.unit,
+        image: product.image || '',
+        gujaratiName: product.gujaratiName || '',
+        mrp: product.mrp ?? null,
+        order: product.order ?? null,
+      };
+      // Full overwrite – ensures name/photo/all fields are properly updated
+      await setDoc(doc(db, 'products', id), fullProduct);
       setEditingProduct(null);
+      alert('✅ Product updated successfully! / પ્રોડક્ટ સફળતાપૂર્વક અપડેટ થઈ!');
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `products/${id}`);
+      alert('❌ Error updating product / પ્રોડક્ટ અપડેટ કરવામાં ભૂલ: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -565,13 +577,21 @@ export default function App() {
 
   const updateCategory = async (id: string, cat: Omit<CategoryItem, 'id'>) => {
     try {
-      const cleanCat = Object.fromEntries(
-        Object.entries(cat).filter(([, v]) => v !== undefined)
-      );
-      await setDoc(doc(db, 'categories', id), { ...cleanCat, id }, { merge: true });
+      // Build a complete document – replace undefined with empty so fields are cleared
+      const fullCat: Record<string, any> = {
+        id,
+        name: cat.name,
+        gujaratiName: cat.gujaratiName || '',
+        image: cat.image || '',
+        order: cat.order ?? null,
+      };
+      // Full overwrite – ensures name/photo/all fields are properly updated
+      await setDoc(doc(db, 'categories', id), fullCat);
       setEditingCategory(null);
+      alert('✅ Category updated successfully! / કેટેગરી સફળતાપૂર્વક અપડેટ થઈ!');
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `categories/${id}`);
+      alert('❌ Error updating category / કેટેગરી અપડેટ કરવામાં ભૂલ: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -681,7 +701,15 @@ export default function App() {
 
   const updateBanner = async (id: string, banner: Omit<Banner, 'id'>) => {
     try {
-      await setDoc(doc(db, 'banners', id), { ...banner, id }, { merge: true });
+      const fullBanner: Record<string, any> = {
+        id,
+        imageUrl: banner.imageUrl || '',
+        title: banner.title || '',
+        linkUrl: banner.linkUrl || '',
+        isActive: banner.isActive ?? true,
+        order: banner.order ?? 0,
+      };
+      await setDoc(doc(db, 'banners', id), fullBanner);
       setEditingBanner(null);
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `banners/${id}`);
@@ -2300,24 +2328,18 @@ const BannerForm: React.FC<BannerFormProps> = ({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Image Source Type</label>
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Image Source Type / ઈમેજ સોર્સ</label>
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => {
-              setUploadType('url');
-              setImageUrl('');
-            }}
+            onClick={() => setUploadType('url')}
             className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'url' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
           >
             Image URL
           </button>
           <button
             type="button"
-            onClick={() => {
-              setUploadType('file');
-              setImageUrl('');
-            }}
+            onClick={() => setUploadType('file')}
             className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'file' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
           >
             Upload File
@@ -2649,12 +2671,31 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
   const [gujaratiName, setGujaratiName] = useState(initialData?.gujaratiName || '');
   const [image, setImage] = useState<string | null>(initialData?.image || null);
   const [order] = useState<number>(initialData?.order ?? nextOrder);
+  const [uploadType, setUploadType] = useState<'url' | 'file'>(() => {
+    const img = initialData?.image || '';
+    if (img.startsWith('data:')) return 'file';
+    if (img && !img.startsWith('data:')) return 'url';
+    return 'file';
+  });
+  const [imageUrl, setImageUrl] = useState(() => {
+    const img = initialData?.image || '';
+    return (!img.startsWith('data:')) ? img : '';
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
 
-    const cat = { name, gujaratiName, image: image || undefined, order };
+    let finalImage: string | undefined;
+    if (uploadType === 'url' && imageUrl.trim()) {
+      finalImage = imageUrl.trim();
+    } else if (uploadType === 'file' && image && image.startsWith('data:')) {
+      finalImage = image;
+    } else if (image) {
+      finalImage = image;
+    }
+
+    const cat = { name, gujaratiName, image: finalImage, order };
     if (initialData && onUpdate) {
       onUpdate(cat);
     } else {
@@ -2662,6 +2703,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
       setName('');
       setGujaratiName('');
       setImage(null);
+      setImageUrl('');
     }
   };
 
@@ -2676,29 +2718,68 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex flex-col items-center gap-3">
-        <label className="relative cursor-pointer group">
-          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 group-hover:border-primary-green group-hover:bg-emerald-50 transition-all overflow-hidden text-center p-1.5">
-            {image ? (
-              <>
-                <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <X className="text-white w-5 h-5" onClick={(e) => {
-                    e.preventDefault();
-                    setImage(null);
-                  }} />
-                </div>
-              </>
-            ) : (
-              <>
-                <Camera className="w-5 h-5 mb-0.5 text-slate-400" />
-                <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Photo</span>
-              </>
-            )}
-          </div>
-          <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-        </label>
+      {/* Image Source Type Toggle */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Image Source / ફોટો સોર્સ</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setUploadType('url')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'url' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Image URL
+          </button>
+          <button
+            type="button"
+            onClick={() => setUploadType('file')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'file' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Upload File
+          </button>
+        </div>
       </div>
+
+      {uploadType === 'url' ? (
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Category Image URL</label>
+          <input
+            type="text"
+            value={imageUrl}
+            onChange={e => setImageUrl(e.target.value)}
+            placeholder="https://images.unsplash.com/..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
+          />
+          {imageUrl && (
+            <div className="mt-2 w-20 h-20 rounded-2xl border border-slate-200 overflow-hidden mx-auto bg-slate-50">
+              <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <label className="relative cursor-pointer group">
+            <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 group-hover:border-primary-green group-hover:bg-emerald-50 transition-all overflow-hidden text-center p-1.5">
+              {image ? (
+                <>
+                  <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <X className="text-white w-5 h-5" onClick={(e) => {
+                      e.preventDefault();
+                      setImage(null);
+                    }} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-5 h-5 mb-0.5 text-slate-400" />
+                  <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Photo</span>
+                </>
+              )}
+            </div>
+            <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </label>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">English Name</label>
@@ -2729,7 +2810,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
         type="submit"
         className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 mt-2"
       >
-        <Plus className="w-4 h-4" /> {initialData ? 'Update Category' : 'Create Category'}
+        <Plus className="w-4 h-4" /> {initialData ? 'Update Category / કેટેગરી અપડેટ કરો' : 'Create Category / કેટેગરી બનાવો'}
       </motion.button>
     </form>
   );
@@ -2762,6 +2843,17 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const [unit, setUnit] = useState(initialData?.unit || availableUnits[0] || 'kg');
   const [image, setImage] = useState<string | null>(initialData?.image || null);
   const [gujaratiName, setGujaratiName] = useState(initialData?.gujaratiName || '');
+
+  const [uploadType, setUploadType] = useState<'url' | 'file'>(() => {
+    const img = initialData?.image || '';
+    if (img.startsWith('data:')) return 'file';
+    if (img && !img.startsWith('data:')) return 'url';
+    return 'file';
+  });
+  const [productImageUrl, setProductImageUrl] = useState(() => {
+    const img = initialData?.image || '';
+    return (!img.startsWith('data:')) ? img : '';
+  });
 
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCat, setNewCat] = useState('');
@@ -2797,13 +2889,22 @@ const ProductForm: React.FC<ProductFormProps> = ({
     const priceVal = parseFloat(price);
     const mrpVal = mrp ? parseFloat(mrp) : undefined;
 
+    let finalImage: string | undefined;
+    if (uploadType === 'url' && productImageUrl.trim()) {
+      finalImage = productImageUrl.trim();
+    } else if (uploadType === 'file' && image && image.startsWith('data:')) {
+      finalImage = image;
+    } else if (image) {
+      finalImage = image;
+    }
+
     const dataPayload = { 
       name: name.toUpperCase(), 
       category: finalCat, 
       price: priceVal, 
       mrp: mrpVal, 
       unit: finalUnit, 
-      image: image || undefined,
+      image: finalImage,
       gujaratiName: gujaratiName || undefined
     };
 
@@ -2816,6 +2917,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
       setMrp('');
       setGujaratiName('');
       setImage(null);
+      setProductImageUrl('');
     }
     
     setIsAddingNewCat(false);
@@ -2826,29 +2928,68 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5">
-      <div className="flex flex-col items-center gap-3">
-        <label className="relative cursor-pointer group">
-          <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 group-hover:border-primary-green group-hover:bg-emerald-50 transition-all overflow-hidden">
-            {image ? (
-              <>
-                <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <X className="text-white w-5 h-5" onClick={(e) => {
-                    e.preventDefault();
-                    setImage(null);
-                  }} />
-                </div>
-              </>
-            ) : (
-              <>
-                <Camera className="w-5 h-5 mb-0.5 text-slate-400" />
-                <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Photo</span>
-              </>
-            )}
-          </div>
-          <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-        </label>
+      {/* Image Source Type Toggle */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Image Source / ફોટો સોર્સ</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setUploadType('url')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'url' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Image URL
+          </button>
+          <button
+            type="button"
+            onClick={() => setUploadType('file')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${uploadType === 'file' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+          >
+            Upload File
+          </button>
+        </div>
       </div>
+
+      {uploadType === 'url' ? (
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Product Image URL</label>
+          <input
+            type="text"
+            value={productImageUrl}
+            onChange={e => setProductImageUrl(e.target.value)}
+            placeholder="https://images.unsplash.com/..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
+          />
+          {productImageUrl && (
+            <div className="mt-2 w-20 h-20 rounded-2xl border border-slate-200 overflow-hidden mx-auto bg-slate-50">
+              <img src={productImageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <label className="relative cursor-pointer group">
+            <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-400 group-hover:border-primary-green group-hover:bg-emerald-50 transition-all overflow-hidden">
+              {image ? (
+                <>
+                  <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <X className="text-white w-5 h-5" onClick={(e) => {
+                      e.preventDefault();
+                      setImage(null);
+                    }} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-5 h-5 mb-0.5 text-slate-400" />
+                  <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Photo</span>
+                </>
+              )}
+            </div>
+            <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </label>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Product Name (EN)</label>
@@ -2948,7 +3089,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         type="submit"
         className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 mt-2"
       >
-        <Plus className="w-4 h-4" /> {initialData ? 'Update Product' : 'Register Product'}
+        <Plus className="w-4 h-4" /> {initialData ? 'Update Product / પ્રોડક્ટ અપડેટ કરો' : 'Register Product / પ્રોડક્ટ ઉમેરો'}
       </motion.button>
     </form>
   );
