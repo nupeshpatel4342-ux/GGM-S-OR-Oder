@@ -873,17 +873,27 @@ export default function App() {
     }
 
     // Construct WhatsApp message
-    let msg = `*📦 NEW ORDER: ${shopSettings.shopName}*\n\n`;
-    msg += `*👤 Customer Details:*\n`;
-    msg += `• Name: ${customerDetails.name}\n`;
-    msg += `• Phone: ${customerDetails.phone}\n`;
-    msg += `• Address: ${customerDetails.address}\n\n`;
-    msg += `*🛒 Items Ordered:*\n`;
+    let msg = `====================\n`;
+    msg += `*📦 NEW ORDER - ${shopSettings.shopName.toUpperCase()}*\n`;
+    msg += `*Order ID:* ${newOrder.id}\n`;
+    msg += `====================\n\n`;
+    msg += `*🛒 ITEMS TO PREPARE / આપવાનો સામાન:*\n`;
+    msg += `--------------------\n`;
     cart.forEach((item, index) => {
-      msg += `${index + 1}. ${item.name} (${item.quantity} ${item.unit}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
+      const gujName = item.gujaratiName ? `\n   (_${item.gujaratiName}_)` : '';
+      msg += `*${index + 1}. ${item.name}*${gujName}\n   👉 *Qty:* ${item.quantity} ${item.unit} | *Price:* ₹${item.price} | *Total:* ₹${(item.price * item.quantity).toFixed(2)}\n\n`;
     });
-    msg += `\n*💰 GRAND TOTAL: ₹${cartTotal.toFixed(2)}*\n\n`;
-    msg += `Thank you for shopping with us!`;
+    msg = msg.trim();
+    msg += `\n\n====================\n`;
+    msg += `*💰 GRAND TOTAL: ₹${cartTotal.toFixed(2)}*\n`;
+    msg += `====================\n\n`;
+    msg += `*👤 CUSTOMER DETAILS / ગ્રાહક વિગતો:*\n`;
+    msg += `--------------------\n`;
+    msg += `• *Name / નામ:* ${customerDetails.name}\n`;
+    msg += `• *Phone / ફોન:* ${customerDetails.phone}\n`;
+    msg += `• *Address / સરનામું:* ${customerDetails.address}\n`;
+    msg += `====================\n\n`;
+    msg += `Thank you for shopping with us! 🙏`;
 
     const cleanWhatsappNumber = shopSettings.whatsapp.replace(/\D/g, '');
     let finalWhatsapp = cleanWhatsappNumber;
