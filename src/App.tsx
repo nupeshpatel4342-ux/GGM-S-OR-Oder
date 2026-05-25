@@ -4,6 +4,11 @@
  */
 
 import React, { useState, useMemo, useEffect, ChangeEvent, FormEvent, useCallback, useRef } from 'react';
+// Flag to prevent multiple tabs/devices from re-seeding Firestore
+let hasSeededProducts = false;
+let hasSeededCategories = false;
+let hasSeededBanners = false;
+let hasSeededSettings = false;
 import { 
   ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, 
   ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, 
@@ -281,22 +286,26 @@ export default function App() {
   // Real-time Firestore synchronization listeners
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
-      if (snapshot.empty) {
-        // Seed if empty in Firestore and we have seed/stored products
+      if (!snapshot.empty) {
+        // Firestore has data – always use it
+        const list: Product[] = [];
+        snapshot.forEach((d) => {
+          list.push({ ...d.data(), id: d.id } as Product);
+        });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        setProducts(list);
+        localStorage.setItem('products', JSON.stringify(list));
+        hasSeededProducts = true; // data exists, no need to seed
+      } else if (!snapshot.metadata.fromCache && !hasSeededProducts) {
+        // Collection is genuinely empty on server – seed once
+        hasSeededProducts = true;
         const saved = localStorage.getItem('products');
         const initial: Product[] = saved ? JSON.parse(saved) : SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}`, order: idx }));
         initial.forEach((p) => {
           setDoc(doc(db, 'products', p.id), p).catch(err => console.error("Error seeding product:", err));
         });
-      } else {
-        const list: Product[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ ...doc.data(), id: doc.id } as Product);
-        });
-        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-        setProducts(list);
-        localStorage.setItem('products', JSON.stringify(list));
       }
+      // If fromCache && empty → do nothing, wait for server response
     }, (error) => {
       console.error("Firestore products read error:", error);
     });
@@ -305,8 +314,17 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      if (snapshot.empty) {
-        // Seed if empty
+      if (!snapshot.empty) {
+        const list: CategoryItem[] = [];
+        snapshot.forEach((d) => {
+          list.push({ ...d.data(), id: d.id } as CategoryItem);
+        });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        setCategoryItems(list);
+        localStorage.setItem('categories', JSON.stringify(list));
+        hasSeededCategories = true;
+      } else if (!snapshot.metadata.fromCache && !hasSeededCategories) {
+        hasSeededCategories = true;
         const saved = localStorage.getItem('categories');
         const formatted: CategoryItem[] = saved ? JSON.parse(saved) : DEFAULT_CATEGORIES.map((cat, idx) => ({
           id: cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'),
@@ -318,14 +336,6 @@ export default function App() {
         formatted.forEach((cat) => {
           setDoc(doc(db, 'categories', cat.id), cat).catch(err => console.error("Error seeding category:", err));
         });
-      } else {
-        const list: CategoryItem[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ ...doc.data(), id: doc.id } as CategoryItem);
-        });
-        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-        setCategoryItems(list);
-        localStorage.setItem('categories', JSON.stringify(list));
       }
     }, (error) => {
       console.error("Firestore categories read error:", error);
@@ -335,8 +345,17 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'banners'), (snapshot) => {
-      if (snapshot.empty) {
-        // Seed if empty
+      if (!snapshot.empty) {
+        const list: Banner[] = [];
+        snapshot.forEach((d) => {
+          list.push({ ...d.data(), id: d.id } as Banner);
+        });
+        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+        setBanners(list);
+        localStorage.setItem('banners', JSON.stringify(list));
+        hasSeededBanners = true;
+      } else if (!snapshot.metadata.fromCache && !hasSeededBanners) {
+        hasSeededBanners = true;
         const saved = localStorage.getItem('banners');
         const defaultBanners: Banner[] = saved ? JSON.parse(saved) : [
           {
@@ -367,14 +386,6 @@ export default function App() {
         defaultBanners.forEach((b) => {
           setDoc(doc(db, 'banners', b.id), b).catch(err => console.error("Error seeding banner:", err));
         });
-      } else {
-        const list: Banner[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ ...doc.data(), id: doc.id } as Banner);
-        });
-        list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-        setBanners(list);
-        localStorage.setItem('banners', JSON.stringify(list));
       }
     }, (error) => {
       console.error("Firestore banners read error:", error);
@@ -400,6 +411,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
       if (snapshot.exists()) {
+        hasSeededSettings = true;
         const data = snapshot.data();
         if (data.shopSettings) {
           setShopSettings(data.shopSettings);
@@ -420,7 +432,9 @@ export default function App() {
           customUnits: data.customUnits || [],
           qrValue: data.qrValue || ''
         }));
-      } else {
+      } else if (!snapshot.metadata.fromCache && !hasSeededSettings) {
+        // Document genuinely doesn't exist on server – seed once
+        hasSeededSettings = true;
         const savedShop = localStorage.getItem('shopSettings');
         const shopSettingsInit = savedShop ? JSON.parse(savedShop) : {
           shopName: 'GGM&S Grocery',
@@ -439,11 +453,12 @@ export default function App() {
         };
         setDoc(doc(db, 'settings', 'global'), defaultSettings).catch(err => console.error("Error seeding settings:", err));
       }
+      // If fromCache && !exists → do nothing, wait for server
     }, (error) => {
       console.error("Firestore settings read error:", error);
     });
     return () => unsub();
-  }, [customCategories, customUnits, qrValue]);
+  }, []); // Subscribe once – onSnapshot receives all real-time updates automatically
 
   const addCategory = async (cat: Omit<CategoryItem, 'id'>) => {
     const id = cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
