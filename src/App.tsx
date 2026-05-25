@@ -570,6 +570,7 @@ export default function App() {
         gujaratiName: product.gujaratiName || '',
         mrp: product.mrp ?? null,
         order: product.order ?? null,
+        variants: product.variants || null,
       };
       // Full overwrite – ensures name/photo/all fields are properly updated
       await setDoc(doc(db, 'products', id), fullProduct);
@@ -771,23 +772,40 @@ export default function App() {
     }
   };
 
-  const addToCart = (product: Product, quantity: number) => {
+  const addToCart = (product: Product, quantity: number, selectedVariant?: ProductVariant) => {
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
+      const existing = prev.find(item => 
+        item.id === product.id && 
+        ((!item.selectedVariant && !selectedVariant) || (item.selectedVariant?.id === selectedVariant?.id))
+      );
       if (existing) {
         return prev.map(item =>
-          item.id === product.id
+          item.id === product.id && 
+          ((!item.selectedVariant && !selectedVariant) || (item.selectedVariant?.id === selectedVariant?.id))
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { ...product, quantity }];
+      
+      const finalPrice = selectedVariant ? selectedVariant.price : product.price;
+      const finalMrp = selectedVariant ? selectedVariant.mrp : product.mrp;
+      const finalUnit = selectedVariant ? selectedVariant.name : product.unit;
+
+      return [...prev, { 
+        ...product, 
+        price: finalPrice, 
+        mrp: finalMrp, 
+        unit: finalUnit, 
+        selectedVariant, 
+        quantity 
+      }];
     });
   };
 
-  const updateCartQuantity = (id: string, delta: number) => {
+  const updateCartQuantity = (cartItemId: string, delta: number) => {
     setCart(prev => prev.flatMap(item => {
-      if (item.id !== id) return item;
+      const currentKey = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
+      if (currentKey !== cartItemId) return item;
       const newQty = item.quantity + delta;
       if (newQty <= 0) return [];
       return { ...item, quantity: newQty };
@@ -880,7 +898,8 @@ export default function App() {
     msg += `• Address: ${customerDetails.address}\n\n`;
     msg += `*🛒 Items Ordered:*\n`;
     cart.forEach((item, index) => {
-      msg += `${index + 1}. ${item.name} (${item.quantity} ${item.unit}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
+      const displayUnit = item.selectedVariant ? `${item.quantity} x ${item.unit}` : `${item.quantity} ${item.unit}`;
+      msg += `${index + 1}. ${item.name} (${displayUnit}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
     });
     msg += `\n*💰 GRAND TOTAL: ₹${cartTotal.toFixed(2)}*\n\n`;
     msg += `Thank you for shopping with us!`;
@@ -1461,7 +1480,11 @@ export default function App() {
                             <div className="min-w-0">
                               <span className="text-[8px] font-black text-primary-green uppercase tracking-wider block mb-0.5">{p.category}</span>
                               <h4 className="font-bold text-slate-900 text-sm uppercase truncate">{p.name}</h4>
-                              <p className="text-[10px] text-slate-400 font-semibold">{p.unit} • ₹{p.price}</p>
+                              <p className="text-[10px] text-slate-400 font-semibold">
+                                {p.variants && p.variants.length > 0 
+                                  ? `${p.variants.length} Sizes (e.g. ${p.variants[0].name})` 
+                                  : p.unit} • ₹{p.price}
+                              </p>
                             </div>
                           </div>
 
@@ -2039,41 +2062,44 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden divide-y divide-slate-100">
-                          {cart.map(item => (
-                            <div key={item.id} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-all">
-                              <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
-                                {item.image ? (
-                                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <ImageIcon className="w-5 h-5 text-slate-300" />
-                                )}
+                          {cart.map(item => {
+                            const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
+                            return (
+                              <div key={cartItemId} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-all">
+                                <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
+                                  {item.image ? (
+                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <ImageIcon className="w-5 h-5 text-slate-300" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
+                                  <h4 className="font-bold text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
+                                  <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                                </div>
+                                
+                                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl shrink-0">
+                                  <button
+                                    onClick={() => updateCartQuantity(cartItemId, -1)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
+                                  >
+                                    {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <ChevronLeft className="w-4 h-4" />}
+                                  </button>
+                                  <span className="w-6 text-center font-black text-xs text-slate-800">{item.quantity}</span>
+                                  <button
+                                    onClick={() => updateCartQuantity(cartItemId, 1)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
+                                  >
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <div className="text-right shrink-0 min-w-[60px]">
+                                  <p className="font-black text-sm text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
-                                <h4 className="font-bold text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
-                                <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
-                              </div>
-                              
-                              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl shrink-0">
-                                <button
-                                  onClick={() => updateCartQuantity(item.id, -1)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
-                                >
-                                  {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <ChevronLeft className="w-4 h-4" />}
-                                </button>
-                                <span className="w-6 text-center font-black text-xs text-slate-800">{item.quantity}</span>
-                                <button
-                                  onClick={() => updateCartQuantity(item.id, 1)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
-                                >
-                                  <ChevronRight className="w-4 h-4" />
-                                </button>
-                              </div>
-                              <div className="text-right shrink-0 min-w-[60px]">
-                                <p className="font-black text-sm text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2441,7 +2467,7 @@ const BannerForm: React.FC<BannerFormProps> = ({
 // Product detail view sub-page
 interface ProductDetailPageProps {
   products: Product[];
-  addToCart: (product: Product, quantity: number) => void;
+  addToCart: (product: Product, quantity: number, variant?: ProductVariant) => void;
 }
 
 function ProductDetailPageWrapper({ products, addToCart }: ProductDetailPageProps) {
@@ -2450,6 +2476,11 @@ function ProductDetailPageWrapper({ products, addToCart }: ProductDetailPageProp
   const foundProduct = products.find(p => p.id === id);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | undefined>(() => {
+    return foundProduct && foundProduct.variants && foundProduct.variants.length > 0
+      ? foundProduct.variants[0]
+      : undefined;
+  });
 
   if (!foundProduct) {
     return (
@@ -2464,13 +2495,17 @@ function ProductDetailPageWrapper({ products, addToCart }: ProductDetailPageProp
     );
   }
 
-  const discount = foundProduct.mrp && foundProduct.mrp > foundProduct.price 
-    ? ((foundProduct.mrp - foundProduct.price) / foundProduct.mrp * 100).toFixed(0) 
+  const currentPrice = selectedVariant ? selectedVariant.price : foundProduct.price;
+  const currentMrp = selectedVariant ? selectedVariant.mrp : foundProduct.mrp;
+  const currentUnit = selectedVariant ? selectedVariant.name : foundProduct.unit;
+
+  const discount = currentMrp && currentMrp > currentPrice 
+    ? ((currentMrp - currentPrice) / currentMrp * 100).toFixed(0) 
     : '0';
   const hasDiscount = parseInt(discount) > 0;
 
   const handleAddToCart = () => {
-    addToCart(foundProduct, qty);
+    addToCart(foundProduct, qty, selectedVariant);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -2512,18 +2547,40 @@ function ProductDetailPageWrapper({ products, addToCart }: ProductDetailPageProp
               </h3>
             )}
 
+            {/* Variants Selector Pills / સાઇઝ સિલેક્ટર */}
+            {foundProduct.variants && foundProduct.variants.length > 0 && (
+              <div className="mb-6">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Select Size / સાઇઝ પસંદ કરો:</span>
+                <div className="flex flex-wrap gap-2">
+                  {foundProduct.variants.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVariant(v)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                        selectedVariant?.id === v.id
+                          ? 'bg-[#00884F] text-white border-[#00884F] shadow-xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-[#00884F]/30 hover:bg-white'
+                      }`}
+                    >
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center justify-between mb-8">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pricing Details</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-[#00884F]">₹{foundProduct.price.toFixed(2)}</span>
-                  <span className="text-xs text-slate-500 font-bold lowercase">/ {foundProduct.unit}</span>
+                  <span className="text-3xl font-black text-[#00884F]">₹{currentPrice.toFixed(2)}</span>
+                  <span className="text-xs text-slate-500 font-bold lowercase">/ {currentUnit}</span>
                 </div>
               </div>
-              {foundProduct.mrp && foundProduct.mrp > foundProduct.price && (
+              {currentMrp && currentMrp > currentPrice && (
                 <div className="text-right">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">M.R.P.</p>
-                  <span className="text-lg text-slate-400 line-through font-semibold">₹{foundProduct.mrp.toFixed(2)}</span>
+                  <span className="text-lg text-slate-400 line-through font-semibold">₹{currentMrp.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -2875,6 +2932,45 @@ const ProductForm: React.FC<ProductFormProps> = ({
   
   const [isAddingNewUnit, setIsAddingNewUnit] = useState(false);
   const [newUnitInput, setNewUnitInput] = useState('');
+  
+  const [hasVariants, setHasVariants] = useState<boolean>(initialData?.variants && initialData.variants.length > 0 ? true : false);
+  const [variants, setVariants] = useState<ProductVariant[]>(initialData?.variants || []);
+
+  const addPresetVariant = (name: string) => {
+    if (variants.some(v => v.name.toLowerCase() === name.toLowerCase())) return;
+    const newVar: ProductVariant = {
+      id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name,
+      price: 0,
+      mrp: undefined
+    };
+    setVariants(prev => [...prev, newVar]);
+  };
+
+  const addCustomVariant = () => {
+    const newVar: ProductVariant = {
+      id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: '',
+      price: 0,
+      mrp: undefined
+    };
+    setVariants(prev => [...prev, newVar]);
+  };
+
+  const updateVariantField = (id: string, field: keyof ProductVariant, value: any) => {
+    setVariants(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      if (field === 'price' || field === 'mrp') {
+        const val = value === '' ? 0 : parseFloat(value);
+        return { ...v, [field]: val };
+      }
+      return { ...v, [field]: value };
+    }));
+  };
+
+  const deleteVariant = (id: string) => {
+    setVariants(prev => prev.filter(v => v.id !== id));
+  };
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2887,7 +2983,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!name || !price) return;
+    if (!name || (!hasVariants && !price)) return;
     
     let finalCat = category;
     if (isAddingNewCat && newCat.trim()) {
@@ -2901,8 +2997,18 @@ const ProductForm: React.FC<ProductFormProps> = ({
       onAddNewUnit(finalUnit);
     }
 
-    const priceVal = parseFloat(price);
-    const mrpVal = mrp ? parseFloat(mrp) : undefined;
+    let priceVal = parseFloat(price);
+    let mrpVal = mrp ? parseFloat(mrp) : undefined;
+
+    if (hasVariants) {
+      if (variants.length === 0) {
+        alert('❌ Please add at least one variant size / કૃપા કરીને ઓછામાં ઓછું એક માપ ઉમેરો');
+        return;
+      }
+      priceVal = variants[0].price;
+      mrpVal = variants[0].mrp;
+      finalUnit = variants[0].name;
+    }
 
     let finalImage: string | undefined;
     if (uploadType === 'url' && productImageUrl.trim()) {
@@ -2920,7 +3026,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
       mrp: mrpVal, 
       unit: finalUnit, 
       image: finalImage,
-      gujaratiName: gujaratiName || undefined
+      gujaratiName: gujaratiName || undefined,
+      variants: hasVariants ? variants.map(v => ({ id: v.id, name: v.name, price: v.price, mrp: v.mrp || null })) : null
     };
 
     if (initialData && onUpdate) {
@@ -2933,6 +3040,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
       setGujaratiName('');
       setImage(null);
       setProductImageUrl('');
+      setVariants([]);
+      setHasVariants(false);
     }
     
     setIsAddingNewCat(false);
@@ -3058,45 +3167,158 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Selling Price (₹)</label>
-          <input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">M.R.P. (₹ - Optional)</label>
-          <input type="number" step="0.01" value={mrp} onChange={e => setMrp(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
-        </div>
+      {/* Variants Toggle / વેરિએન્ટ્સ ટોગલ */}
+      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={hasVariants} 
+            onChange={(e) => setHasVariants(e.target.checked)}
+            className="w-4.5 h-4.5 text-primary-green focus:ring-primary-green border-slate-300 rounded-md cursor-pointer accent-[#00884F]"
+          />
+          <div className="flex flex-col">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Has Multiple Sizes/Variants</span>
+            <span className="text-[9px] font-bold text-slate-400">અલગ-અલગ વજન/માપ અને કિંમત ઉમેરો</span>
+          </div>
+        </label>
       </div>
 
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center px-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</label>
-          <button type="button" onClick={() => setIsAddingNewUnit(!isAddingNewUnit)} className="text-[9px] font-black text-primary-green uppercase tracking-widest hover:underline">
-            {isAddingNewUnit ? 'Choose' : '+ New'}
-          </button>
-        </div>
-        {isAddingNewUnit ? (
-          <input
-            autoFocus
-            type="text"
-            value={newUnitInput}
-            onChange={e => setNewUnitInput(e.target.value)}
-            placeholder="e.g. piece"
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
-          />
-        ) : (
-          <select
-            value={unit}
-            onChange={e => setUnit(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden cursor-pointer"
-          >
-            {availableUnits.map(u => (
-              <option key={u} value={u}>{u}</option>
+      {!hasVariants ? (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Selling Price (₹)</label>
+              <input required={!hasVariants} type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">M.R.P. (₹ - Optional)</label>
+              <input type="number" step="0.01" value={mrp} onChange={e => setMrp(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</label>
+              <button type="button" onClick={() => setIsAddingNewUnit(!isAddingNewUnit)} className="text-[9px] font-black text-primary-green uppercase tracking-widest hover:underline">
+                {isAddingNewUnit ? 'Choose' : '+ New'}
+              </button>
+            </div>
+            {isAddingNewUnit ? (
+              <input
+                autoFocus
+                type="text"
+                value={newUnitInput}
+                onChange={e => setNewUnitInput(e.target.value)}
+                placeholder="e.g. piece"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
+              />
+            ) : (
+              <select
+                value={unit}
+                onChange={e => setUnit(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden cursor-pointer"
+              >
+                {availableUnits.map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-4 border border-slate-100 bg-slate-50/50 p-4 rounded-3xl">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Sizes & Prices / માપ અને કિંમત</span>
+            <button
+              type="button"
+              onClick={addCustomVariant}
+              className="text-[9px] font-black text-[#00884F] bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1 uppercase tracking-wider hover:bg-emerald-100/60 transition-all"
+            >
+              + Add Size
+            </button>
+          </div>
+
+          {/* Quick presets */}
+          <div className="space-y-2">
+            <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Quick Presets / ઝડપી ઉમેરો:</span>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">GM:</span>
+              {['50 gm', '100 gm', '200 gm', '250 gm', '500 gm'].map(p => (
+                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">KG:</span>
+              {['1 kg', '2 kg', '3 kg', '5 kg', '10 kg'].map(p => (
+                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">L:</span>
+              {['500 ml', '1 L', '2 L', '5 L', '15 L'].map(p => (
+                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Variants inputs list */}
+          <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
+            {variants.map((v, index) => (
+              <div key={v.id} className="flex gap-2 items-center bg-white border border-slate-200 rounded-2xl p-2.5 relative shadow-xs">
+                <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[9px] font-black text-slate-400 shrink-0">
+                  {index + 1}
+                </div>
+                <div className="grid grid-cols-3 gap-2 flex-1">
+                  <div>
+                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Size/Unit</span>
+                    <input
+                      required
+                      type="text"
+                      value={v.name}
+                      onChange={e => updateVariantField(v.id, 'name', e.target.value)}
+                      placeholder="e.g. 500 gm"
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Price (₹)</span>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      value={v.price === 0 ? '' : v.price}
+                      onChange={e => updateVariantField(v.id, 'price', e.target.value)}
+                      placeholder="e.g. 100"
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">MRP (₹)</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={v.mrp === undefined || v.mrp === 0 ? '' : v.mrp}
+                      onChange={e => updateVariantField(v.id, 'mrp', e.target.value)}
+                      placeholder="e.g. 120"
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => deleteVariant(v.id)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all shrink-0 mt-3"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             ))}
-          </select>
-        )}
-      </div>
+            {variants.length === 0 && (
+              <p className="text-center py-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">No sizes added yet / કોઈ સાઇઝ ઉમેરેલી નથી</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <motion.button
         whileHover={{ scale: 1.01 }}
@@ -3113,22 +3335,29 @@ const ProductForm: React.FC<ProductFormProps> = ({
 // Customer Product Card
 interface ProductCardProps {
   product: Product;
-  onAdd: (p: Product, qty: number) => void;
+  onAdd: (p: Product, qty: number, variant?: ProductVariant) => void;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
   const navigate = useNavigate();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | undefined>(() => {
+    return product.variants && product.variants.length > 0 ? product.variants[0] : undefined;
+  });
   
-  const discount = product.mrp && product.mrp > product.price 
-    ? ((product.mrp - product.price) / product.mrp * 100).toFixed(0) 
+  const currentPrice = selectedVariant ? selectedVariant.price : product.price;
+  const currentMrp = selectedVariant ? selectedVariant.mrp : product.mrp;
+  const currentUnit = selectedVariant ? selectedVariant.name : product.unit;
+
+  const discount = currentMrp && currentMrp > currentPrice 
+    ? ((currentMrp - currentPrice) / currentMrp * 100).toFixed(0) 
     : '0';
   const hasDiscount = parseInt(discount) > 0;
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid navigating to details page
-    onAdd(product, qty);
+    onAdd(product, qty, selectedVariant);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
     setQty(1);
@@ -3169,14 +3398,34 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
               {product.gujaratiName}
             </p>
           )}
+
+          {/* Variants Selector Dropdown */}
+          {product.variants && product.variants.length > 0 && (
+            <div className="mt-2" onClick={e => e.stopPropagation()}>
+              <select
+                value={selectedVariant?.id || ''}
+                onChange={e => {
+                  const found = product.variants?.find(v => v.id === e.target.value);
+                  if (found) setSelectedVariant(found);
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-[10px] font-bold focus:border-[#00884F] outline-hidden cursor-pointer"
+              >
+                {product.variants.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} - ₹{v.price} {v.mrp && v.mrp > v.price ? `(MRP ₹${v.mrp})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         
         <div className="mt-3 space-y-2.5">
           <div className="flex items-baseline gap-1">
-            <span className="text-base font-black text-[#00884F]">₹{product.price.toFixed(0)}</span>
-            <span className="text-[9px] text-slate-400 font-bold lowercase">/ {product.unit}</span>
-            {product.mrp && product.mrp > product.price && (
-              <span className="text-[10px] text-slate-400 line-through font-semibold ml-1">₹{product.mrp.toFixed(0)}</span>
+            <span className="text-base font-black text-[#00884F]">₹{currentPrice.toFixed(0)}</span>
+            <span className="text-[9px] text-slate-400 font-bold lowercase">/ {currentUnit}</span>
+            {currentMrp && currentMrp > currentPrice && (
+              <span className="text-[10px] text-slate-400 line-through font-semibold ml-1">₹{currentMrp.toFixed(0)}</span>
             )}
           </div>
 

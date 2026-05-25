@@ -6,6 +6,13 @@ export interface CategoryItem {
   order?: number;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  price: number;
+  mrp?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,10 +23,12 @@ export interface Product {
   image?: string;
   gujaratiName?: string;
   order?: number;
+  variants?: ProductVariant[];
 }
 
 export interface CartItem extends Product {
   quantity: number;
+  selectedVariant?: ProductVariant;
 }
 
 export interface CustomerDetails {
