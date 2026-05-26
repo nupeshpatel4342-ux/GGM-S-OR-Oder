@@ -2888,6 +2888,29 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
   );
 };
 
+const parseCustomSizeMultiplier = (size: string): number => {
+  const clean = size.toLowerCase().trim();
+  const numMatch = clean.match(/^([0-9.]+)\s*(gm|kg|ml|l|litre|litres|g)?$/);
+  if (!numMatch) return 1.0;
+  
+  const val = parseFloat(numMatch[1]);
+  const unit = numMatch[2] || '';
+  
+  if (unit === 'gm' || unit === 'g') {
+    return val / 1000;
+  }
+  if (unit === 'ml') {
+    return val / 1000;
+  }
+  if (unit === 'kg') {
+    return val;
+  }
+  if (unit === 'l' || unit === 'litre' || unit === 'litres') {
+    return val;
+  }
+  return 1.0;
+};
+
 const getWeightMultiplier = (size: string): number => {
   switch (size) {
     case '50 gm': return 0.05;
@@ -2900,7 +2923,7 @@ const getWeightMultiplier = (size: string): number => {
     case '3 kg': return 3.0;
     case '5 kg': return 5.0;
     case '10 kg': return 10.0;
-    default: return 1.0;
+    default: return parseCustomSizeMultiplier(size);
   }
 };
 
@@ -2913,7 +2936,7 @@ const getVolumeMultiplier = (size: string): number => {
     case '2 L': return 2.0;
     case '5 L': return 5.0;
     case '15 L': return 15.0;
-    default: return 1.0;
+    default: return parseCustomSizeMultiplier(size);
   }
 };
 
@@ -3006,6 +3029,48 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const [isAddingNewUnit, setIsAddingNewUnit] = useState(false);
   const [newUnitInput, setNewUnitInput] = useState('');
 
+  const [customSizeInput, setCustomSizeInput] = useState('');
+
+  const handleAddCustomSize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const cleanSize = customSizeInput.trim();
+    if (!cleanSize) return;
+    
+    const lower = cleanSize.toLowerCase();
+    if (variantType === 'weight') {
+      if (!lower.endsWith('gm') && !lower.endsWith('g') && !lower.endsWith('kg')) {
+        alert('❌ Please use gm or kg unit (e.g. 150 gm) / કૃપા કરીને gm અથવા kg યુનિટ વાપરો');
+        return;
+      }
+    } else if (variantType === 'volume') {
+      if (!lower.endsWith('ml') && !lower.endsWith('l') && !lower.endsWith('litre') && !lower.endsWith('litres')) {
+        alert('❌ Please use ml or L unit (e.g. 250 ml) / કૃપા કરીને ml અથવા L યુનિટ વાપરો');
+        return;
+      }
+    }
+
+    if (selectedSizes.some(s => s.toLowerCase() === lower)) {
+      alert('❌ This size already exists / આ સાઇઝ પહેલેથી ઉમેરેલી છે');
+      return;
+    }
+
+    let formattedSize = cleanSize;
+    const numPart = cleanSize.match(/^([0-9.]+)/)?.[1] || '';
+    const unitPart = cleanSize.slice(numPart.length).trim();
+    if (unitPart.toLowerCase() === 'l') {
+      formattedSize = `${numPart} L`;
+    } else if (unitPart.toLowerCase() === 'ml') {
+      formattedSize = `${numPart} ml`;
+    } else if (unitPart.toLowerCase() === 'gm' || unitPart.toLowerCase() === 'g') {
+      formattedSize = `${numPart} gm`;
+    } else if (unitPart.toLowerCase() === 'kg') {
+      formattedSize = `${numPart} kg`;
+    }
+
+    setSelectedSizes(prev => [...prev, formattedSize]);
+    setCustomSizeInput('');
+  };
+
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -3043,7 +3108,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
       
       if (variantType === 'weight') {
         calculatedVariants = selectedSizes.map(size => {
-          const mult = getWeightMultiplier(size);
+          const mult = parseCustomSizeMultiplier(size);
           return {
             id: `v-${size.replace(/\s+/g, '')}`,
             name: size,
@@ -3051,10 +3116,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
             mrp: mrpVal ? parseFloat((mrpVal * mult).toFixed(2)) : undefined
           };
         });
-        calculatedVariants.sort((a, b) => getWeightMultiplier(a.name) - getWeightMultiplier(b.name));
+        calculatedVariants.sort((a, b) => parseCustomSizeMultiplier(a.name) - parseCustomSizeMultiplier(b.name));
       } else if (variantType === 'volume') {
         calculatedVariants = selectedSizes.map(size => {
-          const mult = getVolumeMultiplier(size);
+          const mult = parseCustomSizeMultiplier(size);
           return {
             id: `v-${size.replace(/\s+/g, '')}`,
             name: size,
@@ -3062,7 +3127,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
             mrp: mrpVal ? parseFloat((mrpVal * mult).toFixed(2)) : undefined
           };
         });
-        calculatedVariants.sort((a, b) => getVolumeMultiplier(a.name) - getVolumeMultiplier(b.name));
+        calculatedVariants.sort((a, b) => parseCustomSizeMultiplier(a.name) - parseCustomSizeMultiplier(b.name));
       }
 
       priceVal = calculatedVariants[0].price;
@@ -3361,6 +3426,66 @@ const ProductForm: React.FC<ProductFormProps> = ({
                   </label>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Custom Sized Pills / કસ્ટમ માપ */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+              Custom Sizes / કસ્ટમ સાઇઝ:
+            </span>
+            <div className="flex flex-wrap gap-2 p-3 bg-white rounded-2xl border border-slate-200 min-h-[46px] items-center">
+              {selectedSizes
+                .filter(s => {
+                  const standardList = variantType === 'weight'
+                    ? ['50 gm', '100 gm', '200 gm', '250 gm', '500 gm', '1 kg', '2 kg', '3 kg', '5 kg', '10 kg']
+                    : ['100 ml', '200 ml', '500 ml', '1 L', '2 L', '5 L', '15 L'];
+                  return !standardList.includes(s);
+                })
+                .map(size => (
+                  <span 
+                    key={size} 
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-[#00884F] bg-emerald-50 text-[#00884F] text-xs font-bold"
+                  >
+                    {size}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSizes(prev => prev.filter(s => s !== size))}
+                      className="hover:text-red-500 transition-colors shrink-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              {selectedSizes.filter(s => {
+                const standardList = variantType === 'weight'
+                  ? ['50 gm', '100 gm', '200 gm', '250 gm', '500 gm', '1 kg', '2 kg', '3 kg', '5 kg', '10 kg']
+                  : ['100 ml', '200 ml', '500 ml', '1 L', '2 L', '5 L', '15 L'];
+                return !standardList.includes(s);
+              }).length === 0 && (
+                <span className="text-[10px] font-semibold text-slate-400 italic">No custom sizes added yet</span>
+              )}
+            </div>
+          </div>
+
+          {/* Add custom size input */}
+          <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Add Custom Size / નવી સાઇઝ ઉમેરો</span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customSizeInput}
+                onChange={e => setCustomSizeInput(e.target.value)}
+                placeholder={variantType === 'weight' ? 'e.g. 150 gm' : 'e.g. 250 ml'}
+                className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:border-[#00884F] outline-hidden"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomSize}
+                className="bg-[#00884F] hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
+              >
+                + Add
+              </button>
             </div>
           </div>
         </div>
