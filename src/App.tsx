@@ -2888,6 +2888,35 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ onAdd, onUpdate, initialDat
   );
 };
 
+const getWeightMultiplier = (size: string): number => {
+  switch (size) {
+    case '50 gm': return 0.05;
+    case '100 gm': return 0.1;
+    case '200 gm': return 0.2;
+    case '250 gm': return 0.25;
+    case '500 gm': return 0.5;
+    case '1 kg': return 1.0;
+    case '2 kg': return 2.0;
+    case '3 kg': return 3.0;
+    case '5 kg': return 5.0;
+    case '10 kg': return 10.0;
+    default: return 1.0;
+  }
+};
+
+const getVolumeMultiplier = (size: string): number => {
+  switch (size) {
+    case '100 ml': return 0.1;
+    case '200 ml': return 0.2;
+    case '500 ml': return 0.5;
+    case '1 L': return 1.0;
+    case '2 L': return 2.0;
+    case '5 L': return 5.0;
+    case '15 L': return 15.0;
+    default: return 1.0;
+  }
+};
+
 // Product Manage/Edit Form
 interface ProductFormProps {
   onAdd: (p: Omit<Product, 'id'>) => void;
@@ -2910,8 +2939,52 @@ const ProductForm: React.FC<ProductFormProps> = ({
 }) => {
   const [name, setName] = useState(initialData?.name || '');
   const [category, setCategory] = useState(initialData?.category || availableCategories[0] || 'KARIYANU');
-  const [price, setPrice] = useState(initialData?.price.toString() || '');
-  const [mrp, setMrp] = useState(initialData?.mrp?.toString() || '');
+
+  const [variantType, setVariantType] = useState<'none' | 'weight' | 'volume'>(() => {
+    if (!initialData?.variants || initialData.variants.length === 0) return 'none';
+    const first = initialData.variants[0].name.toLowerCase();
+    if (first.includes('ml') || first.includes(' l')) return 'volume';
+    if (first.includes('gm') || first.includes('kg')) return 'weight';
+    return 'none';
+  });
+
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(() => {
+    if (!initialData?.variants || initialData.variants.length === 0) return [];
+    return initialData.variants.map(v => v.name);
+  });
+
+  const [price, setPrice] = useState(() => {
+    if (initialData?.variants && initialData.variants.length > 0) {
+      const first = initialData.variants[0];
+      const n = first.name.toLowerCase();
+      let multiplier = 1.0;
+      if (n.includes('ml') || n.includes(' l') || n.includes('gm') || n.includes('kg')) {
+        multiplier = n.includes('ml') || n.includes(' l') 
+          ? getVolumeMultiplier(first.name) 
+          : getWeightMultiplier(first.name);
+      }
+      return (first.price / multiplier).toString();
+    }
+    return initialData?.price.toString() || '';
+  });
+
+  const [mrp, setMrp] = useState(() => {
+    if (initialData?.variants && initialData.variants.length > 0) {
+      const first = initialData.variants[0];
+      if (first.mrp) {
+        const n = first.name.toLowerCase();
+        let multiplier = 1.0;
+        if (n.includes('ml') || n.includes(' l') || n.includes('gm') || n.includes('kg')) {
+          multiplier = n.includes('ml') || n.includes(' l') 
+            ? getVolumeMultiplier(first.name) 
+            : getWeightMultiplier(first.name);
+        }
+        return (first.mrp / multiplier).toString();
+      }
+    }
+    return initialData?.mrp?.toString() || '';
+  });
+
   const [unit, setUnit] = useState(initialData?.unit || availableUnits[0] || 'kg');
   const [image, setImage] = useState<string | null>(initialData?.image || null);
   const [gujaratiName, setGujaratiName] = useState(initialData?.gujaratiName || '');
@@ -2932,45 +3005,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
   
   const [isAddingNewUnit, setIsAddingNewUnit] = useState(false);
   const [newUnitInput, setNewUnitInput] = useState('');
-  
-  const [hasVariants, setHasVariants] = useState<boolean>(initialData?.variants && initialData.variants.length > 0 ? true : false);
-  const [variants, setVariants] = useState<ProductVariant[]>(initialData?.variants || []);
-
-  const addPresetVariant = (name: string) => {
-    if (variants.some(v => v.name.toLowerCase() === name.toLowerCase())) return;
-    const newVar: ProductVariant = {
-      id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      name,
-      price: 0,
-      mrp: undefined
-    };
-    setVariants(prev => [...prev, newVar]);
-  };
-
-  const addCustomVariant = () => {
-    const newVar: ProductVariant = {
-      id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      name: '',
-      price: 0,
-      mrp: undefined
-    };
-    setVariants(prev => [...prev, newVar]);
-  };
-
-  const updateVariantField = (id: string, field: keyof ProductVariant, value: any) => {
-    setVariants(prev => prev.map(v => {
-      if (v.id !== id) return v;
-      if (field === 'price' || field === 'mrp') {
-        const val = value === '' ? 0 : parseFloat(value);
-        return { ...v, [field]: val };
-      }
-      return { ...v, [field]: value };
-    }));
-  };
-
-  const deleteVariant = (id: string) => {
-    setVariants(prev => prev.filter(v => v.id !== id));
-  };
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2983,7 +3017,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!name || (!hasVariants && !price)) return;
+    if (!name || (variantType === 'none' && !price)) return;
     
     let finalCat = category;
     if (isAddingNewCat && newCat.trim()) {
@@ -3000,14 +3034,40 @@ const ProductForm: React.FC<ProductFormProps> = ({
     let priceVal = parseFloat(price);
     let mrpVal = mrp ? parseFloat(mrp) : undefined;
 
-    if (hasVariants) {
-      if (variants.length === 0) {
-        alert('❌ Please add at least one variant size / કૃપા કરીને ઓછામાં ઓછું એક માપ ઉમેરો');
+    let calculatedVariants: ProductVariant[] = [];
+    if (variantType !== 'none') {
+      if (selectedSizes.length === 0) {
+        alert('❌ Please select at least one size / કૃપા કરીને ઓછામાં ઓછું એક માપ પસંદ કરો');
         return;
       }
-      priceVal = variants[0].price;
-      mrpVal = variants[0].mrp;
-      finalUnit = variants[0].name;
+      
+      if (variantType === 'weight') {
+        calculatedVariants = selectedSizes.map(size => {
+          const mult = getWeightMultiplier(size);
+          return {
+            id: `v-${size.replace(/\s+/g, '')}`,
+            name: size,
+            price: parseFloat((priceVal * mult).toFixed(2)),
+            mrp: mrpVal ? parseFloat((mrpVal * mult).toFixed(2)) : undefined
+          };
+        });
+        calculatedVariants.sort((a, b) => getWeightMultiplier(a.name) - getWeightMultiplier(b.name));
+      } else if (variantType === 'volume') {
+        calculatedVariants = selectedSizes.map(size => {
+          const mult = getVolumeMultiplier(size);
+          return {
+            id: `v-${size.replace(/\s+/g, '')}`,
+            name: size,
+            price: parseFloat((priceVal * mult).toFixed(2)),
+            mrp: mrpVal ? parseFloat((mrpVal * mult).toFixed(2)) : undefined
+          };
+        });
+        calculatedVariants.sort((a, b) => getVolumeMultiplier(a.name) - getVolumeMultiplier(b.name));
+      }
+
+      priceVal = calculatedVariants[0].price;
+      mrpVal = calculatedVariants[0].mrp;
+      finalUnit = calculatedVariants[0].name;
     }
 
     let finalImage: string | undefined;
@@ -3027,7 +3087,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
       unit: finalUnit, 
       image: finalImage,
       gujaratiName: gujaratiName || undefined,
-      variants: hasVariants ? variants.map(v => ({ id: v.id, name: v.name, price: v.price, mrp: v.mrp || null })) : null
+      variants: variantType !== 'none' ? calculatedVariants.map(v => ({ id: v.id, name: v.name, price: v.price, mrp: v.mrp || null })) : null
     };
 
     if (initialData && onUpdate) {
@@ -3040,8 +3100,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
       setGujaratiName('');
       setImage(null);
       setProductImageUrl('');
-      setVariants([]);
-      setHasVariants(false);
+      setSelectedSizes([]);
+      setVariantType('none');
     }
     
     setIsAddingNewCat(false);
@@ -3167,28 +3227,37 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
       </div>
 
-      {/* Variants Toggle / વેરિએન્ટ્સ ટોગલ */}
-      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input 
-            type="checkbox" 
-            checked={hasVariants} 
-            onChange={(e) => setHasVariants(e.target.checked)}
-            className="w-4.5 h-4.5 text-primary-green focus:ring-primary-green border-slate-300 rounded-md cursor-pointer accent-[#00884F]"
-          />
-          <div className="flex flex-col">
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Has Multiple Sizes/Variants</span>
-            <span className="text-[9px] font-bold text-slate-400">અલગ-અલગ વજન/માપ અને કિંમત ઉમેરો</span>
-          </div>
-        </label>
+      {/* Variant Type Selector / વેરિએન્ટ પ્રકાર પસંદ કરો */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Variant Type / માપ પ્રકાર</label>
+        <div className="flex gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-200">
+          {(['none', 'weight', 'volume'] as const).map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => {
+                setVariantType(type);
+                if (type === 'weight') setUnit('kg');
+                else if (type === 'volume') setUnit('L');
+              }}
+              className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                variantType === type 
+                  ? 'bg-slate-900 text-white shadow-xs' 
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {type === 'none' ? 'None' : type === 'weight' ? 'Weight (KG/GM)' : 'Volume (L/ML)'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {!hasVariants ? (
+      {variantType === 'none' ? (
         <>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Selling Price (₹)</label>
-              <input required={!hasVariants} type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
+              <input required={variantType === 'none'} type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden" />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">M.R.P. (₹ - Optional)</label>
@@ -3227,95 +3296,72 @@ const ProductForm: React.FC<ProductFormProps> = ({
         </>
       ) : (
         <div className="space-y-4 border border-slate-100 bg-slate-50/50 p-4 rounded-3xl">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Sizes & Prices / માપ અને કિંમત</span>
-            <button
-              type="button"
-              onClick={addCustomVariant}
-              className="text-[9px] font-black text-[#00884F] bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1 uppercase tracking-wider hover:bg-emerald-100/60 transition-all"
-            >
-              + Add Size
-            </button>
-          </div>
-
-          {/* Quick presets */}
           <div className="space-y-2">
-            <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Quick Presets / ઝડપી ઉમેરો:</span>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">GM:</span>
-              {['50 gm', '100 gm', '200 gm', '250 gm', '500 gm'].map(p => (
-                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">KG:</span>
-              {['1 kg', '2 kg', '3 kg', '5 kg', '10 kg'].map(p => (
-                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md self-center">L:</span>
-              {['500 ml', '1 L', '2 L', '5 L', '15 L'].map(p => (
-                <button key={p} type="button" onClick={() => addPresetVariant(p)} className="text-[9px] font-bold bg-white hover:bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-700 transition-all">{p}</button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                  Base Price (for 1 {variantType === 'weight' ? 'kg' : 'L'}) (₹)
+                </label>
+                <input 
+                  required 
+                  type="number" 
+                  step="0.01" 
+                  value={price} 
+                  onChange={e => setPrice(e.target.value)} 
+                  placeholder="e.g. 100" 
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-[#00884F] outline-hidden" 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                  Base M.R.P. (for 1 {variantType === 'weight' ? 'kg' : 'L'}) (₹)
+                </label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={mrp} 
+                  onChange={e => setMrp(e.target.value)} 
+                  placeholder="e.g. 120" 
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-[#00884F] outline-hidden" 
+                />
+              </div>
             </div>
           </div>
 
-          {/* Variants inputs list */}
-          <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
-            {variants.map((v, index) => (
-              <div key={v.id} className="flex gap-2 items-center bg-white border border-slate-200 rounded-2xl p-2.5 relative shadow-xs">
-                <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[9px] font-black text-slate-400 shrink-0">
-                  {index + 1}
-                </div>
-                <div className="grid grid-cols-3 gap-2 flex-1">
-                  <div>
-                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Size/Unit</span>
-                    <input
-                      required
-                      type="text"
-                      value={v.name}
-                      onChange={e => updateVariantField(v.id, 'name', e.target.value)}
-                      placeholder="e.g. 500 gm"
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
+          <div className="space-y-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+              Select Sizes / કદ પસંદ કરો:
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white p-3 rounded-2xl border border-slate-200">
+              {(variantType === 'weight' 
+                ? ['50 gm', '100 gm', '200 gm', '250 gm', '500 gm', '1 kg', '2 kg', '3 kg', '5 kg', '10 kg']
+                : ['100 ml', '200 ml', '500 ml', '1 L', '2 L', '5 L', '15 L']
+              ).map(size => {
+                const isChecked = selectedSizes.includes(size);
+                return (
+                  <label 
+                    key={size} 
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer select-none transition-all ${
+                      isChecked 
+                        ? 'border-[#00884F] bg-emerald-50/50 text-[#00884F] font-bold' 
+                        : 'border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100/50'
+                    }`}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={isChecked} 
+                      onChange={() => {
+                        setSelectedSizes(prev => 
+                          prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                        );
+                      }}
+                      className="w-3.5 h-3.5 text-[#00884F] focus:ring-[#00884F] rounded-md cursor-pointer accent-[#00884F]"
                     />
-                  </div>
-                  <div>
-                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Price (₹)</span>
-                    <input
-                      required
-                      type="number"
-                      step="0.01"
-                      value={v.price === 0 ? '' : v.price}
-                      onChange={e => updateVariantField(v.id, 'price', e.target.value)}
-                      placeholder="e.g. 100"
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">MRP (₹)</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={v.mrp === undefined || v.mrp === 0 ? '' : v.mrp}
-                      onChange={e => updateVariantField(v.id, 'mrp', e.target.value)}
-                      placeholder="e.g. 120"
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-bold focus:border-[#00884F] outline-hidden w-full"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => deleteVariant(v.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all shrink-0 mt-3"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {variants.length === 0 && (
-              <p className="text-center py-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">No sizes added yet / કોઈ સાઇઝ ઉમેરેલી નથી</p>
-            )}
+                    <span className="text-xs">{size}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
