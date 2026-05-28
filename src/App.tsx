@@ -912,6 +912,12 @@ export default function App() {
     });
     msg += `\n*💰 GRAND TOTAL: ₹${cartTotal.toFixed(2)}*\n\n`;
     msg += `Thank you for shopping with us!`;
+    msg += `\n\n━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `*📝 IMPORTANT NOTES / મહત્વની નોંધ:*\n\n`;
+    msg += `1️⃣ ઓર્ડરનું પેમેન્ટ ઓર્ડર આપવા આવો ત્યારે આપવાનું રહેશે.\n`;
+    msg += `_(Order payment must be made at the time of pickup/delivery.)_\n\n`;
+    msg += `2️⃣ ઓર્ડર ડિલિવર થયા પછી જો કોઈ વસ્તુ પાછી આપવાની હોય તો 24 કલાકમાં વસ્તુ આપવા રૂબરૂ શોપ પર આવવાનું રહેશે.\n`;
+    msg += `_(If any item needs to be returned after delivery, you must visit the shop in person within 24 hours.)_`;
 
     const cleanWhatsappNumber = shopSettings.whatsapp.replace(/\D/g, '');
     let finalWhatsapp = cleanWhatsappNumber;
