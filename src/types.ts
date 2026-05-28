@@ -35,6 +35,7 @@ export interface CustomerDetails {
   name: string;
   phone: string;
   address: string;
+  deliveryMode?: 'home_delivery' | 'pickup';
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
@@ -46,6 +47,7 @@ export interface Order {
   total: number;
   status: OrderStatus;
   createdAt: string;
+  deliveryMode?: 'home_delivery' | 'pickup';
 }
 
 export interface Banner {

@@ -15,7 +15,7 @@ import {
   Image as ImageIcon, LogOut, ArrowLeft, 
   CheckCircle, Settings, ClipboardList, 
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
-  Download, Upload, Database, GripVertical
+  Download, Upload, Database, GripVertical, Truck, Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -875,13 +875,16 @@ export default function App() {
   const handleCreateOrder = async (customerDetails: CustomerDetails) => {
     if (cart.length === 0) return;
 
+    const deliveryMode = customerDetails.deliveryMode || 'pickup';
+
     const newOrder: Order = {
       id: `ORD-${Date.now().toString().slice(-6)}`,
       items: [...cart],
       customer: customerDetails,
       total: cartTotal,
       status: 'pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      deliveryMode: deliveryMode
     };
 
     try {
@@ -891,11 +894,17 @@ export default function App() {
     }
 
     // Construct WhatsApp message
+    const deliveryLabel = deliveryMode === 'home_delivery' ? '🚚 Home Delivery' : '🏪 Pick Up At Store';
     let msg = `*📦 NEW ORDER: ${shopSettings.shopName}*\n\n`;
+    msg += `*📋 Delivery Mode: ${deliveryLabel}*\n\n`;
     msg += `*👤 Customer Details:*\n`;
     msg += `• Name: ${customerDetails.name}\n`;
     msg += `• Phone: ${customerDetails.phone}\n`;
-    msg += `• Address: ${customerDetails.address}\n\n`;
+    if (deliveryMode === 'home_delivery') {
+      msg += `• Address: ${customerDetails.address}\n\n`;
+    } else {
+      msg += `• (Pick Up At Store)\n\n`;
+    }
     msg += `*🛒 Items Ordered:*\n`;
     cart.forEach((item, index) => {
       const displayUnit = item.selectedVariant ? `${item.quantity} x ${item.unit}` : `${item.quantity} ${item.unit}`;
@@ -915,7 +924,10 @@ export default function App() {
     
     // Reset cart
     setCart([]);
-    alert('Order placed successfully! Redirecting to WhatsApp to send order...');
+    alert(deliveryMode === 'home_delivery' 
+      ? 'Order placed successfully! Home Delivery selected. Redirecting to WhatsApp...'
+      : 'Order placed successfully! Pick up at store selected. Redirecting to WhatsApp...'
+    );
     window.open(url, '_blank');
   };
 
@@ -1949,6 +1961,9 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* 🚚 Welcome Popup Notice */}
+                <WelcomeDeliveryPopup />
+
                 {/* Banner Ad Slider - Mobile Friendly */}
                 {!selectedCategory && (
                   <BannerSlider 
@@ -2125,7 +2140,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        <CheckoutForm onSubmit={handleCreateOrder} isDisabled={cart.length === 0} />
+                        <CheckoutForm onSubmit={handleCreateOrder} isDisabled={cart.length === 0} cartTotal={cartTotal} />
                       </div>
                     </div>
                   </div>
@@ -2178,6 +2193,130 @@ export default function App() {
     </div>
   );
 }
+
+// 🚚 Welcome Delivery Popup Component (shows on first visit)
+const WelcomeDeliveryPopup: React.FC = () => {
+  const [isOpen, setIsOpen] = useState(() => {
+    return sessionStorage.getItem('welcomePopupSeen') !== 'true';
+  });
+
+  const handleClose = () => {
+    setIsOpen(false);
+    sessionStorage.setItem('welcomePopupSeen', 'true');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)' }}
+        onClick={handleClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.85, y: 30 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl"
+          style={{
+            background: 'linear-gradient(160deg, #FFF7ED 0%, #FFFBEB 30%, #FEF3C7 70%, #FDE68A 100%)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Decorative elements */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-300/20"></div>
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-orange-300/15"></div>
+          <div className="absolute top-20 right-10 w-12 h-12 rounded-full bg-amber-200/30"></div>
+
+          {/* Close button */}
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white text-amber-700 hover:text-amber-900 transition-all shadow-sm z-10"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="relative px-6 py-8 sm:px-8 sm:py-10">
+            {/* Header Icon */}
+            <div className="flex justify-center mb-5">
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 via-orange-400 to-orange-500 flex items-center justify-center shadow-xl shadow-orange-300/40"
+              >
+                <Truck className="w-10 h-10 text-white" />
+              </motion.div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-center text-xl sm:text-2xl font-black text-amber-900 mb-2">
+              📢 ડિલિવરી માહિતી
+            </h2>
+            <p className="text-center text-xs font-bold text-amber-600 uppercase tracking-widest mb-6">
+              Delivery Information
+            </p>
+
+            {/* Info Cards */}
+            <div className="space-y-3 mb-6">
+              {/* Home Delivery Info */}
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-amber-200/50">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                    <Truck className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900 leading-snug">
+                      ₹2000 થી વધુ ની ખરીદી પર <span className="text-emerald-600 font-extrabold">હોમ ડિલિવરી</span> મળશે
+                    </p>
+                    <p className="text-[11px] text-amber-700/70 mt-1">
+                      Home delivery on orders above ₹2,000
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Store Pickup Info */}
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-amber-200/50">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                    <Store className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900 leading-snug">
+                      ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને <span className="text-blue-600 font-extrabold">રૂબરૂ લઈ જાવ</span>
+                    </p>
+                    <p className="text-[11px] text-amber-700/70 mt-1">
+                      For orders below ₹2,000, order online & pick up from store
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Button */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleClose}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-orange-300/30 flex items-center justify-center gap-2"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              ખરીદી શરૂ કરો / Start Shopping
+            </motion.button>
+          </div>
+
+          {/* Bottom accent */}
+          <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400"></div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 // Banner Ad Slider Sub-Component
 interface BannerSliderProps {
@@ -2663,69 +2802,233 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ item, name, isActive, onCli
 interface CheckoutFormProps {
   onSubmit: (details: CustomerDetails) => void;
   isDisabled: boolean;
+  cartTotal: number;
 }
 
-const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled }) => {
-  const [details, setDetails] = useState<CustomerDetails>({ name: '', phone: '', address: '' });
+const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartTotal }) => {
+  const [details, setDetails] = useState<CustomerDetails>({ name: '', phone: '', address: '', deliveryMode: undefined });
+  const [showDeliveryWarning, setShowDeliveryWarning] = useState(false);
+  const isHomeDeliveryEligible = cartTotal >= 2000;
+
+  const handleDeliveryModeSelect = (mode: 'home_delivery' | 'pickup') => {
+    if (mode === 'home_delivery' && !isHomeDeliveryEligible) {
+      setShowDeliveryWarning(true);
+      return;
+    }
+    setShowDeliveryWarning(false);
+    setDetails(prev => ({ ...prev, deliveryMode: mode, address: mode === 'pickup' ? 'Pick Up At Store' : (prev.address === 'Pick Up At Store' ? '' : prev.address) }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!details.name || !details.phone || !details.address) {
-      alert('Please fill out all checkout details.');
+    if (!details.deliveryMode) {
+      alert('કૃપા કરીને ડિલિવરી વિકલ્પ પસંદ કરો / Please select a delivery option.');
+      return;
+    }
+    if (!details.name || !details.phone) {
+      alert('કૃપા કરીને બધી વિગતો ભરો / Please fill out all details.');
+      return;
+    }
+    if (details.deliveryMode === 'home_delivery' && !details.address) {
+      alert('કૃપા કરીને ડિલિવરી એડ્રેસ ભરો / Please enter delivery address.');
       return;
     }
     onSubmit(details);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3.5">
-      <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider mb-2">Delivery Details</h4>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider mb-1">Delivery Option / ડિલિવરી વિકલ્પ</h4>
       
-      <div className="relative">
-        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          required
-          type="text"
-          placeholder="Receiver's Name"
-          value={details.name}
-          onChange={e => setDetails({ ...details, name: e.target.value })}
-          className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden"
-        />
+      {/* Delivery Mode Selection */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Home Delivery Option */}
+        <button
+          type="button"
+          onClick={() => handleDeliveryModeSelect('home_delivery')}
+          className={`relative p-3.5 rounded-2xl border-2 text-left transition-all ${
+            details.deliveryMode === 'home_delivery' 
+              ? 'border-emerald-500 bg-emerald-50 shadow-md shadow-emerald-100' 
+              : isHomeDeliveryEligible
+                ? 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30'
+                : 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'
+          }`}
+        >
+          {details.deliveryMode === 'home_delivery' && (
+            <div className="absolute top-2 right-2">
+              <CheckCircle className="w-4 h-4 text-emerald-500" />
+            </div>
+          )}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${
+            details.deliveryMode === 'home_delivery' ? 'bg-emerald-500' : 'bg-slate-200'
+          }`}>
+            <Truck className={`w-5 h-5 ${details.deliveryMode === 'home_delivery' ? 'text-white' : 'text-slate-500'}`} />
+          </div>
+          <p className="text-[10px] font-black text-slate-900 uppercase leading-tight">Home Delivery</p>
+          <p className="text-[9px] font-bold text-slate-400 mt-0.5">હોમ ડિલિવરી</p>
+          {!isHomeDeliveryEligible && (
+            <p className="text-[8px] font-bold text-red-500 mt-1">₹2000+ જરૂરી</p>
+          )}
+        </button>
+
+        {/* Pick Up Option */}
+        <button
+          type="button"
+          onClick={() => handleDeliveryModeSelect('pickup')}
+          className={`relative p-3.5 rounded-2xl border-2 text-left transition-all ${
+            details.deliveryMode === 'pickup' 
+              ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100' 
+              : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30'
+          }`}
+        >
+          {details.deliveryMode === 'pickup' && (
+            <div className="absolute top-2 right-2">
+              <CheckCircle className="w-4 h-4 text-blue-500" />
+            </div>
+          )}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${
+            details.deliveryMode === 'pickup' ? 'bg-blue-500' : 'bg-slate-200'
+          }`}>
+            <Store className={`w-5 h-5 ${details.deliveryMode === 'pickup' ? 'text-white' : 'text-slate-500'}`} />
+          </div>
+          <p className="text-[10px] font-black text-slate-900 uppercase leading-tight">Pick Up At Store</p>
+          <p className="text-[9px] font-bold text-slate-400 mt-0.5">દુકાનેથી લઈ જાવ</p>
+        </button>
       </div>
 
-      <div className="relative">
-        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          required
-          type="tel"
-          placeholder="WhatsApp Number"
-          value={details.phone}
-          onChange={e => setDetails({ ...details, phone: e.target.value })}
-          className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden"
-        />
-      </div>
+      {/* ₹2000 Warning Popup */}
+      <AnimatePresence>
+        {showDeliveryWarning && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4 text-amber-700" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-900 leading-snug">
+                  ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે
+                </p>
+                <p className="text-[10px] text-amber-700 mt-1">
+                  Home delivery only for orders above ₹2,000. Your current total: <span className="font-black">₹{cartTotal.toFixed(0)}</span>
+                </p>
+                <p className="text-[10px] text-amber-600 mt-1 font-semibold">
+                  તમે "Pick Up At Store" પસંદ કરી ઓર્ડર મુકી શકો છો.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeliveryWarning(false);
+                    handleDeliveryModeSelect('pickup');
+                  }}
+                  className="mt-2 text-[10px] font-black text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-all"
+                >
+                  🏪 Pick Up At Store પસંદ કરો
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeliveryWarning(false)}
+                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-amber-200/50 transition-all shrink-0"
+              >
+                <X className="w-3 h-3 text-amber-600" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="relative">
-        <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
-        <textarea
-          required
-          rows={3}
-          placeholder="Complete Delivery Address"
-          value={details.address}
-          onChange={e => setDetails({ ...details, address: e.target.value })}
-          className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden resize-none"
-        />
-      </div>
+      {/* Customer Details - show after delivery mode selected */}
+      <AnimatePresence>
+        {details.deliveryMode && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-3 overflow-hidden"
+          >
+            <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider pt-2">
+              {details.deliveryMode === 'home_delivery' ? 'Delivery Details / ડિલિવરી વિગતો' : 'Your Details / તમારી વિગતો'}
+            </h4>
 
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        type="submit"
-        disabled={isDisabled}
-        className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg disabled:opacity-40 disabled:grayscale transition-all flex items-center justify-center gap-2 mt-4"
-      >
-        <Send className="w-4 h-4" /> Send Order via WhatsApp
-      </motion.button>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                required
+                type="text"
+                placeholder="તમારું નામ / Your Name"
+                value={details.name}
+                onChange={e => setDetails({ ...details, name: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden"
+              />
+            </div>
+
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                required
+                type="tel"
+                placeholder="WhatsApp નંબર / WhatsApp Number"
+                value={details.phone}
+                onChange={e => setDetails({ ...details, phone: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden"
+              />
+            </div>
+
+            {/* Address - only for Home Delivery */}
+            {details.deliveryMode === 'home_delivery' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="relative"
+              >
+                <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="સંપૂર્ણ ડિલિવરી એડ્રેસ / Complete Delivery Address"
+                  value={details.address === 'Pick Up At Store' ? '' : details.address}
+                  onChange={e => setDetails({ ...details, address: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden resize-none"
+                />
+              </motion.div>
+            )}
+
+            {/* Pickup confirmation badge */}
+            {details.deliveryMode === 'pickup' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex items-center gap-2">
+                <Store className="w-4 h-4 text-blue-600 shrink-0" />
+                <p className="text-[11px] font-bold text-blue-800">
+                  તમારો ઓર્ડર દુકાનેથી લઈ જવાનો રહેશે / You'll pick up from our store
+                </p>
+              </div>
+            )}
+
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              type="submit"
+              disabled={isDisabled}
+              className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg disabled:opacity-40 disabled:grayscale transition-all flex items-center justify-center gap-2 mt-4 ${
+                details.deliveryMode === 'home_delivery'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-blue-600 text-white'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              {details.deliveryMode === 'home_delivery' 
+                ? 'Send Order / ઓર્ડર મોકલો 🚚' 
+                : 'Place Pickup Order / ઓર્ડર મુકો 🏪'
+              }
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </form>
   );
 };
