@@ -3508,14 +3508,14 @@ const AdminCouponsPanel: React.FC<AdminCouponsPanelProps> = ({
       discountType,
       discountValue: discountType === 'free_delivery' ? 0 : Number(discountValue),
       minOrderAmount: Number(minOrderAmount),
-      maxDiscount: discountType === 'percentage' && maxDiscount ? Number(maxDiscount) : undefined,
-      category: discountType === 'category' ? category : undefined,
       expiryDate,
       usageLimit: Number(usageLimit),
       activeStatus,
       firstOrderOnly,
       onePerCustomer,
-      customerSpecific: customerSpecific.trim() || undefined
+      ...(discountType === 'percentage' && maxDiscount ? { maxDiscount: Number(maxDiscount) } : {}),
+      ...(discountType === 'category' && category ? { category } : {}),
+      ...(customerSpecific.trim() ? { customerSpecific: customerSpecific.trim() } : {})
     };
 
     if (editingCoupon) {
