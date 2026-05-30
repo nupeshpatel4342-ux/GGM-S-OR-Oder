@@ -48,6 +48,7 @@ export interface Order {
   status: OrderStatus;
   createdAt: string;
   deliveryMode?: 'home_delivery' | 'pickup';
+  customerId?: string;
 }
 
 export interface Banner {
@@ -57,5 +58,27 @@ export interface Banner {
   linkUrl?: string;
   isActive: boolean;
   order?: number;
+}
+
+export interface SavedAddress {
+  id: string;
+  label: string;
+  address: string;
+  isDefault: boolean;
+}
+
+export interface CustomerProfile {
+  uid: string;
+  name: string;
+  phone: string;
+  createdAt: string;
+  savedAddresses: SavedAddress[];
+  wishlist: string[];
+}
+
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
 }
 

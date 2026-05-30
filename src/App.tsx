@@ -15,14 +15,16 @@ import {
   Image as ImageIcon, LogOut, ArrowLeft, 
   CheckCircle, Settings, ClipboardList, 
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
-  Download, Upload, Database, GripVertical, Truck, Home
+  Download, Upload, Database, GripVertical, Truck, Home,
+  Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner } from './types.ts';
-import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from './firebase.ts';
+import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage } from './types.ts';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
+import { db, auth } from './firebase.ts';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User as FirebaseAuthUser } from 'firebase/auth';
 
 enum OperationType {
   CREATE = 'create',
@@ -288,6 +290,14 @@ export default function App() {
 
   const isAdminView = location.pathname.startsWith('/admin');
 
+  // Customer Auth state
+  const [customerUser, setCustomerUser] = useState<FirebaseAuthUser | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [customerAuthLoading, setCustomerAuthLoading] = useState(true);
+
   // Real-time Firestore synchronization listeners
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -468,6 +478,87 @@ export default function App() {
     });
     return () => unsub();
   }, []); // Subscribe once – onSnapshot receives all real-time updates automatically
+
+  // Customer Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCustomerUser(user);
+      if (user) {
+        try {
+          const profileSnap = await getDoc(doc(db, 'customers', user.uid));
+          if (profileSnap.exists()) {
+            setCustomerProfile(profileSnap.data() as CustomerProfile);
+          }
+          const cartSnap = await getDoc(doc(db, 'customerCarts', user.uid));
+          if (cartSnap.exists() && cartSnap.data().items?.length > 0) {
+            setCart(cartSnap.data().items);
+          }
+        } catch (error) {
+          console.error('Error loading customer data:', error);
+        }
+      } else {
+        setCustomerProfile(null);
+        setCart([]);
+      }
+      setCustomerAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Persist cart to Firestore (debounced)
+  const cartSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!customerUser) return;
+    if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current);
+    cartSaveTimerRef.current = setTimeout(() => {
+      setDoc(doc(db, 'customerCarts', customerUser.uid), {
+        items: cart,
+        updatedAt: new Date().toISOString()
+      }).catch(console.error);
+    }, 1500);
+    return () => { if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current); };
+  }, [cart, customerUser]);
+
+  // Toast notification helper
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now().toString() + Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  // Wishlist toggle
+  const toggleWishlist = async (productId: string) => {
+    if (!customerUser || !customerProfile) {
+      setShowAuthModal(true);
+      return;
+    }
+    const currentWishlist = customerProfile.wishlist || [];
+    const isWishlisted = currentWishlist.includes(productId);
+    const newWishlist = isWishlisted
+      ? currentWishlist.filter((id: string) => id !== productId)
+      : [...currentWishlist, productId];
+    try {
+      await setDoc(doc(db, 'customers', customerUser.uid), { wishlist: newWishlist }, { merge: true });
+      setCustomerProfile(prev => prev ? { ...prev, wishlist: newWishlist } : null);
+      showToast(isWishlisted ? 'Wishlist માંથી દૂર કર્યું' : 'Wishlist માં ઉમેર્યું ❤️', isWishlisted ? 'info' : 'success');
+    } catch (error) {
+      showToast('Error updating wishlist', 'error');
+    }
+  };
+
+  // Customer logout
+  const handleCustomerLogout = async () => {
+    try {
+      await signOut(auth);
+      setCustomerUser(null);
+      setCustomerProfile(null);
+      setCart([]);
+      showToast('Successfully logged out / સફળતાપૂર્વક લૉગ આઉટ થયા', 'info');
+      navigate('/');
+    } catch (error) {
+      showToast('Logout failed', 'error');
+    }
+  };
 
   const addCategory = async (cat: Omit<CategoryItem, 'id'>) => {
     const id = cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
@@ -781,7 +872,7 @@ export default function App() {
     }
   };
 
-  const addToCart = (product: Product, quantity: number, selectedVariant?: ProductVariant) => {
+  const addToCartInternal = (product: Product, quantity: number, selectedVariant?: ProductVariant) => {
     setCart(prev => {
       const existing = prev.find(item => 
         item.id === product.id && 
@@ -809,6 +900,15 @@ export default function App() {
         quantity 
       }];
     });
+  };
+
+  const addToCart = (product: Product, quantity: number, selectedVariant?: ProductVariant) => {
+    if (!customerUser) {
+      setAuthRedirectAction(() => () => addToCartInternal(product, quantity, selectedVariant));
+      setShowAuthModal(true);
+      return;
+    }
+    addToCartInternal(product, quantity, selectedVariant);
   };
 
   const updateCartQuantity = (cartItemId: string, delta: number) => {
@@ -893,7 +993,8 @@ export default function App() {
       total: cartTotal,
       status: 'pending',
       createdAt: new Date().toISOString(),
-      deliveryMode: deliveryMode
+      deliveryMode: deliveryMode,
+      customerId: customerUser?.uid || undefined
     };
 
     try {
@@ -1912,6 +2013,29 @@ export default function App() {
                 View Customer Shop
               </motion.button>
             )}
+            {!isAdminView && (
+              customerUser ? (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/account')}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50"
+                >
+                  <User className="w-4.5 h-4.5 text-emerald-650" />
+                  <span>{customerProfile?.name || customerUser.displayName || 'My Account'}</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
+                >
+                  <UserPlus className="w-4.5 h-4.5" />
+                  <span>Login / લૉગિન</span>
+                </motion.button>
+              )
+            )}
           </div>
         </header>
 
@@ -1941,6 +2065,44 @@ export default function App() {
                 className="pb-16"
               >
                 <ProductDetailPageWrapper products={products} addToCart={addToCart} />
+              </motion.div>
+            } />
+
+            {/* Customer Account Dashboard route */}
+            <Route path="/account" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="pb-16"
+              >
+                {customerUser ? (
+                  <MyAccountPage 
+                    customerUser={customerUser}
+                    customerProfile={customerProfile}
+                    setCustomerProfile={setCustomerProfile}
+                    showToast={showToast}
+                    products={products}
+                    onAdd={addToCart}
+                    onLogout={handleCustomerLogout}
+                  />
+                ) : (
+                  <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
+                    <Lock className="w-12 h-12 text-slate-300 mx-auto" />
+                    <h3 className="text-slate-900 font-black text-lg">લૉગિન કરવું જરૂરી છે / Login Required</h3>
+                    <p className="text-slate-400 text-xs">તમારું એકાઉન્ટ અને ઓર્ડર ઇતિહાસ જોવા માટે લૉગિન કરવું જરૂરી છે.</p>
+                    <button
+                      onClick={() => {
+                        setAuthRedirectAction(() => () => navigate('/account'));
+                        setShowAuthModal(true);
+                      }}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
+                    >
+                      Login / લૉગિન કરો
+                    </button>
+                  </div>
+                )}
               </motion.div>
             } />
 
@@ -2065,7 +2227,13 @@ export default function App() {
 
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {filteredProducts.map((p: Product) => (
-                          <ProductCard key={p.id} product={p} onAdd={addToCart} />
+                          <ProductCard 
+                            key={p.id} 
+                            product={p} 
+                            onAdd={addToCart} 
+                            isWishlisted={Boolean(customerProfile?.wishlist?.includes(p.id))}
+                            onToggleWishlist={toggleWishlist}
+                          />
                         ))}
                         {filteredProducts.length === 0 && (
                           <div className="col-span-full py-16 text-center bg-white border border-slate-200 rounded-3xl border-dashed">
@@ -2163,7 +2331,25 @@ export default function App() {
                           </div>
                         </div>
 
-                        <CheckoutForm onSubmit={handleCreateOrder} isDisabled={cart.length === 0} cartTotal={cartTotal} />
+                        {!customerUser ? (
+                          <div className="bg-slate-50 border border-slate-200 border-dashed rounded-[20px] p-5 text-center space-y-3">
+                            <Lock className="w-8 h-8 text-slate-400 mx-auto" />
+                            <p className="text-xs font-black text-slate-800">લૉગિન કરવું જરૂરી છે / Login Required</p>
+                            <p className="text-[10px] font-bold text-slate-400">ઓર્ડર મોકલવા માટે કૃપા કરીને લૉગિન કરો.</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuthRedirectAction(() => () => {});
+                                setShowAuthModal(true);
+                              }}
+                              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                            >
+                              Login / લૉગિન કરો
+                            </button>
+                          </div>
+                        ) : (
+                          <CheckoutForm onSubmit={handleCreateOrder} isDisabled={cart.length === 0} cartTotal={cartTotal} customerProfile={customerProfile} />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2212,6 +2398,19 @@ export default function App() {
           </Routes>
         </AnimatePresence>
 
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+          showToast={showToast} 
+          onAuthSuccess={() => {
+            if (authRedirectAction) {
+              authRedirectAction();
+              setAuthRedirectAction(null);
+            }
+          }}
+        />
+
+        <ToastContainer toasts={toasts} />
       </div>
     </div>
   );
@@ -2849,17 +3048,30 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ item, name, isActive, onCli
   );
 };
 
-// Customer Checkout Form
 interface CheckoutFormProps {
   onSubmit: (details: CustomerDetails) => void;
   isDisabled: boolean;
   cartTotal: number;
+  customerProfile: CustomerProfile | null;
 }
 
-const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartTotal }) => {
+const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartTotal, customerProfile }) => {
   const [details, setDetails] = useState<CustomerDetails>({ name: '', phone: '', address: '', deliveryMode: undefined });
   const [showDeliveryWarning, setShowDeliveryWarning] = useState(false);
   const isHomeDeliveryEligible = cartTotal >= 2000;
+
+  // Auto-fill details from profile
+  useEffect(() => {
+    if (customerProfile) {
+      const defaultAddr = customerProfile.savedAddresses?.find(a => a.isDefault)?.address || '';
+      setDetails(prev => ({
+        ...prev,
+        name: prev.name || customerProfile.name || '',
+        phone: prev.phone || customerProfile.phone || '',
+        address: prev.address || defaultAddr || ''
+      }));
+    }
+  }, [customerProfile]);
 
   const handleDeliveryModeSelect = (mode: 'home_delivery' | 'pickup') => {
     if (mode === 'home_delivery' && !isHomeDeliveryEligible) {
@@ -3036,17 +3248,41 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartT
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="relative"
+                className="space-y-2.5"
               >
-                <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="સંપૂર્ણ ડિલિવરી એડ્રેસ / Complete Delivery Address"
-                  value={details.address === 'Pick Up At Store' ? '' : details.address}
-                  onChange={e => setDetails({ ...details, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-primary-green outline-hidden resize-none"
-                />
+                {customerProfile && customerProfile.savedAddresses && customerProfile.savedAddresses.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Select Address / સરનામું પસંદ કરો</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {customerProfile.savedAddresses.map(addr => (
+                        <button
+                          key={addr.id}
+                          type="button"
+                          onClick={() => setDetails(prev => ({ ...prev, address: addr.address }))}
+                          className={`px-3 py-1.5 rounded-xl border text-[10px] font-black transition-all ${
+                            details.address === addr.address
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-500 shadow-xs'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-350'
+                          }`}
+                        >
+                          {addr.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400" />
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="સંપૂર્ણ ડિલિવરી એડ્રેસ / Complete Delivery Address"
+                    value={details.address === 'Pick Up At Store' ? '' : details.address}
+                    onChange={e => setDetails({ ...details, address: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 outline-hidden resize-none"
+                  />
+                </div>
               </motion.div>
             )}
 
@@ -3861,9 +4097,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
 interface ProductCardProps {
   product: Product;
   onAdd: (p: Product, qty: number, variant?: ProductVariant) => void;
+  isWishlisted: boolean;
+  onToggleWishlist: (productId: string) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, isWishlisted, onToggleWishlist }) => {
   const navigate = useNavigate();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -3901,6 +4139,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
         ) : (
           <ImageIcon className="w-8 h-8 text-slate-200" />
         )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWishlist(product.id);
+          }}
+          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-xs hover:shadow-md flex items-center justify-center border border-slate-100 transition-all duration-200 z-10"
+        >
+          <Heart className={`w-4 h-4 transition-all duration-300 ${isWishlisted ? 'fill-red-500 text-red-500 scale-110' : 'text-slate-400 hover:text-red-500'}`} />
+        </button>
         {hasDiscount && (
           <div className="absolute top-2 left-2">
             <span className="bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
@@ -3982,3 +4230,847 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
     </motion.div>
   );
 };
+
+// ==========================================
+// CUSTOMER AUTHENTICATION COMPONENTS & HELPERS
+// ==========================================
+
+export const normalizePhone = (phone: string) => {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    cleaned = '91' + cleaned;
+  }
+  return cleaned;
+};
+
+export const phoneToEmail = (phone: string) => {
+  return `${normalizePhone(phone)}@ggms.app`;
+};
+
+export const ToastContainer: React.FC<{ toasts: ToastMessage[] }> = ({ toasts }) => {
+  return (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 max-w-sm w-full px-4 pointer-events-none">
+      <AnimatePresence>
+        {toasts.map(toast => (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className={`p-3 rounded-2xl shadow-lg text-xs font-black text-white flex items-center gap-2 border pointer-events-auto ${
+              toast.type === 'success' 
+                ? 'bg-emerald-600 border-emerald-500' 
+                : toast.type === 'error' 
+                  ? 'bg-rose-600 border-rose-500' 
+                  : 'bg-blue-600 border-blue-500'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle className="w-4 h-4 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4 shrink-0" />}
+            {toast.type === 'info' && <Clock className="w-4 h-4 shrink-0" />}
+            <span className="flex-1">{toast.message}</span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export const AuthModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onAuthSuccess: () => void;
+}> = ({ isOpen, onClose, showToast, onAuthSuccess }) => {
+  const [tab, setTab] = useState<'login' | 'signup'>('login');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone || !password) {
+      showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
+      return;
+    }
+    const cleanPhone = normalizePhone(phone);
+    if (cleanPhone.length < 10) {
+      showToast('સાચો ફોન નંબર દાખલ કરો / Enter a valid phone number.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const email = `${cleanPhone}@ggms.app`;
+      await signInWithEmailAndPassword(auth, email, password);
+      showToast('સફળતાપૂર્વક લૉગિન થયા! / Login Successful! 🎉', 'success');
+      onAuthSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      let errMsg = 'લૉગિન નિષ્ફળ ગયું / Login Failed';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errMsg = 'મોબાઈલ નંબર અથવા પાસવર્ડ ખોટો છે / Incorrect mobile or password';
+      }
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !phone || !password || !confirmPassword) {
+      showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
+      return;
+    }
+    const cleanPhone = normalizePhone(phone);
+    if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ''))) {
+      showToast('કૃપા કરીને સાચો ૧૦ આંકડાનો WhatsApp નંબર લખો / Enter a valid 10-digit number.', 'error');
+      return;
+    }
+    if (password.length < 6) {
+      showToast('પાસવર્ડ ઓછામાં ઓછો ૬ અક્ષરનો હોવો જોઈએ / Password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (password !== confirmPassword) {
+      showToast('બંને પાસવર્ડ અલગ અલગ છે / Passwords do not match.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const email = `${cleanPhone}@ggms.app`;
+      // Create user
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = credential.user;
+
+      // Update Firebase Profile
+      await updateProfile(user, { displayName: name });
+
+      // Save to Firestore
+      const newProfile: CustomerProfile = {
+        uid: user.uid,
+        name,
+        phone: cleanPhone,
+        createdAt: new Date().toISOString(),
+        savedAddresses: [],
+        wishlist: []
+      };
+      await setDoc(doc(db, 'customers', user.uid), newProfile);
+
+      showToast('નવું એકાઉન્ટ સફળતાપૂર્વક બની ગયું! / Signup Successful! 🛒', 'success');
+      onAuthSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      let errMsg = 'સાઇનઅપ નિષ્ફળ ગયું / Signup Failed';
+      if (error.code === 'auth/email-already-in-use') {
+        errMsg = 'આ નંબર પર એકાઉન્ટ પહેલેથી બનેલું છે / This number is already registered.';
+      }
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        onClick={onClose} 
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300"
+      />
+
+      {/* Modal Card */}
+      <div className="relative bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-205">
+        
+        {/* Header decoration */}
+        <div className="bg-emerald-600 p-6 text-white text-center relative">
+          <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          
+          <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <Store className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="text-lg font-black tracking-wide">GGM&S Grocery Shop</h3>
+          <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-0.5">Customer Portal / ગ્રાહક લૉગિન</p>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="flex border-b border-slate-100 bg-slate-50">
+          <button
+            type="button"
+            onClick={() => { setTab('login'); }}
+            className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+              tab === 'login' 
+                ? 'border-emerald-600 text-emerald-600 bg-white' 
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Login / લૉગિન
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTab('signup'); }}
+            className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+              tab === 'signup' 
+                ? 'border-emerald-600 text-emerald-600 bg-white' 
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Sign Up / નોંધણી
+          </button>
+        </div>
+
+        {/* Form Container */}
+        <div className="p-6 overflow-y-auto">
+          {tab === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number / વૉટ્સએપ નંબર</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="દા.ત. 9876543210"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password / પાસવર્ડ</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="છ કે તેથી વધુ અક્ષર"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <User className="w-4 h-4" />
+                      Login / લૉગિન
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <p className="text-[10px] text-slate-400 font-bold">
+                  Forgot Password? / પાસવર્ડ ભૂલી ગયા?
+                </p>
+                <p className="text-[11px] font-black text-emerald-600 mt-1">
+                  દુકાન પર રૂબરૂ અથવા WhatsApp પર સંપર્ક કરો.
+                </p>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleSignup} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Name / તમારું પૂરું નામ</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type="text"
+                    placeholder="નામ અને અટક"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number / વૉટ્સએપ નંબર</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="૧૦ આંકડાનો WhatsApp નંબર"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password / પાસવર્ડ</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="ઓછામાં ઓછા ૬ અક્ષર"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm Password / કન્ફર્મ પાસવર્ડ</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="પાસવર્ડ ફરીથી લખો"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      Sign Up / એકાઉન્ટ બનાવો
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTab('login')}
+                  className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors"
+                >
+                  Already have an account? Login / લૉગિન કરો
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const MyAccountPage: React.FC<{
+  customerUser: FirebaseAuthUser;
+  customerProfile: CustomerProfile | null;
+  setCustomerProfile: React.Dispatch<React.SetStateAction<CustomerProfile | null>>;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  products: Product[];
+  onAdd: (p: Product, qty: number, variant?: ProductVariant) => void;
+  onLogout: () => void;
+}> = ({ customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout }) => {
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist'>('orders');
+  const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  
+  // Address Form State
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addrLabel, setAddrLabel] = useState('');
+  const [addrText, setAddrText] = useState('');
+  const [editingAddrId, setEditingAddrId] = useState<string | null>(null);
+
+  // Fetch orders
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), where('customerId', '==', customerUser.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Order[] = [];
+      snapshot.forEach(docSnap => {
+        list.push({ ...docSnap.data(), id: docSnap.id } as Order);
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setCustomerOrders(list);
+      setOrdersLoading(false);
+    }, (err) => {
+      console.error(err);
+      setOrdersLoading(false);
+    });
+    return () => unsubscribe();
+  }, [customerUser.uid]);
+
+  // Handle address save (add or edit)
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addrLabel || !addrText) return;
+
+    const currentAddresses = customerProfile?.savedAddresses || [];
+    let updatedAddresses: SavedAddress[] = [];
+
+    if (editingAddrId) {
+      // Edit existing
+      updatedAddresses = currentAddresses.map(addr => 
+        addr.id === editingAddrId 
+          ? { ...addr, label: addrLabel, address: addrText } 
+          : addr
+      );
+      showToast('સરનામું અપડેટ કર્યું / Address updated successfully', 'success');
+    } else {
+      // Add new
+      const newAddress: SavedAddress = {
+        id: Date.now().toString(),
+        label: addrLabel,
+        address: addrText,
+        isDefault: currentAddresses.length === 0 // Default if it's the first address
+      };
+      updatedAddresses = [...currentAddresses, newAddress];
+      showToast('સરનામું સાચવ્યું / Address added successfully', 'success');
+    }
+
+    try {
+      await setDoc(doc(db, 'customers', customerUser.uid), { savedAddresses: updatedAddresses }, { merge: true });
+      setCustomerProfile(prev => prev ? { ...prev, savedAddresses: updatedAddresses } : null);
+      
+      // Reset form
+      setAddrLabel('');
+      setAddrText('');
+      setEditingAddrId(null);
+      setShowAddressForm(false);
+    } catch (error) {
+      showToast('Error saving address', 'error');
+    }
+  };
+
+  const handleEditAddress = (addr: SavedAddress) => {
+    setAddrLabel(addr.label);
+    setAddrText(addr.address);
+    setEditingAddrId(addr.id);
+    setShowAddressForm(true);
+  };
+
+  const handleDeleteAddress = async (addrId: string) => {
+    const currentAddresses = customerProfile?.savedAddresses || [];
+    const updatedAddresses = currentAddresses.filter(a => a.id !== addrId);
+    
+    // If we deleted the default one, make the first remaining one default
+    if (currentAddresses.find(a => a.id === addrId)?.isDefault && updatedAddresses.length > 0) {
+      updatedAddresses[0].isDefault = true;
+    }
+
+    try {
+      await setDoc(doc(db, 'customers', customerUser.uid), { savedAddresses: updatedAddresses }, { merge: true });
+      setCustomerProfile(prev => prev ? { ...prev, savedAddresses: updatedAddresses } : null);
+      showToast('સરનામું કાઢી નાખ્યું / Address deleted successfully', 'info');
+    } catch (error) {
+      showToast('Error deleting address', 'error');
+    }
+  };
+
+  const handleSetDefaultAddress = async (addrId: string) => {
+    const currentAddresses = customerProfile?.savedAddresses || [];
+    const updatedAddresses = currentAddresses.map(addr => ({
+      ...addr,
+      isDefault: addr.id === addrId
+    }));
+
+    try {
+      await setDoc(doc(db, 'customers', customerUser.uid), { savedAddresses: updatedAddresses }, { merge: true });
+      setCustomerProfile(prev => prev ? { ...prev, savedAddresses: updatedAddresses } : null);
+      showToast('મુખ્ય સરનામું સેટ કર્યું / Default address updated', 'success');
+    } catch (error) {
+      showToast('Error setting default address', 'error');
+    }
+  };
+
+  const handleReorder = (order: Order) => {
+    order.items.forEach(item => {
+      const latestProduct = products.find(p => p.id === item.id);
+      if (latestProduct) {
+        onAdd(latestProduct, item.quantity, item.selectedVariant);
+      }
+    });
+    showToast('બધી આઇટમ્સ કાર્ટમાં ઉમેરવામાં આવી છે / All items added to basket!', 'success');
+  };
+
+  // Find wishlist products
+  const wishlistProducts = useMemo(() => {
+    const wishlistIds = customerProfile?.wishlist || [];
+    return products.filter(p => wishlistIds.includes(p.id));
+  }, [customerProfile?.wishlist, products]);
+
+  return (
+    <div className="bg-slate-50 min-h-screen py-8 px-4 md:px-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* User Card */}
+        <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+              <User className="w-8 h-8" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900">{customerProfile?.name || customerUser.displayName || 'ગ્રાહક / Customer'}</h2>
+              <p className="text-xs font-bold text-slate-400 mt-1 flex items-center justify-center md:justify-start gap-1">
+                <Smartphone className="w-3.5 h-3.5" />
+                +{customerProfile?.phone || customerUser.email?.split('@')[0]}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="px-6 py-3 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout / લૉગ આઉટ
+          </button>
+        </div>
+
+        {/* Dashboard Tabs & Content */}
+        <div className="grid lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Tabs Menu */}
+          <div className="lg:col-span-3 bg-white border border-slate-100 rounded-[28px] p-4 space-y-1 shadow-sm">
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'orders' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              My Orders / ઓર્ડર્સ ({customerOrders.length})
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('addresses')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'addresses' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Addresses / સરનામું ({customerProfile?.savedAddresses?.length || 0})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('wishlist')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'wishlist' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Heart className="w-4 h-4" />
+              Wishlist / મનપસંદ ({wishlistProducts.length})
+            </button>
+          </div>
+
+          {/* Content Area */}
+          <div className="lg:col-span-9 bg-white border border-slate-100 rounded-[32px] p-6 shadow-sm min-h-[50vh]">
+            
+            {/* Orders Tab */}
+            {activeTab === 'orders' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-base font-black text-slate-900 uppercase">Order History / તમારો ઓર્ડર ઇતિહાસ</h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે કરેલા તમામ ઓર્ડર્સની વિગત</p>
+                </div>
+
+                {ordersLoading ? (
+                  <div className="py-12 flex items-center justify-center">
+                    <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : customerOrders.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                      <ClipboardList className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-slate-900 font-black">No Orders Found</h4>
+                    <p className="text-slate-400 text-xs mt-1">તમે હજુ સુધી કોઈ ઓર્ડર આપ્યો નથી.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {customerOrders.map(order => (
+                      <div key={order.id} className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+                        <div className="bg-slate-50 p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-150">
+                          <div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">ORDER ID</span>
+                            <span className="text-sm font-black text-slate-800">{order.id}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">DATE</span>
+                            <span className="text-xs font-bold text-slate-600">{new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">TOTAL</span>
+                            <span className="text-sm font-black text-[#00884F]">₹{order.total.toFixed(0)}</span>
+                          </div>
+                          <div>
+                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${
+                              order.status === 'pending' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                              order.status === 'processing' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                              order.status === 'delivered' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                              'bg-rose-100 text-rose-800 border border-rose-200'
+                            }`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleReorder(order)}
+                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Reorder
+                          </button>
+                        </div>
+                        
+                        {/* Order Items */}
+                        <div className="p-4 divide-y divide-slate-100">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="py-2.5 flex items-center justify-between gap-4 text-xs font-bold text-slate-700 first:pt-0 last:pb-0">
+                              <div className="flex-1">
+                                <p className="text-slate-800 uppercase font-black">{item.name}</p>
+                                {item.selectedVariant && (
+                                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">{item.selectedVariant.name}</p>
+                                )}
+                              </div>
+                              <span className="text-slate-500 shrink-0 font-mono">{item.quantity} x ₹{item.price.toFixed(0)}</span>
+                              <span className="text-slate-900 font-black font-mono">₹{(item.price * item.quantity).toFixed(0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Addresses Tab */}
+            {activeTab === 'addresses' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 uppercase">Saved Addresses / તમારા સરનામા</h3>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">ડિલિવરી ઝડપી કરવા માટે સરનામાં સેવ કરો</p>
+                  </div>
+                  {!showAddressForm && (
+                    <button
+                      onClick={() => {
+                        setEditingAddrId(null);
+                        setAddrLabel('');
+                        setAddrText('');
+                        setShowAddressForm(true);
+                      }}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Address
+                    </button>
+                  )}
+                </div>
+
+                {showAddressForm && (
+                  <form onSubmit={handleSaveAddress} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl space-y-4 animate-in slide-in-from-top duration-200">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      {editingAddrId ? 'Edit Address / સરનામું સુધારો' : 'New Address / નવું સરનામું ઉમેરો'}
+                    </h4>
+                    
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Label / નામ (દા.ત. Home, Office)</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="દા.ત. ઘર, ઓફિસ"
+                        value={addrLabel}
+                        onChange={e => setAddrLabel(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Address details / સંપૂર્ણ સરનામું</label>
+                      <textarea
+                        required
+                        rows={3}
+                        placeholder="ઘર નંબર, સોસાયટી, શેરી, ગામ/શહેર, પિનકોડ"
+                        value={addrText}
+                        onChange={e => setAddrText(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden resize-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="submit"
+                        className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        Save Address / સાચવો
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddressForm(false);
+                          setEditingAddrId(null);
+                        }}
+                        className="px-6 py-3 bg-slate-200 hover:bg-slate-350 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Addresses List */}
+                <div className="space-y-4">
+                  {(customerProfile?.savedAddresses || []).length === 0 ? (
+                    <div className="py-12 text-center text-slate-400 text-xs font-bold">
+                      કોઈ સરનામું સેવ કરેલું નથી. Add Address બટનથી ઉમેરો.
+                    </div>
+                  ) : (
+                    (customerProfile?.savedAddresses || []).map(addr => (
+                      <div key={addr.id} className={`p-5 rounded-2xl border-2 transition-all flex flex-col justify-between md:flex-row md:items-start gap-4 ${
+                        addr.isDefault 
+                          ? 'border-emerald-500 bg-emerald-50/20' 
+                          : 'border-slate-150 hover:border-slate-300'
+                      }`}>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-slate-250 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                              {addr.label}
+                            </span>
+                            {addr.isDefault && (
+                              <span className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Main / ડિફોલ્ટ
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-bold text-slate-700 leading-relaxed max-w-lg">
+                            {addr.address}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-start">
+                          {!addr.isDefault && (
+                            <button
+                              onClick={() => handleSetDefaultAddress(addr.id)}
+                              className="px-3 py-1.5 text-[9px] font-black uppercase tracking-wider border border-emerald-500 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            >
+                              Set Default
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditAddress(addr)}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wishlist Tab */}
+            {activeTab === 'wishlist' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-base font-black text-slate-900 uppercase">My Wishlist / તમારી મનપસંદ વસ્તુઓ</h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે સેવ કરેલી વસ્તુઓનું લિસ્ટ</p>
+                </div>
+
+                {wishlistProducts.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                      <Heart className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-slate-900 font-black">Wishlist is Empty</h4>
+                    <p className="text-slate-400 text-xs mt-1">તમારી મનપસંદ પ્રોડક્ટ્સ અહીં સેવ કરો.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {wishlistProducts.map(p => {
+                      const foundProfileWishlist = customerProfile?.wishlist || [];
+                      return (
+                        <ProductCard 
+                          key={p.id} 
+                          product={p} 
+                          onAdd={onAdd}
+                          isWishlisted={foundProfileWishlist.includes(p.id)}
+                          onToggleWishlist={async (pid) => {
+                            const newWish = foundProfileWishlist.filter(id => id !== pid);
+                            try {
+                              await setDoc(doc(db, 'customers', customerUser.uid), { wishlist: newWish }, { merge: true });
+                              setCustomerProfile(prev => prev ? { ...prev, wishlist: newWish } : null);
+                              showToast('Wishlist માંથી કાઢી નાખ્યું', 'info');
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
