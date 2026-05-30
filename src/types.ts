@@ -49,6 +49,8 @@ export interface Order {
   createdAt: string;
   deliveryMode?: 'home_delivery' | 'pickup';
   customerId?: string;
+  couponCode?: string;
+  couponDiscount?: number;
 }
 
 export interface Banner {
@@ -82,4 +84,35 @@ export interface ToastMessage {
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+export interface Coupon {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  discountType: 'flat' | 'percentage' | 'free_delivery' | 'category';
+  discountValue: number;
+  minOrderAmount: number;
+  maxDiscount?: number;
+  category?: string;
+  expiryDate: string;
+  usageLimit: number;
+  totalUsed: number;
+  activeStatus: boolean;
+  firstOrderOnly: boolean;
+  onePerCustomer: boolean;
+  customerSpecific?: string;
+  createdAt: string;
+}
+
+export interface CouponUsage {
+  id: string;
+  customerId: string;
+  customerPhone: string;
+  couponCode: string;
+  orderId: string;
+  discountAmount: number;
+  usedAt: string;
+}
+
 

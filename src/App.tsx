@@ -16,7 +16,8 @@ import {
   CheckCircle, Settings, ClipboardList, 
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
-  Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag
+  Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
+  Gift, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -276,7 +277,7 @@ export default function App() {
   });
 
   // Admin tab navigation state
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons'>('dashboard');
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -297,6 +298,13 @@ export default function App() {
   const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [customerAuthLoading, setCustomerAuthLoading] = useState(true);
+
+  // Coupon System state
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponUsages, setCouponUsages] = useState<CouponUsage[]>([]);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
 
   // Real-time Firestore synchronization listeners
   useEffect(() => {
@@ -478,6 +486,32 @@ export default function App() {
     });
     return () => unsub();
   }, []); // Subscribe once – onSnapshot receives all real-time updates automatically
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'coupons'), (snapshot) => {
+      const list: Coupon[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as Coupon);
+      });
+      setCoupons(list);
+    }, (error) => {
+      console.error("Firestore coupons read error:", error);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'couponUsages'), (snapshot) => {
+      const list: CouponUsage[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as CouponUsage);
+      });
+      setCouponUsages(list);
+    }, (error) => {
+      console.error("Firestore couponUsages read error:", error);
+    });
+    return () => unsub();
+  }, []);
 
   // Customer Auth state listener
   useEffect(() => {
@@ -667,9 +701,122 @@ export default function App() {
     return result;
   }, [products, selectedCategory, searchQuery]);
 
+  const validateCoupon = (code: string, currentCart: CartItem[], currentCartTotal: number): { valid: boolean; message: string; coupon?: Coupon } => {
+    const cleanCode = code.trim().toUpperCase();
+    const coupon = coupons.find(c => c.code.toUpperCase() === cleanCode);
+
+    if (!coupon) {
+      return { valid: false, message: 'ખોટો કૂપન કોડ / Invalid Coupon Code' };
+    }
+
+    if (!coupon.activeStatus) {
+      return { valid: false, message: 'આ કૂપન અત્યારે બંધ છે / Coupon is currently inactive' };
+    }
+
+    // Expiry check
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (coupon.expiryDate < todayStr) {
+      return { valid: false, message: 'કૂપન એક્સપાયર થઈ ગઈ છે / Coupon has expired' };
+    }
+
+    // Usage limit check
+    if (coupon.totalUsed >= coupon.usageLimit) {
+      return { valid: false, message: 'કૂપનની વપરાશ મર્યાદા પૂરી થઈ ગઈ છે / Coupon usage limit reached' };
+    }
+
+    // Minimum order amount
+    if (currentCartTotal < coupon.minOrderAmount) {
+      return { valid: false, message: `ન્યૂનતમ ₹${coupon.minOrderAmount} નો ઓર્ડર જરૂરી છે / Minimum order value of ₹${coupon.minOrderAmount} required` };
+    }
+
+    // Check if customer already used it (onePerCustomer)
+    if (customerUser && coupon.onePerCustomer) {
+      const hasUsed = couponUsages.some(u => u.customerId === customerUser.uid && u.couponCode.toUpperCase() === cleanCode);
+      if (hasUsed) {
+        return { valid: false, message: 'તમે આ કૂપન વાપરી ચૂક્યા છો / You have already used this coupon' };
+      }
+    }
+
+    // Check if first order only
+    if (customerUser && coupon.firstOrderOnly) {
+      const userOrders = orders.filter(o => o.customerId === customerUser.uid);
+      if (userOrders.length > 0) {
+        return { valid: false, message: 'આ કૂપન ફક્ત પ્રથમ ઓર્ડર માટે જ છે / Coupon only valid for first order' };
+      }
+    }
+
+    // Customer Specific coupon
+    if (customerUser && coupon.customerSpecific) {
+      const cleanCustomerSpecific = coupon.customerSpecific.replace(/\D/g, '');
+      const cleanCustomerPhone = (customerProfile?.phone || '').replace(/\D/g, '');
+      if (cleanCustomerSpecific !== cleanCustomerPhone) {
+        return { valid: false, message: 'આ કૂપન તમારા માટે એલિજિબલ નથી / You are not eligible for this coupon' };
+      }
+    }
+
+    // Category specific
+    if (coupon.discountType === 'category' && coupon.category) {
+      const hasCategoryItem = currentCart.some(item => item.category === coupon.category);
+      if (!hasCategoryItem) {
+        return { valid: false, message: `આ કૂપન ફક્ત ${coupon.category} કેટેગરી માટે છે / Coupon valid only for ${coupon.category} category` };
+      }
+    }
+
+    return { valid: true, message: 'કૂપન સફળતાપૂર્વક લાગુ થઈ ગઈ! / Coupon applied successfully! 🎉', coupon };
+  };
+
+  const handleApplyCoupon = (code: string) => {
+    if (!customerUser) {
+      setAuthRedirectAction(() => () => handleApplyCoupon(code));
+      setShowAuthModal(true);
+      return;
+    }
+    const result = validateCoupon(code, cart, cartTotal);
+    if (result.valid && result.coupon) {
+      setAppliedCoupon(result.coupon);
+      showToast(result.message, 'success');
+    } else {
+      showToast(result.message, 'error');
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput('');
+    showToast('કૂપન દૂર કરી / Coupon removed successfully', 'info');
+  };
+
   const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }, [cart]);
+
+  const couponDiscount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (cartTotal < appliedCoupon.minOrderAmount) return 0;
+
+    let discount = 0;
+    if (appliedCoupon.discountType === 'flat') {
+      discount = appliedCoupon.discountValue;
+    } else if (appliedCoupon.discountType === 'percentage') {
+      discount = cartTotal * (appliedCoupon.discountValue / 100);
+      if (appliedCoupon.maxDiscount && discount > appliedCoupon.maxDiscount) {
+        discount = appliedCoupon.maxDiscount;
+      }
+    } else if (appliedCoupon.discountType === 'category' && appliedCoupon.category) {
+      const categoryTotal = cart
+        .filter(item => item.category === appliedCoupon.category)
+        .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      discount = categoryTotal * (appliedCoupon.discountValue / 100);
+      if (appliedCoupon.maxDiscount && discount > appliedCoupon.maxDiscount) {
+        discount = appliedCoupon.maxDiscount;
+      }
+    }
+    return Math.min(discount, cartTotal);
+  }, [appliedCoupon, cart, cartTotal]);
+
+  const finalTotal = useMemo(() => {
+    return Math.max(0, cartTotal - couponDiscount);
+  }, [cartTotal, couponDiscount]);
 
   const addProduct = async (product: Omit<Product, 'id'>) => {
     try {
@@ -868,6 +1015,52 @@ export default function App() {
     }
   };
 
+  const addCoupon = async (coupon: Omit<Coupon, 'id' | 'createdAt' | 'totalUsed'>) => {
+    try {
+      const code = coupon.code.toUpperCase().trim();
+      const newCoupon: Coupon = {
+        ...coupon,
+        id: code,
+        code,
+        totalUsed: 0,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'coupons', code), newCoupon);
+      showToast('કૂપન સફળતાપૂર્વક ઉમેરાઈ ગઈ / Coupon created successfully', 'success');
+    } catch (error) {
+      handleLocalDataError(error, OperationType.CREATE, `coupons/${coupon.code}`);
+    }
+  };
+
+  const updateCoupon = async (id: string, coupon: Omit<Coupon, 'id' | 'createdAt' | 'totalUsed'>) => {
+    try {
+      const code = coupon.code.toUpperCase().trim();
+      const existing = coupons.find(c => c.id === id);
+      const updatedCoupon: Coupon = {
+        ...coupon,
+        code,
+        id,
+        createdAt: existing?.createdAt || new Date().toISOString(),
+        totalUsed: existing?.totalUsed || 0,
+      };
+      await setDoc(doc(db, 'coupons', id), updatedCoupon);
+      setEditingCoupon(null);
+      showToast('કૂપન સફળતાપૂર્વક અપડેટ થઈ ગઈ / Coupon updated successfully', 'success');
+    } catch (error) {
+      handleLocalDataError(error, OperationType.UPDATE, `coupons/${id}`);
+    }
+  };
+
+  const deleteCoupon = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this coupon? / શું તમે ખરેખર આ કૂપન ડીલીટ કરવા માંગો છો?')) return;
+    try {
+      await deleteDoc(doc(db, 'coupons', id));
+      showToast('કૂપન સફળતાપૂર્વક ડીલીટ થઈ ગઈ / Coupon deleted successfully', 'success');
+    } catch (error) {
+      handleLocalDataError(error, OperationType.DELETE, `coupons/${id}`);
+    }
+  };
+
   const updateQrValue = async (val: string) => {
     try {
       await setDoc(doc(db, 'settings', 'global'), { qrValue: val }, { merge: true });
@@ -1017,15 +1210,37 @@ export default function App() {
       id: `ORD-${Date.now().toString().slice(-6)}`,
       items: [...cart],
       customer: customerDetails,
-      total: cartTotal,
+      total: finalTotal,
       status: 'pending',
       createdAt: new Date().toISOString(),
       deliveryMode: deliveryMode,
-      customerId: customerUser?.uid || undefined
+      customerId: customerUser?.uid || undefined,
+      couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+      couponDiscount: couponDiscount > 0 ? couponDiscount : undefined
     };
 
     try {
       await setDoc(doc(db, 'orders', newOrder.id), newOrder);
+      
+      // Update coupon usage if applicable
+      if (appliedCoupon && customerUser) {
+        const usageId = `usage-${Date.now().toString()}-${Math.random().toString(36).substring(2, 9)}`;
+        const usageLog: CouponUsage = {
+          id: usageId,
+          customerId: customerUser.uid,
+          customerPhone: customerDetails.phone,
+          couponCode: appliedCoupon.code,
+          orderId: newOrder.id,
+          discountAmount: couponDiscount,
+          usedAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'couponUsages', usageId), usageLog);
+
+        // Increment coupon use count
+        await setDoc(doc(db, 'coupons', appliedCoupon.code), {
+          totalUsed: (appliedCoupon.totalUsed || 0) + 1
+        }, { merge: true });
+      }
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, 'orders');
     }
@@ -1047,7 +1262,14 @@ export default function App() {
       const displayUnit = item.selectedVariant ? `${item.quantity} x ${item.unit}` : `${item.quantity} ${item.unit}`;
       msg += `${index + 1}. ${item.name} (${displayUnit}) - ₹${(item.price * item.quantity).toFixed(2)}\n`;
     });
-    msg += `\n*💰 GRAND TOTAL: ₹${cartTotal.toFixed(2)}*\n\n`;
+    
+    if (appliedCoupon && couponDiscount > 0) {
+      msg += `\n*🏷️ Coupon Discount (${appliedCoupon.code}): -₹${couponDiscount.toFixed(0)}*`;
+      msg += `\n*💰 GRAND TOTAL: ₹${finalTotal.toFixed(0)}*\n\n`;
+    } else {
+      msg += `\n*💰 GRAND TOTAL: ₹${cartTotal.toFixed(0)}*\n\n`;
+    }
+    
     msg += `Thank you for shopping with us!`;
     msg += `\n\n━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `*📝 મહત્વની નોંધ:*\n\n`;
@@ -1063,8 +1285,11 @@ export default function App() {
     }
     const url = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(msg)}`;
     
-    // Reset cart
+    // Reset cart and coupon
     setCart([]);
+    setAppliedCoupon(null);
+    setCouponCodeInput('');
+    
     alert(deliveryMode === 'home_delivery' 
       ? 'Order placed successfully! Home Delivery selected. Redirecting to WhatsApp...'
       : 'Order placed successfully! Pick up at store selected. Redirecting to WhatsApp...'
@@ -1315,6 +1540,9 @@ export default function App() {
             </button>
             <button onClick={() => setAdminTab('banners')} className={`admin-sidebar-btn ${adminTab === 'banners' ? 'active' : ''}`}>
               <ImageIcon className="w-4 h-4" /> AD SLIDER BANNERS ({banners.length})
+            </button>
+            <button onClick={() => setAdminTab('coupons')} className={`admin-sidebar-btn ${adminTab === 'coupons' ? 'active' : ''}`}>
+              <Tag className="w-4 h-4" /> COUPONS & OFFERS ({coupons.length})
             </button>
             <button onClick={() => setAdminTab('qr')} className={`admin-sidebar-btn ${adminTab === 'qr' ? 'active' : ''}`}>
               <Smartphone className="w-4 h-4" /> COUNTER QR
@@ -1997,6 +2225,21 @@ export default function App() {
               </div>
             )}
 
+            {/* Coupons Tab */}
+            {adminTab === 'coupons' && (
+              <AdminCouponsPanel
+                coupons={coupons}
+                couponUsages={couponUsages}
+                onAdd={addCoupon}
+                onUpdate={updateCoupon}
+                onDelete={deleteCoupon}
+                availableCategories={categoryItems.map(c => c.name)}
+                editingCoupon={editingCoupon}
+                setEditingCoupon={setEditingCoupon}
+                showToast={showToast}
+              />
+            )}
+
           </div>
         </>
       )}
@@ -2324,62 +2567,159 @@ export default function App() {
                           <p className="text-slate-400 text-xs max-w-xs mx-auto">Explore categories, select products, and they will show up here for quick WhatsApp ordering.</p>
                         </div>
                       ) : (
-                        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden divide-y divide-slate-100">
-                          {cart.map(item => {
-                            const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
+                        <>
+                          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden divide-y divide-slate-100">
+                            {cart.map(item => {
+                              const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
+                              return (
+                                <div key={cartItemId} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 transition-all">
+                                  {/* Left: Product Image & Details */}
+                                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                                    <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                      {item.image ? (
+                                        <img src={item.image} alt={item.name} className="max-h-full max-w-full object-contain" />
+                                      ) : (
+                                        <ImageIcon className="w-5 h-5 text-slate-300" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
+                                      <h4 className="font-black text-xs sm:text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
+                                      {item.gujaratiName && (
+                                        <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
+                                      )}
+                                      <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Right: Controls (Qty editor, Subtotal, Delete) */}
+                                  <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                                      <button
+                                        onClick={() => updateCartQuantity(cartItemId, -1)}
+                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
+                                      >
+                                        {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" /> : <ChevronLeft className="w-4 h-4 text-slate-600" />}
+                                      </button>
+                                      <span className="w-6 text-center font-black text-xs text-slate-850 font-mono">{item.quantity}</span>
+                                      <button
+                                        onClick={() => updateCartQuantity(cartItemId, 1)}
+                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
+                                      >
+                                        <ChevronRight className="w-4 h-4 text-slate-600" />
+                                      </button>
+                                    </div>
+                                    <div className="text-right min-w-[70px]">
+                                      <p className="font-black text-sm text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
+                                      className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                      title="Remove item"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Smart Progress Bar Suggestions */}
+                          {(() => {
+                            const nextCoupon = coupons
+                              .filter(c => c.activeStatus && c.minOrderAmount > cartTotal && c.minOrderAmount <= cartTotal + 500)
+                              .sort((a, b) => a.minOrderAmount - b.minOrderAmount)[0];
+
+                            if (!nextCoupon) return null;
+
+                            const needed = nextCoupon.minOrderAmount - cartTotal;
+                            const percentage = (cartTotal / nextCoupon.minOrderAmount) * 100;
+
                             return (
-                              <div key={cartItemId} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 transition-all">
-                                {/* Left: Product Image & Details */}
-                                <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                                  <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
-                                    {item.image ? (
-                                      <img src={item.image} alt={item.name} className="max-h-full max-w-full object-contain" />
-                                    ) : (
-                                      <ImageIcon className="w-5 h-5 text-slate-300" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
-                                    <h4 className="font-black text-xs sm:text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
-                                    {item.gujaratiName && (
-                                      <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
-                                    )}
-                                    <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
-                                  </div>
+                              <div className="bg-amber-50/40 border border-amber-205 rounded-[24px] p-4.5 space-y-2.5 mt-6 shadow-2xs border-amber-200/60">
+                                <div className="flex justify-between items-center text-xs font-black text-amber-900 uppercase tracking-wide">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                    Add ₹{needed.toFixed(0)} more to unlock {nextCoupon.code}!
+                                  </span>
+                                  <span className="font-mono text-[10px]">₹{cartTotal.toFixed(0)} / ₹{nextCoupon.minOrderAmount.toFixed(0)}</span>
                                 </div>
-                                
-                                {/* Right: Controls (Qty editor, Subtotal, Delete) */}
-                                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
-                                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-                                    <button
-                                      onClick={() => updateCartQuantity(cartItemId, -1)}
-                                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
-                                    >
-                                      {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" /> : <ChevronLeft className="w-4 h-4 text-slate-600" />}
-                                    </button>
-                                    <span className="w-6 text-center font-black text-xs text-slate-850 font-mono">{item.quantity}</span>
-                                    <button
-                                      onClick={() => updateCartQuantity(cartItemId, 1)}
-                                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
-                                    >
-                                      <ChevronRight className="w-4 h-4 text-slate-600" />
-                                    </button>
-                                  </div>
-                                  <div className="text-right min-w-[70px]">
-                                    <p className="font-black text-sm text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
-                                  </div>
-                                  <button
-                                    onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
-                                    className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                    title="Remove item"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                <div className="w-full bg-slate-200/70 h-2 rounded-full overflow-hidden">
+                                  <div className="bg-amber-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, percentage)}%` }} />
                                 </div>
+                                <p className="text-[10px] text-amber-700 font-bold">
+                                  Apply <span className="font-extrabold uppercase bg-amber-100 px-1.5 py-0.5 rounded text-amber-900 text-[9px]">{nextCoupon.code}</span> to get {nextCoupon.discountType === 'flat' ? `₹${nextCoupon.discountValue} off` : `${nextCoupon.discountValue}% off`}!
+                                </p>
                               </div>
                             );
-                          })}
-                        </div>
+                          })()}
+
+                          {/* Available Coupons Section */}
+                          <div className="bg-white border border-slate-200 rounded-[28px] p-5 space-y-4 shadow-sm mt-6">
+                            <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                              <Tag className="w-4 h-4 text-emerald-600" />
+                              Available Offers / ઉપલબ્ધ ઑફર્સ
+                            </h4>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                              {(() => {
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                const activeList = coupons.filter(c => {
+                                  const isLive = c.activeStatus && c.expiryDate >= todayStr;
+                                  if (!isLive) return false;
+                                  // Filter out if customer specific and phone doesn't match
+                                  if (customerUser && c.customerSpecific) {
+                                    const cleanSpecific = c.customerSpecific.replace(/\D/g, '');
+                                    const cleanPhone = (customerProfile?.phone || '').replace(/\D/g, '');
+                                    if (cleanSpecific !== cleanPhone) return false;
+                                  }
+                                  return true;
+                                });
+
+                                if (activeList.length === 0) {
+                                  return (
+                                    <p className="text-xs font-bold text-slate-400 col-span-full py-4 text-center">હાલમાં કોઈ ઓફર ઉપલબ્ધ નથી / No offers available right now.</p>
+                                  );
+                                }
+
+                                return activeList.map(c => {
+                                  const isEligible = cartTotal >= c.minOrderAmount;
+                                  return (
+                                    <div key={c.id} className={`p-4.5 rounded-2xl border-2 transition-all flex flex-col justify-between gap-4 ${isEligible ? 'border-emerald-150 bg-emerald-50/5 hover:border-emerald-300' : 'border-slate-100 bg-slate-50/30'}`}>
+                                      <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <span className="bg-emerald-100 text-emerald-800 border border-emerald-255 px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border-emerald-200">{c.code}</span>
+                                          <span className="text-[9px] font-bold text-slate-400">Exp: {new Date(c.expiryDate).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short' })}</span>
+                                        </div>
+                                        <h5 className="text-xs font-black text-slate-800">{c.title}</h5>
+                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed">{c.description}</p>
+                                        <p className="text-[9px] font-bold text-slate-400">
+                                          • Min. Order: ₹{c.minOrderAmount} {c.firstOrderOnly && '• First Order Only'}
+                                        </p>
+                                      </div>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCouponCodeInput(c.code);
+                                          handleApplyCoupon(c.code);
+                                        }}
+                                        disabled={!isEligible}
+                                        className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
+                                          isEligible 
+                                            ? 'bg-emerald-600 border-emerald-650 hover:bg-emerald-700 text-white active:scale-95' 
+                                            : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                        }`}
+                                      >
+                                        {isEligible ? 'Apply Coupon' : `Add ₹${(c.minOrderAmount - cartTotal).toFixed(0)} more`}
+                                      </button>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -2388,18 +2728,68 @@ export default function App() {
                       <div className="bg-white border border-slate-200 rounded-[28px] p-6 shadow-sm">
                         <div className="mb-6">
                           <span className="tag bg-emerald-50 text-emerald-800 border border-emerald-100 mb-3 block w-fit">Order Pricing</span>
+                          
+                          {/* Coupon Input Box */}
+                          {customerUser && (
+                            <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl space-y-2 mb-4">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Apply Coupon / કૂપન કોડ</label>
+                              {appliedCoupon ? (
+                                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-250 rounded-xl px-3.5 py-2.5">
+                                  <div>
+                                    <span className="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-250 px-2 py-0.5 rounded-md uppercase">{appliedCoupon.code}</span>
+                                    <p className="text-[9px] font-bold text-emerald-700 mt-1">
+                                      ₹{couponDiscount.toFixed(0)} discount applied!
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveCoupon}
+                                    className="text-[10px] font-black text-rose-600 hover:text-rose-700 uppercase tracking-wider pl-2"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="દા.ત. FIRSTORDER"
+                                    value={couponCodeInput}
+                                    onChange={e => setCouponCodeInput(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase focus:border-primary-green outline-hidden"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyCoupon(couponCodeInput)}
+                                    className="bg-slate-900 hover:bg-slate-800 active:scale-95 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs font-semibold text-slate-500">
                               <span>Subtotal</span>
                               <span>₹{cartTotal.toFixed(2)}</span>
                             </div>
+                            
+                            {appliedCoupon && couponDiscount > 0 && (
+                              <div className="flex justify-between text-xs font-bold text-rose-600 items-center">
+                                <span>Discount ({appliedCoupon.code})</span>
+                                <span className="font-mono">-₹{couponDiscount.toFixed(2)}</span>
+                              </div>
+                            )}
+
                             <div className="flex justify-between text-xs font-bold text-emerald-700 items-center">
                               <span>Delivery Charge</span>
                               <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[9px] font-black">FREE</span>
                             </div>
                             <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                               <span className="font-extrabold text-slate-900 text-sm">Grand Total</span>
-                              <span className="text-2xl font-black text-slate-900">₹{cartTotal.toFixed(2)}</span>
+                              <span className="text-2xl font-black text-slate-900">₹{finalTotal.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
@@ -2421,7 +2811,15 @@ export default function App() {
                             </button>
                           </div>
                         ) : (
-                          <CheckoutForm onSubmit={handleCreateOrder} isDisabled={cart.length === 0} cartTotal={cartTotal} customerProfile={customerProfile} />
+                          <CheckoutForm 
+                            onSubmit={handleCreateOrder} 
+                            isDisabled={cart.length === 0} 
+                            cartTotal={cartTotal} 
+                            finalTotal={finalTotal}
+                            couponDiscount={couponDiscount}
+                            appliedCoupon={appliedCoupon}
+                            customerProfile={customerProfile} 
+                          />
                         )}
                       </div>
                     </div>
@@ -2926,6 +3324,669 @@ const BannerForm: React.FC<BannerFormProps> = ({
   );
 };
 
+interface AdminCouponsPanelProps {
+  coupons: Coupon[];
+  couponUsages: CouponUsage[];
+  onAdd: (coupon: Omit<Coupon, 'id' | 'createdAt' | 'totalUsed'>) => Promise<void>;
+  onUpdate: (id: string, coupon: Omit<Coupon, 'id' | 'createdAt' | 'totalUsed'>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  availableCategories: string[];
+  editingCoupon: Coupon | null;
+  setEditingCoupon: (coupon: Coupon | null) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+const AdminCouponsPanel: React.FC<AdminCouponsPanelProps> = ({
+  coupons,
+  couponUsages,
+  onAdd,
+  onUpdate,
+  onDelete,
+  availableCategories,
+  editingCoupon,
+  setEditingCoupon,
+  showToast
+}) => {
+  const [subTab, setSubTab] = useState<'all' | 'logs'>('all');
+  
+  // Form fields state
+  const [code, setCode] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [discountType, setDiscountType] = useState<'flat' | 'percentage' | 'free_delivery' | 'category'>('flat');
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [minOrderAmount, setMinOrderAmount] = useState<number>(0);
+  const [maxDiscount, setMaxDiscount] = useState<number>(0);
+  const [category, setCategory] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [usageLimit, setUsageLimit] = useState<number>(1000);
+  const [activeStatus, setActiveStatus] = useState(true);
+  const [firstOrderOnly, setFirstOrderOnly] = useState(false);
+  const [onePerCustomer, setOnePerCustomer] = useState(true);
+  const [customerSpecific, setCustomerSpecific] = useState('');
+
+  // Populate form if editingCoupon is set
+  useEffect(() => {
+    if (editingCoupon) {
+      setCode(editingCoupon.code);
+      setTitle(editingCoupon.title);
+      setDescription(editingCoupon.description);
+      setDiscountType(editingCoupon.discountType);
+      setDiscountValue(editingCoupon.discountValue);
+      setMinOrderAmount(editingCoupon.minOrderAmount);
+      setMaxDiscount(editingCoupon.maxDiscount || 0);
+      setCategory(editingCoupon.category || '');
+      setExpiryDate(editingCoupon.expiryDate);
+      setUsageLimit(editingCoupon.usageLimit);
+      setActiveStatus(editingCoupon.activeStatus);
+      setFirstOrderOnly(editingCoupon.firstOrderOnly);
+      setOnePerCustomer(editingCoupon.onePerCustomer);
+      setCustomerSpecific(editingCoupon.customerSpecific || '');
+    } else {
+      clearForm();
+    }
+  }, [editingCoupon]);
+
+  const clearForm = () => {
+    setCode('');
+    setTitle('');
+    setDescription('');
+    setDiscountType('flat');
+    setDiscountValue(0);
+    setMinOrderAmount(0);
+    setMaxDiscount(0);
+    setCategory('');
+    // Default expiry date: 30 days from now
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    setExpiryDate(d.toISOString().split('T')[0]);
+    setUsageLimit(1000);
+    setActiveStatus(true);
+    setFirstOrderOnly(false);
+    setOnePerCustomer(true);
+    setCustomerSpecific('');
+  };
+
+  const handlePreset = (presetName: string) => {
+    const today = new Date();
+    const endOfYear = new Date(today.getFullYear(), 11, 31);
+    const endOfNavratri = new Date(today.getFullYear(), 9, 31); // End of October approx
+    const endOfDiwali = new Date(today.getFullYear(), 10, 30); // End of November approx
+    
+    // Get next Sunday
+    const nextSunday = new Date();
+    nextSunday.setDate(today.getDate() + (7 - today.getDay()) % 7);
+    if (nextSunday.toDateString() === today.toDateString()) {
+      nextSunday.setDate(nextSunday.getDate() + 7); // Next Sunday if today is Sunday
+    }
+
+    if (presetName === 'welcome') {
+      setCode('WELCOME50');
+      setTitle('Welcome Discount');
+      setDescription('Get ₹50 flat discount on your first order / તમારા પહેલા ઓર્ડર પર ₹૫૦ ફ્લેટ ડિસ્કાઉન્ટ મેળવો');
+      setDiscountType('flat');
+      setDiscountValue(50);
+      setMinOrderAmount(300);
+      setMaxDiscount(0);
+      setCategory('');
+      setExpiryDate(endOfYear.toISOString().split('T')[0]);
+      setUsageLimit(1000);
+      setActiveStatus(true);
+      setFirstOrderOnly(true);
+      setOnePerCustomer(true);
+      setCustomerSpecific('');
+      showToast('Welcome preset loaded!', 'info');
+    } else if (presetName === 'navratri') {
+      setCode('NAVRATRI10');
+      setTitle('Navratri Special');
+      setDescription('10% off on all grocery items during Navratri / નવરાત્રિ દરમિયાન કરિયાણાની વસ્તુઓ પર ૧૦% ડિસ્કાઉન્ટ');
+      setDiscountType('percentage');
+      setDiscountValue(10);
+      setMinOrderAmount(1000);
+      setMaxDiscount(150);
+      setCategory('');
+      setExpiryDate(endOfNavratri.toISOString().split('T')[0]);
+      setUsageLimit(2000);
+      setActiveStatus(true);
+      setFirstOrderOnly(false);
+      setOnePerCustomer(true);
+      setCustomerSpecific('');
+      showToast('Navratri preset loaded!', 'info');
+    } else if (presetName === 'diwali') {
+      setCode('DIWALI200');
+      setTitle('Diwali Celebration');
+      setDescription('₹200 flat discount on orders above ₹2000 / ₹૨૦૦૦ થી વધુ ઓર્ડર પર ₹૨૦૦ ફ્લેટ ડિસ્કાઉન્ટ');
+      setDiscountType('flat');
+      setDiscountValue(200);
+      setMinOrderAmount(2000);
+      setMaxDiscount(0);
+      setCategory('');
+      setExpiryDate(endOfDiwali.toISOString().split('T')[0]);
+      setUsageLimit(1500);
+      setActiveStatus(true);
+      setFirstOrderOnly(false);
+      setOnePerCustomer(true);
+      setCustomerSpecific('');
+      showToast('Diwali preset loaded!', 'info');
+    } else if (presetName === 'free_del') {
+      setCode('FREEDEL');
+      setTitle('Free Delivery Offer');
+      setDescription('Free Home Delivery on all orders this weekend / આ વીકએન્ડમાં બધા ઓર્ડર પર ફ્રી હોમ ડિલિવરી');
+      setDiscountType('free_delivery');
+      setDiscountValue(0);
+      setMinOrderAmount(250);
+      setMaxDiscount(0);
+      setCategory('');
+      setExpiryDate(nextSunday.toISOString().split('T')[0]);
+      setUsageLimit(5000);
+      setActiveStatus(true);
+      setFirstOrderOnly(false);
+      setOnePerCustomer(false);
+      setCustomerSpecific('');
+      showToast('Free Delivery preset loaded!', 'info');
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!code || !title || !description || !expiryDate) {
+      showToast('Please fill all required fields / કૃપા કરીને બધી વિગતો ભરો', 'error');
+      return;
+    }
+    if (discountType !== 'free_delivery' && discountValue <= 0) {
+      showToast('Discount value must be greater than 0 / ડિસ્કાઉન્ટ કિંમત ૦ થી વધારે હોવી જોઈએ', 'error');
+      return;
+    }
+
+    const data: Omit<Coupon, 'id' | 'createdAt' | 'totalUsed'> = {
+      code: code.toUpperCase().trim(),
+      title: title.trim(),
+      description: description.trim(),
+      discountType,
+      discountValue: discountType === 'free_delivery' ? 0 : Number(discountValue),
+      minOrderAmount: Number(minOrderAmount),
+      maxDiscount: discountType === 'percentage' && maxDiscount ? Number(maxDiscount) : undefined,
+      category: discountType === 'category' ? category : undefined,
+      expiryDate,
+      usageLimit: Number(usageLimit),
+      activeStatus,
+      firstOrderOnly,
+      onePerCustomer,
+      customerSpecific: customerSpecific.trim() || undefined
+    };
+
+    if (editingCoupon) {
+      await onUpdate(editingCoupon.id, data);
+    } else {
+      if (coupons.some(c => c.code.toUpperCase() === data.code)) {
+        showToast('Coupon code already exists! / આ કૂપન કોડ પહેલેથી જ છે!', 'error');
+        return;
+      }
+      await onAdd(data);
+    }
+    clearForm();
+  };
+
+  // Analytics summary calculation
+  const totalSavings = useMemo(() => {
+    return couponUsages.reduce((acc, curr) => acc + curr.discountAmount, 0);
+  }, [couponUsages]);
+
+  const activeCount = useMemo(() => {
+    return coupons.filter(c => c.activeStatus).length;
+  }, [coupons]);
+
+  return (
+    <div className="space-y-8">
+      {/* Analytics Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Coupons</span>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-slate-900">{coupons.length}</span>
+            <span className="text-xs text-slate-400">created</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Offers</span>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-emerald-600">{activeCount}</span>
+            <span className="text-xs text-emerald-400">running</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Savings Given</span>
+          <div className="mt-4 flex items-baseline gap-1">
+            <IndianRupee className="w-6 h-6 text-slate-900" />
+            <span className="text-3xl font-black text-slate-900">{totalSavings.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Redemptions</span>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-blue-600">{couponUsages.length}</span>
+            <span className="text-xs text-blue-400">times used</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Form Builder & List */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Form Builder */}
+        <div className="lg:col-span-4 bg-white p-6 rounded-[32px] border border-slate-100 shadow-lg h-fit">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Gift className="w-5 h-5 text-emerald-600" />
+              {editingCoupon ? 'Edit Coupon' : 'Create Coupon'}
+            </h3>
+            {editingCoupon && (
+              <button 
+                onClick={() => setEditingCoupon(null)} 
+                className="text-xs text-slate-400 hover:text-slate-600 underline font-bold"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+
+          {/* Preset templates */}
+          {!editingCoupon && (
+            <div className="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Preset Quick Templates</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => handlePreset('welcome')} className="bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold py-2 px-1 rounded-xl text-center text-slate-700 truncate shadow-xs">
+                  🎉 Welcome ₹50
+                </button>
+                <button type="button" onClick={() => handlePreset('navratri')} className="bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold py-2 px-1 rounded-xl text-center text-slate-700 truncate shadow-xs">
+                  🕌 Navratri 10%
+                </button>
+                <button type="button" onClick={() => handlePreset('diwali')} className="bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold py-2 px-1 rounded-xl text-center text-slate-700 truncate shadow-xs">
+                  🪔 Diwali ₹200
+                </button>
+                <button type="button" onClick={() => handlePreset('free_del')} className="bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold py-2 px-1 rounded-xl text-center text-slate-700 truncate shadow-xs">
+                  🚚 Free Delivery
+                </button>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Coupon Code *</label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                disabled={!!editingCoupon}
+                className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold text-slate-900 disabled:opacity-50"
+                placeholder="e.g. FESTIVAL50"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Title (ENG) *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-medium text-slate-900"
+                  placeholder="e.g. Diwali Fest"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Expiry Date *</label>
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-medium text-slate-900"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Description (Guj / Eng) *</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 text-sm font-medium text-slate-900 resize-none"
+                placeholder="e.g. Get ₹50 flat discount / ₹૫૦ ડિસ્કાઉન્ટ મેળવો"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Discount Type</label>
+                <select
+                  value={discountType}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setDiscountType(val);
+                    if (val === 'free_delivery') {
+                      setDiscountValue(0);
+                    }
+                  }}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-semibold text-slate-900"
+                >
+                  <option value="flat">Flat ₹ Discount</option>
+                  <option value="percentage">Percentage % Discount</option>
+                  <option value="free_delivery">Free Delivery</option>
+                  <option value="category">Category Flat ₹</option>
+                </select>
+              </div>
+
+              {discountType !== 'free_delivery' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">
+                    Value ({discountType === 'percentage' ? '%' : '₹'}) *
+                  </label>
+                  <input
+                    type="number"
+                    value={discountValue || ''}
+                    onChange={(e) => setDiscountValue(Number(e.target.value))}
+                    className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold text-slate-900"
+                    placeholder="Value"
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            {discountType === 'percentage' && (
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Max Discount Cap (₹) (Optional)</label>
+                <input
+                  type="number"
+                  value={maxDiscount || ''}
+                  onChange={(e) => setMaxDiscount(Number(e.target.value))}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold text-slate-900"
+                  placeholder="e.g. 150"
+                />
+              </div>
+            )}
+
+            {discountType === 'category' && (
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Target Category *</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-semibold text-slate-900"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {availableCategories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Min Order Amount (₹)</label>
+                <input
+                  type="number"
+                  value={minOrderAmount || ''}
+                  onChange={(e) => setMinOrderAmount(Number(e.target.value))}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold text-slate-900"
+                  placeholder="Min cart total"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Total Usage Limit</label>
+                <input
+                  type="number"
+                  value={usageLimit || ''}
+                  onChange={(e) => setUsageLimit(Number(e.target.value))}
+                  className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-bold text-slate-900"
+                  placeholder="e.g. 1000"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Restrict to Phone (Optional)</label>
+              <input
+                type="text"
+                value={customerSpecific}
+                onChange={(e) => setCustomerSpecific(e.target.value.replace(/\D/g, ''))}
+                className="w-full bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-semibold text-slate-900"
+                placeholder="10-digit number e.g. 9876543210"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={activeStatus}
+                  onChange={(e) => setActiveStatus(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Active (કૂપન ચાલુ છે)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={firstOrderOnly}
+                  onChange={(e) => setFirstOrderOnly(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">First Order Only</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={onePerCustomer}
+                  onChange={(e) => setOnePerCustomer(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">One Limit per customer</span>
+              </label>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              type="submit"
+              className="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 mt-2"
+            >
+              <Plus className="w-4 h-4" /> {editingCoupon ? 'Update Coupon' : 'Create Coupon'}
+            </motion.button>
+          </form>
+        </div>
+
+        {/* Coupons List and logs */}
+        <div className="lg:col-span-8 bg-white p-6 rounded-[32px] border border-slate-100 shadow-lg flex flex-col">
+          {/* Sub-Navigation tabs */}
+          <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6">
+            <button
+              onClick={() => setSubTab('all')}
+              className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+                subTab === 'all'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              All Coupons ({coupons.length})
+            </button>
+            <button
+              onClick={() => setSubTab('logs')}
+              className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+                subTab === 'logs'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              Redemption Audit Logs ({couponUsages.length})
+            </button>
+          </div>
+
+          {subTab === 'all' ? (
+            <div className="overflow-x-auto flex-1">
+              {coupons.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">
+                  <Tag className="w-12 h-12 mx-auto opacity-20 mb-4" />
+                  <p className="italic text-sm">No coupons created yet.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Code / Title</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Type / Value</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Min Order</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Redeemed</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Expiry</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Status</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coupons.map((coupon) => {
+                      const isExpired = new Date(coupon.expiryDate) < new Date(new Date().toISOString().split('T')[0]);
+                      return (
+                        <tr key={coupon.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all">
+                          <td className="py-4 px-4">
+                            <span className="bg-slate-100 text-slate-800 text-xs font-extrabold px-2.5 py-1 rounded-md border border-slate-200">
+                              {coupon.code}
+                            </span>
+                            <span className="block text-xs font-black text-slate-900 mt-1.5">{coupon.title}</span>
+                            <span className="block text-[10px] text-slate-400 max-w-[180px] truncate">{coupon.description}</span>
+                          </td>
+                          <td className="py-4 px-4 text-xs font-semibold text-slate-700">
+                            {coupon.discountType === 'flat' && `₹${coupon.discountValue} Flat`}
+                            {coupon.discountType === 'percentage' && `${coupon.discountValue}% Off`}
+                            {coupon.discountType === 'free_delivery' && 'Free Delivery'}
+                            {coupon.discountType === 'category' && `₹${coupon.discountValue} Flat (${coupon.category})`}
+                            {coupon.maxDiscount ? <span className="block text-[10px] text-slate-400">Cap: ₹{coupon.maxDiscount}</span> : null}
+                          </td>
+                          <td className="py-4 px-4 text-xs font-bold text-slate-900">
+                            ₹{coupon.minOrderAmount}
+                          </td>
+                          <td className="py-4 px-4 text-xs font-bold">
+                            <span className="text-slate-900">{coupon.totalUsed || 0}</span>
+                            <span className="text-slate-400 font-normal"> / {coupon.usageLimit}</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className={`text-xs font-bold ${isExpired ? 'text-red-500' : 'text-slate-600'}`}>
+                              {coupon.expiryDate}
+                            </span>
+                            {isExpired && <span className="block text-[9px] font-bold text-red-400 uppercase tracking-widest">Expired</span>}
+                          </td>
+                          <td className="py-4 px-4">
+                            <button
+                              onClick={() => {
+                                onUpdate(coupon.id, {
+                                  ...coupon,
+                                  activeStatus: !coupon.activeStatus
+                                });
+                              }}
+                              className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all ${
+                                coupon.activeStatus
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : 'bg-slate-50 border-slate-200 text-slate-500'
+                              }`}
+                            >
+                              {coupon.activeStatus ? 'Active' : 'Inactive'}
+                            </button>
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button
+                                onClick={() => setEditingCoupon(coupon)}
+                                className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 rounded-lg transition-all"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => onDelete(coupon.id)}
+                                className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg transition-all"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto flex-1">
+              {couponUsages.length === 0 ? (
+                <div className="text-center py-20 text-slate-400">
+                  <ClipboardList className="w-12 h-12 mx-auto opacity-20 mb-4" />
+                  <p className="italic text-sm">No redemption logs recorded yet.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Date & Time</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Customer Phone</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Coupon Code</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Savings Given</th>
+                      <th className="py-3 px-4 text-xs font-black text-slate-400 uppercase tracking-wider">Order Link</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...couponUsages].sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime()).map((log) => {
+                      const formattedTime = new Date(log.usedAt).toLocaleString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      return (
+                        <tr key={log.id} className="border-b border-slate-50 hover:bg-slate-50 transition-all">
+                          <td className="py-4 px-4 text-xs font-medium text-slate-500">
+                            {formattedTime}
+                          </td>
+                          <td className="py-4 px-4 text-xs font-bold text-slate-900">
+                            {log.customerPhone}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="bg-slate-100 text-slate-800 text-xs font-bold px-2 py-0.5 rounded border border-slate-200">
+                              {log.couponCode}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-xs font-black text-emerald-600">
+                            +₹{log.discountAmount}
+                          </td>
+                          <td className="py-4 px-4 text-[10px] font-mono text-slate-400">
+                            {log.orderId}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Product detail view sub-page
 interface ProductDetailPageProps {
   products: Product[];
@@ -3125,13 +4186,18 @@ interface CheckoutFormProps {
   onSubmit: (details: CustomerDetails) => void;
   isDisabled: boolean;
   cartTotal: number;
+  finalTotal: number;
+  couponDiscount: number;
+  appliedCoupon: Coupon | null;
   customerProfile: CustomerProfile | null;
 }
 
-const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartTotal, customerProfile }) => {
+const CheckoutForm: React.FC<CheckoutFormProps> = ({ 
+  onSubmit, isDisabled, cartTotal, finalTotal, couponDiscount, appliedCoupon, customerProfile 
+}) => {
   const [details, setDetails] = useState<CustomerDetails>({ name: '', phone: '', address: '', deliveryMode: undefined });
   const [showDeliveryWarning, setShowDeliveryWarning] = useState(false);
-  const isHomeDeliveryEligible = cartTotal >= 2000;
+  const isHomeDeliveryEligible = cartTotal >= 2000 || (appliedCoupon && appliedCoupon.discountType === 'free_delivery');
 
   // Auto-fill details from profile
   useEffect(() => {
@@ -3383,14 +4449,14 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartT
               disabled={isDisabled}
               className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg disabled:opacity-40 disabled:grayscale transition-all flex items-center justify-center gap-2 mt-4 ${
                 details.deliveryMode === 'home_delivery'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-blue-600 text-white'
+                  ? 'bg-emerald-600 text-white shadow-emerald-100 shadow-md'
+                  : 'bg-blue-600 text-white shadow-blue-100 shadow-md'
               }`}
             >
               <Send className="w-4 h-4" />
               {details.deliveryMode === 'home_delivery' 
-                ? 'Send Order / ઓર્ડર મોકલો 🚚' 
-                : 'Place Pickup Order / ઓર્ડર મુકો 🏪'
+                ? `Send Order (₹${finalTotal.toFixed(0)}) / ઓર્ડર મોકલો 🚚` 
+                : `Place Pickup Order (₹${finalTotal.toFixed(0)}) / ઓર્ડર મુકો 🏪`
               }
             </motion.button>
           </motion.div>
