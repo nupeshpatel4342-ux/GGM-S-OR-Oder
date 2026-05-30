@@ -6006,7 +6006,7 @@ export const MyAccountPage: React.FC<{
   cart, setCart, cartTotal, updateCartQuantity, shopSettings,
   preferredTheme, handleThemeChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   
