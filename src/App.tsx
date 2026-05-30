@@ -2142,6 +2142,7 @@ export default function App() {
                     setCart={setCart}
                     cartTotal={cartTotal}
                     updateCartQuantity={updateCartQuantity}
+                    shopSettings={shopSettings}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -4693,9 +4694,10 @@ export const MyAccountPage: React.FC<{
   setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
   cartTotal: number;
   updateCartQuantity: (id: string, delta: number) => void;
+  shopSettings: any;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
-  cart, setCart, cartTotal, updateCartQuantity 
+  cart, setCart, cartTotal, updateCartQuantity, shopSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile'>('orders');
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
@@ -4895,6 +4897,228 @@ export const MyAccountPage: React.FC<{
     showToast('બધી આઇટમ્સ કાર્ટમાં ઉમેરવામાં આવી છે / All items added to basket!', 'success');
   };
 
+  const handleDownloadInvoice = async (order: Order) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        showToast('Failed to generate drawing context', 'error');
+        return;
+      }
+
+      const itemRowHeight = 40;
+      const headerHeight = 360;
+      const footerHeight = 220;
+      const totalItemsHeight = order.items.length * itemRowHeight;
+      const canvasWidth = 800;
+      const canvasHeight = headerHeight + totalItemsHeight + footerHeight;
+
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Accent top line
+      ctx.fillStyle = '#00884F';
+      ctx.fillRect(0, 0, canvasWidth, 15);
+
+      // Shop Name
+      ctx.fillStyle = '#00884F';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.fillText(shopSettings.shopName, 40, 60);
+
+      // Shop Tagline
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(shopSettings.tagline.toUpperCase(), 40, 80);
+
+      // Shop Contact (Right)
+      ctx.fillStyle = '#1E293B';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Phone: ${shopSettings.mobile}`, canvasWidth - 40, 50);
+      ctx.fillText(`WhatsApp: ${shopSettings.whatsapp}`, canvasWidth - 40, 70);
+      
+      const shopAddr = shopSettings.address || '';
+      ctx.fillText(shopAddr.length > 50 ? shopAddr.substring(0, 48) + '...' : shopAddr, canvasWidth - 40, 90);
+
+      ctx.textAlign = 'left';
+
+      // Divider line
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(40, 115);
+      ctx.lineTo(canvasWidth - 40, 115);
+      ctx.stroke();
+
+      // Title
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText('INVOICE / ઓર્ડર બિલ', 40, 150);
+
+      // Info Block
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(40, 170, canvasWidth - 80, 100);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.strokeRect(40, 170, canvasWidth - 80, 100);
+
+      // Labels
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('BILL TO / ગ્રાહક:', 60, 195);
+      ctx.fillText('PHONE / મોબાઈલ:', 60, 220);
+      ctx.fillText('ADDRESS / સરનામું:', 60, 245);
+
+      ctx.fillText('ORDER ID / આઈડી:', 450, 195);
+      ctx.fillText('DATE / તારીખ:', 450, 220);
+      ctx.fillText('DELIVERY / ઓપ્શન:', 450, 245);
+
+      // Values
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(order.customer.name, 180, 195);
+      ctx.fillText(order.customer.phone, 180, 220);
+      
+      const cleanAddress = order.customer.address || 'N/A';
+      ctx.fillText(cleanAddress.length > 35 ? cleanAddress.substring(0, 33) + '...' : cleanAddress, 180, 245);
+
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(order.id, 580, 195);
+      ctx.fillText(new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' }), 580, 220);
+      
+      const modeText = order.customer.deliveryMode === 'home_delivery' ? 'Home Delivery (હોમ ડિલિવરી)' : 'Shop Pick Up (દુકાનેથી રૂબરૂ)';
+      ctx.fillText(modeText, 580, 245);
+
+      // Items Table Header
+      const tableTop = 295;
+      ctx.fillStyle = '#0F172A';
+      ctx.fillRect(40, tableTop, canvasWidth - 80, 35);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('ITEM DESCRIPTION / વિગત', 60, tableTop + 22);
+      ctx.fillText('UNIT / પેક', 360, tableTop + 22);
+      ctx.textAlign = 'center';
+      ctx.fillText('QTY / નંગ', 500, tableTop + 22);
+      ctx.textAlign = 'right';
+      ctx.fillText('PRICE / કિંમત', 630, tableTop + 22);
+      ctx.fillText('TOTAL / કુલ', 740, tableTop + 22);
+
+      ctx.textAlign = 'left';
+
+      // Table Rows
+      let currentY = tableTop + 35;
+      order.items.forEach((item, idx) => {
+        ctx.fillStyle = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+        ctx.fillRect(40, currentY, canvasWidth - 80, itemRowHeight);
+        
+        ctx.strokeStyle = '#F1F5F9';
+        ctx.beginPath();
+        ctx.moveTo(40, currentY + itemRowHeight);
+        ctx.lineTo(canvasWidth - 40, currentY + itemRowHeight);
+        ctx.stroke();
+
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 12px sans-serif';
+        
+        const nameText = item.name + (item.gujaratiName ? ` (${item.gujaratiName})` : '');
+        ctx.fillText(nameText.length > 35 ? nameText.substring(0, 32) + '...' : nameText, 60, currentY + 25);
+
+        const unitName = item.selectedVariant ? item.selectedVariant.name : item.unit;
+        ctx.fillStyle = '#475569';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(unitName, 360, currentY + 25);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#0F172A';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(item.quantity.toString(), 500, currentY + 25);
+
+        ctx.textAlign = 'right';
+        ctx.font = 'mono 12px sans-serif';
+        ctx.fillText(`₹${item.price.toFixed(0)}`, 630, currentY + 25);
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(`₹${(item.price * item.quantity).toFixed(0)}`, 740, currentY + 25);
+
+        ctx.textAlign = 'left';
+        currentY += itemRowHeight;
+      });
+
+      currentY += 15;
+
+      // Totals
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#475569';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Subtotal / કિંમત:', 580, currentY + 20);
+      ctx.fillText('Delivery / ભાડું:', 580, currentY + 45);
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`₹${order.total.toFixed(0)}`, 740, currentY + 20);
+      ctx.fillStyle = '#00884F';
+      ctx.fillText('FREE', 740, currentY + 45);
+
+      // Grand Total Box
+      ctx.fillStyle = '#F0FDF4';
+      ctx.fillRect(400, currentY + 60, 360, 45);
+      ctx.strokeStyle = '#DCFCE7';
+      ctx.strokeRect(400, currentY + 60, 360, 45);
+
+      ctx.fillStyle = '#166534';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Grand Total / કુલ કિંમત:', 580, currentY + 88);
+      ctx.font = 'black 18px sans-serif';
+      ctx.fillText(`₹${order.total.toFixed(0)}`, 740, currentY + 88);
+
+      ctx.textAlign = 'left';
+
+      // Terms Box
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(40, currentY + 60, 340, 95);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.strokeRect(40, currentY + 60, 340, 95);
+
+      ctx.fillStyle = '#0F172A';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('⚠️ નિયમો / Terms:', 55, currentY + 80);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('૧. ઓર્ડરનું પેમેન્ટ ઓર્ડર આપવા આવો ત્યારે આપવાનું રહેશે.', 55, currentY + 105);
+      ctx.fillText('૨. કોઈ વસ્તુ પાછી આપવાની હોય તો ૨૪ કલાકમાં શોપ પર આવવાનું રહેશે.', 55, currentY + 125);
+
+      // Thank you
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#00884F';
+      ctx.font = 'bold italic 13px sans-serif';
+      ctx.fillText('Thank you for shopping with us! / મુલાકાત બદલ આભાર 🙏', canvasWidth / 2, canvasHeight - 25);
+
+      // PDF export
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const { jsPDF } = await import('jspdf');
+      
+      const pdfWidth = 210;
+      const pdfHeight = (canvasHeight * pdfWidth) / canvasWidth;
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
+
+      doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      doc.save(`invoice_${order.id}.pdf`);
+      showToast('બિલ ડાઉનલોડ થઈ ગયું! / Invoice PDF downloaded successfully! 🎉', 'success');
+
+    } catch (err) {
+      console.error('Invoice PDF generation failed:', err);
+      showToast('બિલ ડાઉનલોડ નિષ્ફળ ગયું / Invoice download failed', 'error');
+    }
+  };
+
   // Find wishlist products
   const wishlistProducts = useMemo(() => {
     const wishlistIds = customerProfile?.wishlist || [];
@@ -5054,6 +5278,13 @@ export const MyAccountPage: React.FC<{
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Reorder
+                          </button>
+                          <button
+                            onClick={() => handleDownloadInvoice(order)}
+                            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Bill / બિલ
                           </button>
                         </div>
                         
