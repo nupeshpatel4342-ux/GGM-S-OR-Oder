@@ -17,7 +17,7 @@ import {
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
-  Gift, Percent
+  Gift, Percent, Sun, Moon, Monitor
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -160,6 +160,8 @@ export default function App() {
       whatsapp: '91972455778',
       address: '123 Market Road, Rajkot, Gujarat',
       announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
+      defaultTheme: 'system',
+      festivalThemeActive: 'none',
     };
     // Auto-migrate if old dummy number is in local storage
     if (settings.whatsapp === '919876543210') {
@@ -169,6 +171,14 @@ export default function App() {
     }
     if (!settings.announcementText) {
       settings.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
+      localStorage.setItem('shopSettings', JSON.stringify(settings));
+    }
+    if (!settings.defaultTheme) {
+      settings.defaultTheme = 'system';
+      localStorage.setItem('shopSettings', JSON.stringify(settings));
+    }
+    if (!settings.festivalThemeActive) {
+      settings.festivalThemeActive = 'none';
       localStorage.setItem('shopSettings', JSON.stringify(settings));
     }
     return settings;
@@ -298,6 +308,139 @@ export default function App() {
   const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [customerAuthLoading, setCustomerAuthLoading] = useState(true);
+
+  // Theme state
+  const [preferredTheme, setPreferredTheme] = useState<'light' | 'dark' | 'system' | 'time_based'>(() => {
+    return (localStorage.getItem('preferredTheme') as any) || 'system';
+  });
+
+  const checkSystemIsDark = (): boolean => {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+
+  const checkIsNightTime = (): boolean => {
+    const hours = new Date().getHours();
+    return hours >= 19 || hours < 6;
+  };
+
+  const [systemIsDark, setSystemIsDark] = useState(() => checkSystemIsDark());
+  const [isNightTime, setIsNightTime] = useState(() => checkIsNightTime());
+  
+  // Real-time listener for OS system theme changes and night time hours
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemChange = (e: MediaQueryListEvent) => {
+      setSystemIsDark(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleSystemChange);
+
+    const interval = setInterval(() => {
+      setIsNightTime(checkIsNightTime());
+    }, 60000);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const effectivePreference = preferredTheme || shopSettings.defaultTheme || 'system';
+
+  const activeBaseTheme: 'light' | 'dark' = useMemo(() => {
+    if (effectivePreference === 'light') return 'light';
+    if (effectivePreference === 'dark') return 'dark';
+    if (effectivePreference === 'time_based') return isNightTime ? 'dark' : 'light';
+    return systemIsDark ? 'dark' : 'light';
+  }, [effectivePreference, systemIsDark, isNightTime]);
+
+  // Apply appropriate classes to document element
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('dark', 'theme-diwali', 'theme-navratri', 'theme-newyear');
+    
+    if (activeBaseTheme === 'dark') {
+      root.classList.add('dark');
+    }
+    
+    const festival = shopSettings.festivalThemeActive;
+    if (festival && festival !== 'none') {
+      if (festival === 'diwali') root.classList.add('theme-diwali');
+      else if (festival === 'navratri') root.classList.add('theme-navratri');
+      else if (festival === 'new_year') root.classList.add('theme-newyear');
+    }
+  }, [activeBaseTheme, shopSettings.festivalThemeActive]);
+
+  // Handler to change theme preference and sync with profile
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system' | 'time_based') => {
+    setPreferredTheme(newTheme);
+    localStorage.setItem('preferredTheme', newTheme);
+    
+    if (customerUser) {
+      try {
+        const customerRef = doc(db, 'customers', customerUser.uid);
+        const updateData = {
+          preferredTheme: newTheme,
+          lastThemeChanged: new Date().toISOString()
+        };
+        await setDoc(customerRef, updateData, { merge: true });
+        
+        if (customerProfile) {
+          setCustomerProfile({
+            ...customerProfile,
+            ...updateData
+          });
+        }
+      } catch (error) {
+        console.error("Error updating preferred theme:", error);
+      }
+    }
+  };
+
+  const [customerProfilesList, setCustomerProfilesList] = useState<CustomerProfile[]>([]);
+
+  useEffect(() => {
+    if (!isAdminUnlocked) return;
+    const unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
+      const list: CustomerProfile[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as CustomerProfile);
+      });
+      setCustomerProfilesList(list);
+    }, (error) => {
+      console.error("Firestore customers list query error:", error);
+    });
+    return () => unsub();
+  }, [isAdminUnlocked]);
+
+  const themeStats = useMemo(() => {
+    const total = customerProfilesList.length;
+    let lightCount = 0;
+    let darkCount = 0;
+    let systemCount = 0;
+    let timeBasedCount = 0;
+
+    customerProfilesList.forEach((profile) => {
+      const theme = profile.preferredTheme || 'system';
+      if (theme === 'light') lightCount++;
+      else if (theme === 'dark') darkCount++;
+      else if (theme === 'time_based') timeBasedCount++;
+      else systemCount++;
+    });
+
+    const getPercent = (count: number) => total > 0 ? ((count / total) * 100).toFixed(0) : '0';
+
+    return {
+      total,
+      lightCount,
+      lightPercent: getPercent(lightCount),
+      darkCount,
+      darkPercent: getPercent(darkCount),
+      systemCount,
+      systemPercent: getPercent(systemCount),
+      timeBasedCount,
+      timeBasedPercent: getPercent(timeBasedCount)
+    };
+  }, [customerProfilesList]);
 
   // Coupon System state
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -437,8 +580,13 @@ export default function App() {
         hasSeededSettings = true;
         const data = snapshot.data();
         if (data.shopSettings) {
-          setShopSettings(data.shopSettings);
-          localStorage.setItem('shopSettings', JSON.stringify(data.shopSettings));
+          const settingsObj = {
+            ...data.shopSettings,
+            defaultTheme: data.shopSettings.defaultTheme || 'system',
+            festivalThemeActive: data.shopSettings.festivalThemeActive || 'none',
+          };
+          setShopSettings(settingsObj);
+          localStorage.setItem('shopSettings', JSON.stringify(settingsObj));
         }
         if (data.customCategories) {
           setCustomCategories(data.customCategories);
@@ -466,10 +614,15 @@ export default function App() {
           whatsapp: '91972455778',
           address: '123 Market Road, Rajkot, Gujarat',
           announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
+          defaultTheme: 'system',
+          festivalThemeActive: 'none',
         };
         if (!shopSettingsInit.announcementText) {
           shopSettingsInit.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
         }
+        if (!shopSettingsInit.defaultTheme) shopSettingsInit.defaultTheme = 'system';
+        if (!shopSettingsInit.festivalThemeActive) shopSettingsInit.festivalThemeActive = 'none';
+
         const savedSettings = localStorage.getItem('settings');
         const settingsInit = savedSettings ? JSON.parse(savedSettings) : {};
         const defaultSettings = {
@@ -524,6 +677,10 @@ export default function App() {
           if (profileSnap.exists()) {
             profile = profileSnap.data() as CustomerProfile;
             setCustomerProfile(profile);
+            if (profile.preferredTheme) {
+              setPreferredTheme(profile.preferredTheme);
+              localStorage.setItem('preferredTheme', profile.preferredTheme);
+            }
           } else {
             profile = {
               uid: user.uid,
@@ -1599,7 +1756,7 @@ export default function App() {
                 </div>
 
                 <div className="grid md:grid-cols-12 gap-6">
-                  {/* Category Share */}
+                  {/* Stock Breakdown */}
                   <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6">
                     <h4 className="font-extrabold text-slate-900 text-sm mb-4">Stock Breakdown</h4>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto no-scrollbar">
@@ -1615,8 +1772,34 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Customer Theme Analytics */}
+                  <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6">
+                    <h4 className="font-extrabold text-slate-900 text-sm mb-4">Theme Analytics / થીમ એનાલિટિક્સ</h4>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">☀️ Light Mode</span>
+                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.lightCount} ({themeStats.lightPercent}%)</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">🌙 Dark Mode</span>
+                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.darkCount} ({themeStats.darkPercent}%)</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">🖥️ System Match</span>
+                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.systemCount} ({themeStats.systemPercent}%)</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">⏰ Time-based Auto</span>
+                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.timeBasedCount} ({themeStats.timeBasedPercent}%)</span>
+                      </div>
+                      <div className="border-t border-slate-100 pt-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
+                        Total Users Tracked: {themeStats.total}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Recent Orders */}
-                  <div className="md:col-span-8 bg-white border border-slate-200 rounded-[24px] p-6 flex flex-col justify-between">
+                  <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6 flex flex-col justify-between">
                     <div>
                       <h4 className="font-extrabold text-slate-900 text-sm mb-4">Recent Orders</h4>
                       <div className="divide-y divide-slate-100 overflow-x-auto">
@@ -1625,15 +1808,15 @@ export default function App() {
                         ) : (
                           orders.slice(0, 5).map(ord => (
                             <div key={ord.id} className="py-3 flex justify-between items-center text-xs gap-4">
-                              <div>
-                                <span className="font-black text-slate-800">{ord.id}</span>
-                                <p className="text-[10px] text-slate-400 font-bold">{ord.customer.name}</p>
+                              <div className="min-w-0">
+                                <span className="font-black text-slate-800 block truncate">{ord.id}</span>
+                                <p className="text-[10px] text-slate-400 font-bold truncate">{ord.customer.name}</p>
                               </div>
-                              <span className="font-black text-slate-900">₹{ord.total.toFixed(0)}</span>
-                              <span className={`status-badge status-${ord.status}`}>{ord.status}</span>
+                              <span className="font-black text-slate-900 shrink-0">₹{ord.total.toFixed(0)}</span>
+                              <span className={`status-badge status-${ord.status} shrink-0`}>{ord.status}</span>
                               <button 
                                 onClick={() => { setViewingOrder(ord); setAdminTab('orders'); }}
-                                className="text-xs font-black text-primary-green hover:underline"
+                                className="text-xs font-black text-primary-green hover:underline shrink-0"
                               >
                                 View
                               </button>
@@ -2050,6 +2233,8 @@ export default function App() {
                       whatsapp: fd.get('whatsapp') as string,
                       address: fd.get('address') as string,
                       announcementText: fd.get('announcementText') as string,
+                      defaultTheme: fd.get('defaultTheme') as 'light' | 'dark' | 'system',
+                      festivalThemeActive: fd.get('festivalThemeActive') as 'none' | 'diwali' | 'navratri' | 'new_year',
                     });
                   }}
                   className="space-y-4"
@@ -2086,6 +2271,28 @@ export default function App() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Scrolling Announcement Text / પટ્ટી માં ચાલતું લખાણ</label>
                     <input required type="text" name="announcementText" defaultValue={shopSettings.announcementText || ""} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden" />
                     <span className="text-[10px] text-slate-400 block pl-1">હોમ પેજ પર ચાલતી પટ્ટીમાં જે લખાણ બતાવવું હોય તે અહીં લખો.</span>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Default Shop Theme / ડિફોલ્ટ શોપ થીમ</label>
+                      <select name="defaultTheme" defaultValue={shopSettings.defaultTheme || 'system'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden">
+                        <option value="light">Light Mode / લાઈટ મોડ ☀️</option>
+                        <option value="dark">Dark Mode / ડાર્ક મોડ 🌙</option>
+                        <option value="system">System Match / સિસ્ટમ મુજબ 🖥️</option>
+                      </select>
+                      <span className="text-[10px] text-slate-400 block pl-1">નવા ગ્રાહકો માટે ડિફોલ્ટ થીમ સેટ કરો.</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Festival Branding Override / તહેવારની થીમ</label>
+                      <select name="festivalThemeActive" defaultValue={shopSettings.festivalThemeActive || 'none'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden">
+                        <option value="none">None / સામાન્ય થીમ 🛍️</option>
+                        <option value="diwali">Diwali / દિવાળી ઉત્સવ 🪔</option>
+                        <option value="navratri">Navratri / નવરાત્રી ઉત્સવ 💃</option>
+                        <option value="new_year">New Year / નવું વર્ષ ✨</option>
+                      </select>
+                      <span className="text-[10px] text-slate-400 block pl-1">આખી વેબસાઈટ પર તહેવારની રંગપદ્ધતિ ચાલુ કરો.</span>
+                    </div>
                   </div>
 
                   <motion.button
@@ -2282,6 +2489,25 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
+            {/* Theme Toggle Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                const nextTheme = activeBaseTheme === 'light' ? 'dark' : 'light';
+                handleThemeChange(nextTheme);
+                showToast(`Theme: ${nextTheme === 'light' ? 'Light Mode / લાઈટ મોડ' : 'Dark Mode / ડાર્ક મોડ'}`, 'info');
+              }}
+              className="p-2.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-primary-green hover:border-primary-green hover:bg-light-green/30 transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-primary-green"
+              title="Toggle Theme / થીમ બદલો"
+            >
+              {activeBaseTheme === 'light' ? (
+                <Moon className="w-5 h-5 text-indigo-500" />
+              ) : (
+                <Sun className="w-5 h-5 text-amber-500" />
+              )}
+            </motion.button>
+
             {isAdminView && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -2396,6 +2622,8 @@ export default function App() {
                     cartTotal={cartTotal}
                     updateCartQuantity={updateCartQuantity}
                     shopSettings={shopSettings}
+                    preferredTheme={preferredTheme}
+                    handleThemeChange={handleThemeChange}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -5771,11 +5999,14 @@ export const MyAccountPage: React.FC<{
   cartTotal: number;
   updateCartQuantity: (id: string, delta: number) => void;
   shopSettings: any;
+  preferredTheme: 'light' | 'dark' | 'system' | 'time_based';
+  handleThemeChange: (theme: 'light' | 'dark' | 'system' | 'time_based') => Promise<void>;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
-  cart, setCart, cartTotal, updateCartQuantity, shopSettings
+  cart, setCart, cartTotal, updateCartQuantity, shopSettings,
+  preferredTheme, handleThemeChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme'>('orders');
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   
@@ -6377,6 +6608,18 @@ export const MyAccountPage: React.FC<{
               <User className="w-4 h-4" />
               Edit Profile / માય પ્રોફાઇલ
             </button>
+
+            <button
+              onClick={() => setActiveTab('theme')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'theme' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Theme Settings / થીમ સેટિંગ્સ
+            </button>
           </div>
 
           {/* Content Area */}
@@ -6852,6 +7095,74 @@ export const MyAccountPage: React.FC<{
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {/* Theme Settings Tab */}
+            {activeTab === 'theme' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-base font-black text-slate-900 uppercase">Theme Preferences / થીમ પસંદગી</h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">પસંદ કરો કે વેબસાઈટ લાઈટ મોડમાં જોવી છે કે ડાર્ક મોડમાં</p>
+                </div>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Light Mode Option */}
+                  <div 
+                    onClick={() => handleThemeChange('light')}
+                    className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
+                      preferredTheme === 'light' 
+                        ? 'border-primary-green bg-light-green/30 text-primary-green' 
+                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                    }`}
+                  >
+                    <Sun className="w-8 h-8 text-amber-500" />
+                    <span className="text-xs font-black">Light Mode / લાઈટ મોડ</span>
+                    <span className="text-[10px] text-slate-400 leading-relaxed">નિયમિત તેજસ્વી થીમ / Standard Bright UI theme</span>
+                  </div>
+                  
+                  {/* Dark Mode Option */}
+                  <div 
+                    onClick={() => handleThemeChange('dark')}
+                    className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
+                      preferredTheme === 'dark' 
+                        ? 'border-primary-green bg-light-green/30 text-primary-green' 
+                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                    }`}
+                  >
+                    <Moon className="w-8 h-8 text-indigo-400" />
+                    <span className="text-xs font-black">Dark Mode / ડાર્ક મોડ</span>
+                    <span className="text-[10px] text-slate-400 leading-relaxed">રાત્રિના સમય અને આંખની સુરક્ષા માટે અનુકૂળ થીમ / Soft background optimized for low-light</span>
+                  </div>
+
+                  {/* System Match Option */}
+                  <div 
+                    onClick={() => handleThemeChange('system')}
+                    className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
+                      preferredTheme === 'system' 
+                        ? 'border-primary-green bg-light-green/30 text-primary-green' 
+                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                    }`}
+                  >
+                    <Monitor className="w-8 h-8 text-slate-500" />
+                    <span className="text-xs font-black">System Match / સિસ્ટમ મુજબ</span>
+                    <span className="text-[10px] text-slate-400 leading-relaxed">તમારા ફોન અથવા કોમ્પ્યુટર સેટિંગ્સ મુજબ બદલાશે / Follows OS settings automatically</span>
+                  </div>
+
+                  {/* Time-Based Option */}
+                  <div 
+                    onClick={() => handleThemeChange('time_based')}
+                    className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
+                      preferredTheme === 'time_based' 
+                        ? 'border-primary-green bg-light-green/30 text-primary-green' 
+                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                    }`}
+                  >
+                    <Clock className="w-8 h-8 text-emerald-600" />
+                    <span className="text-xs font-black">Time-based Auto / સમય આધારિત ઓટો</span>
+                    <span className="text-[10px] text-slate-400 leading-relaxed">રાત્રે (7 PM - 6 AM) ડાર્ક અને દિવસે લાઈટ મોડ / Light by day, Dark by night (7 PM - 6 AM)</span>
+                  </div>
+                </div>
               </div>
             )}
 

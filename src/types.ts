@@ -77,6 +77,8 @@ export interface CustomerProfile {
   savedAddresses: SavedAddress[];
   wishlist: string[];
   profileImage?: string;
+  preferredTheme?: 'light' | 'dark' | 'system' | 'time_based';
+  lastThemeChanged?: string;
 }
 
 export interface ToastMessage {
