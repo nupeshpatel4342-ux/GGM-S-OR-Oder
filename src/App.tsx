@@ -2327,37 +2327,53 @@ export default function App() {
                           {cart.map(item => {
                             const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
                             return (
-                              <div key={cartItemId} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-all">
-                                <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
-                                  {item.image ? (
-                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <ImageIcon className="w-5 h-5 text-slate-300" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
-                                  <h4 className="font-bold text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
-                                  <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                              <div key={cartItemId} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 transition-all">
+                                {/* Left: Product Image & Details */}
+                                <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                                  <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                    {item.image ? (
+                                      <img src={item.image} alt={item.name} className="max-h-full max-w-full object-contain" />
+                                    ) : (
+                                      <ImageIcon className="w-5 h-5 text-slate-300" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase mb-0.5 block tracking-wider">{item.category}</span>
+                                    <h4 className="font-black text-xs sm:text-sm text-slate-900 truncate leading-tight uppercase">{item.name}</h4>
+                                    {item.gujaratiName && (
+                                      <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
+                                    )}
+                                    <p className="text-xs font-black text-primary-green mt-0.5">₹{item.price.toFixed(0)} / {item.unit}</p>
+                                  </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl shrink-0">
+                                {/* Right: Controls (Qty editor, Subtotal, Delete) */}
+                                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
+                                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                                    <button
+                                      onClick={() => updateCartQuantity(cartItemId, -1)}
+                                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
+                                    >
+                                      {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" /> : <ChevronLeft className="w-4 h-4 text-slate-600" />}
+                                    </button>
+                                    <span className="w-6 text-center font-black text-xs text-slate-850 font-mono">{item.quantity}</span>
+                                    <button
+                                      onClick={() => updateCartQuantity(cartItemId, 1)}
+                                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
+                                    >
+                                      <ChevronRight className="w-4 h-4 text-slate-600" />
+                                    </button>
+                                  </div>
+                                  <div className="text-right min-w-[70px]">
+                                    <p className="font-black text-sm text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
+                                  </div>
                                   <button
-                                    onClick={() => updateCartQuantity(cartItemId, -1)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 transition-all"
+                                    onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
+                                    className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                    title="Remove item"
                                   >
-                                    {item.quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <ChevronLeft className="w-4 h-4" />}
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
-                                  <span className="w-6 text-center font-black text-xs text-slate-800">{item.quantity}</span>
-                                  <button
-                                    onClick={() => updateCartQuantity(cartItemId, 1)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:text-primary-green transition-all"
-                                  >
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                </div>
-                                <div className="text-right shrink-0 min-w-[60px]">
-                                  <p className="font-black text-sm text-slate-900">₹{(item.price * item.quantity).toFixed(0)}</p>
                                 </div>
                               </div>
                             );
@@ -5264,57 +5280,62 @@ export const MyAccountPage: React.FC<{
                       {cart.map((item, idx) => {
                         const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
                         return (
-                          <div key={idx} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors">
-                            {item.image ? (
-                              <img src={item.image} alt={item.name} className="w-12 h-12 object-contain shrink-0 rounded-lg bg-white border border-slate-100 p-1" />
-                            ) : (
-                              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
-                                <ShoppingCart className="w-5 h-5" />
+                          <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 transition-colors">
+                            {/* Left: Product Image & Details */}
+                            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                              <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
+                                {item.image ? (
+                                  <img src={item.image} alt={item.name} className="max-h-full max-w-full object-contain" />
+                                ) : (
+                                  <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                                    <ShoppingCart className="w-5 h-5" />
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-xs font-black text-slate-800 uppercase truncate leading-snug">{item.name}</h4>
-                              {item.gujaratiName && (
-                                <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
-                              )}
-                              <p className="text-[9px] font-extrabold text-slate-500 mt-1 font-mono">
-                                ₹{item.price} / {item.unit}
-                              </p>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-xs font-black text-slate-800 uppercase truncate leading-snug">{item.name}</h4>
+                                {item.gujaratiName && (
+                                  <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
+                                )}
+                                <p className="text-[10px] font-extrabold text-slate-500 mt-1 font-mono">
+                                  ₹{item.price} / {item.unit}
+                                </p>
+                              </div>
                             </div>
 
-                            {/* Qty edit buttons */}
-                            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-0.5 gap-2 shrink-0">
+                            {/* Right: Controls (Qty, Subtotal, Delete) */}
+                            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
+                              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-0.5 gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartQuantity(cartItemId, -1)}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                                >
+                                  -
+                                </button>
+                                <span className="text-center font-black text-slate-900 text-xs w-4 font-mono">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCartQuantity(cartItemId, 1)}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <div className="text-right shrink-0 min-w-[70px]">
+                                <p className="text-xs font-black text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
+                              </div>
+
                               <button
                                 type="button"
-                                onClick={() => updateCartQuantity(cartItemId, -1)}
-                                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                                onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
+                                className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all shrink-0"
+                                title="Remove item"
                               >
-                                -
-                              </button>
-                              <span className="text-center font-black text-slate-900 text-xs w-4 font-mono">{item.quantity}</span>
-                              <button
-                                type="button"
-                                onClick={() => updateCartQuantity(cartItemId, 1)}
-                                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
-                              >
-                                +
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
-
-                            {/* Subtotal */}
-                            <div className="text-right shrink-0 w-16">
-                              <p className="text-xs font-black text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
-                            </div>
-
-                            {/* Remove item */}
-                            <button
-                              type="button"
-                              onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
-                              className="p-1 text-slate-350 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all shrink-0"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         );
                       })}
