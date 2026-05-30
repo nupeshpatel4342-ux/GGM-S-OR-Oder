@@ -5982,24 +5982,43 @@ export const MyAccountPage: React.FC<{
         return;
       }
 
-      const itemRowHeight = 40;
-      const headerHeight = 360;
-      const footerHeight = 220;
+      const hasCoupon = !!order.couponCode && (order.couponDiscount || 0) > 0;
+      
+      let totalProductSavings = 0;
+      order.items.forEach(item => {
+        const mrpVal = item.selectedVariant && item.selectedVariant.mrp ? item.selectedVariant.mrp : item.mrp;
+        const priceVal = item.selectedVariant ? item.selectedVariant.price : item.price;
+        if (mrpVal && mrpVal > priceVal) {
+          totalProductSavings += (mrpVal - priceVal) * item.quantity;
+        }
+      });
+      const totalSavingsVal = totalProductSavings + (order.couponDiscount || 0);
+      const hasSavings = totalSavingsVal > 0;
+
+      const itemRowHeight = 38;
+      const headerHeight = 330; // Matches tableTop + 35
+      const footerHeight = 230 + (hasCoupon ? 25 : 0) + (hasSavings ? 35 : 0);
       const totalItemsHeight = order.items.length * itemRowHeight;
       const canvasWidth = 800;
       const canvasHeight = headerHeight + totalItemsHeight + footerHeight;
 
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
+      // Enable High-DPI Retina resolution (2x scaling)
+      canvas.width = canvasWidth * 2;
+      canvas.height = canvasHeight * 2;
+      canvas.style.width = canvasWidth + 'px';
+      canvas.style.height = canvasHeight + 'px';
 
+      ctx.scale(2, 2);
+
+      // Background fill
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      // Accent top line
+      // Accent top line (Premium emerald green)
       ctx.fillStyle = '#00884F';
       ctx.fillRect(0, 0, canvasWidth, 15);
 
-      // Shop Name
+      // Shop Name (Bold modern serif/sans)
       ctx.fillStyle = '#00884F';
       ctx.font = 'bold 28px sans-serif';
       ctx.fillText(shopSettings.shopName, 40, 60);
@@ -6009,7 +6028,7 @@ export const MyAccountPage: React.FC<{
       ctx.font = 'bold 11px sans-serif';
       ctx.fillText(shopSettings.tagline.toUpperCase(), 40, 80);
 
-      // Shop Contact (Right)
+      // Shop Contact (Right aligned)
       ctx.fillStyle = '#1E293B';
       ctx.font = '12px sans-serif';
       ctx.textAlign = 'right';
@@ -6025,50 +6044,50 @@ export const MyAccountPage: React.FC<{
       ctx.strokeStyle = '#E2E8F0';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(40, 115);
-      ctx.lineTo(canvasWidth - 40, 115);
+      ctx.moveTo(40, 110);
+      ctx.lineTo(canvasWidth - 40, 110);
       ctx.stroke();
 
       // Title
       ctx.fillStyle = '#0F172A';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('INVOICE / ઓર્ડર બિલ', 40, 150);
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('INVOICE / ઓર્ડર બિલ', 40, 140);
 
-      // Info Block
+      // Customer and Order Info Block
       ctx.fillStyle = '#F8FAFC';
-      ctx.fillRect(40, 170, canvasWidth - 80, 100);
+      ctx.fillRect(40, 160, canvasWidth - 80, 100);
       ctx.strokeStyle = '#E2E8F0';
-      ctx.strokeRect(40, 170, canvasWidth - 80, 100);
+      ctx.strokeRect(40, 160, canvasWidth - 80, 100);
 
-      // Labels
+      // Info Labels
       ctx.fillStyle = '#64748B';
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('BILL TO / ગ્રાહક:', 60, 195);
-      ctx.fillText('PHONE / મોબાઈલ:', 60, 220);
-      ctx.fillText('ADDRESS / સરનામું:', 60, 245);
+      ctx.fillText('BILL TO / ગ્રાહક:', 60, 185);
+      ctx.fillText('PHONE / મોબાઈલ:', 60, 210);
+      ctx.fillText('ADDRESS / સરનામું:', 60, 235);
 
-      ctx.fillText('ORDER ID / આઈડી:', 450, 195);
-      ctx.fillText('DATE / તારીખ:', 450, 220);
-      ctx.fillText('DELIVERY / ઓપ્શન:', 450, 245);
+      ctx.fillText('ORDER ID / આઈડી:', 450, 185);
+      ctx.fillText('DATE / તારીખ:', 450, 210);
+      ctx.fillText('DELIVERY / ઓપ્શન:', 450, 235);
 
-      // Values
+      // Info Values
       ctx.fillStyle = '#0F172A';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(order.customer.name, 180, 195);
-      ctx.fillText(order.customer.phone, 180, 220);
+      ctx.fillText(order.customer.name, 185, 185);
+      ctx.fillText(order.customer.phone, 185, 210);
       
       const cleanAddress = order.customer.address || 'N/A';
-      ctx.fillText(cleanAddress.length > 35 ? cleanAddress.substring(0, 33) + '...' : cleanAddress, 180, 245);
+      ctx.fillText(cleanAddress.length > 33 ? cleanAddress.substring(0, 31) + '...' : cleanAddress, 185, 235);
 
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(order.id, 580, 195);
-      ctx.fillText(new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' }), 580, 220);
+      ctx.fillText(order.id, 580, 185);
+      ctx.fillText(new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' }), 580, 210);
       
       const modeText = order.customer.deliveryMode === 'home_delivery' ? 'Home Delivery (હોમ ડિલિવરી)' : 'Shop Pick Up (દુકાનેથી રૂબરૂ)';
-      ctx.fillText(modeText, 580, 245);
+      ctx.fillText(modeText, 580, 235);
 
       // Items Table Header
-      const tableTop = 295;
+      const tableTop = 280;
       ctx.fillStyle = '#0F172A';
       ctx.fillRect(40, tableTop, canvasWidth - 80, 35);
 
@@ -6100,92 +6119,154 @@ export const MyAccountPage: React.FC<{
         ctx.font = 'bold 12px sans-serif';
         
         const nameText = item.name + (item.gujaratiName ? ` (${item.gujaratiName})` : '');
-        ctx.fillText(nameText.length > 35 ? nameText.substring(0, 32) + '...' : nameText, 60, currentY + 25);
+        ctx.fillText(nameText.length > 35 ? nameText.substring(0, 32) + '...' : nameText, 60, currentY + 24);
 
         const unitName = item.selectedVariant ? item.selectedVariant.name : item.unit;
         ctx.fillStyle = '#475569';
         ctx.font = '11px sans-serif';
-        ctx.fillText(unitName, 360, currentY + 25);
+        ctx.fillText(unitName, 360, currentY + 24);
 
         ctx.textAlign = 'center';
         ctx.fillStyle = '#0F172A';
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(item.quantity.toString(), 500, currentY + 25);
+        ctx.fillText(item.quantity.toString(), 500, currentY + 24);
 
         ctx.textAlign = 'right';
         ctx.font = 'mono 12px sans-serif';
-        ctx.fillText(`₹${item.price.toFixed(0)}`, 630, currentY + 25);
+        ctx.fillText(`₹${item.price.toFixed(0)}`, 630, currentY + 24);
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(`₹${(item.price * item.quantity).toFixed(0)}`, 740, currentY + 25);
+        ctx.fillText(`₹${(item.price * item.quantity).toFixed(0)}`, 740, currentY + 24);
 
         ctx.textAlign = 'left';
         currentY += itemRowHeight;
       });
 
-      currentY += 15;
+      // Dotted Separator between Items and Totals
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(40, currentY + 10);
+      ctx.lineTo(canvasWidth - 40, currentY + 10);
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset line dash to solid
 
-      // Totals
+      let totalsY = currentY + 25;
+
+      // Totals (Right Aligned labels)
       ctx.textAlign = 'right';
       ctx.fillStyle = '#475569';
       ctx.font = '12px sans-serif';
-      ctx.fillText('Subtotal / કિંમત:', 580, currentY + 20);
-      ctx.fillText('Delivery / ભાડું:', 580, currentY + 45);
-
+      ctx.fillText('Subtotal / કિંમત:', 580, totalsY);
+      
       ctx.fillStyle = '#0F172A';
       ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(`₹${order.total.toFixed(0)}`, 740, currentY + 20);
-      ctx.fillStyle = '#00884F';
-      ctx.fillText('FREE', 740, currentY + 45);
+      const calculatedSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      ctx.fillText(`₹${calculatedSubtotal.toFixed(0)}`, 740, totalsY);
+      
+      totalsY += 25;
 
-      // Grand Total Box
+      if (hasCoupon) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#E11D48'; // Rose-600
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(`Discount (${order.couponCode}) / ડિસ્કાઉન્ટ:`, 580, totalsY);
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(`-₹${(order.couponDiscount || 0).toFixed(0)}`, 740, totalsY);
+        totalsY += 25;
+      }
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#475569';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Delivery / ભાડું:', 580, totalsY);
+      ctx.fillStyle = '#00884F';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('FREE', 740, totalsY);
+      
+      totalsY += 25;
+
+      // Grand Total Box (Green Highlight Box)
       ctx.fillStyle = '#F0FDF4';
-      ctx.fillRect(400, currentY + 60, 360, 45);
+      ctx.fillRect(400, totalsY, 360, 50);
       ctx.strokeStyle = '#DCFCE7';
-      ctx.strokeRect(400, currentY + 60, 360, 45);
+      ctx.strokeRect(400, totalsY, 360, 50);
 
       ctx.fillStyle = '#166534';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('Grand Total / કુલ કિંમત:', 580, currentY + 88);
-      ctx.font = 'black 18px sans-serif';
-      ctx.fillText(`₹${order.total.toFixed(0)}`, 740, currentY + 88);
+      ctx.fillText('Grand Total / કુલ કિંમત:', 580, totalsY + 32);
+      ctx.font = 'black 20px sans-serif';
+      ctx.fillText(`₹${order.total.toFixed(0)}`, 740, totalsY + 32);
+
+      // Total Savings Green Badge
+      if (hasSavings) {
+        const savingsY = totalsY + 58;
+        ctx.fillStyle = '#DCFCE7'; // light green
+        ctx.fillRect(400, savingsY, 360, 32);
+        ctx.strokeStyle = '#BBF7D0';
+        ctx.strokeRect(400, savingsY, 360, 32);
+
+        ctx.fillStyle = '#15803D'; // green-700
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`🎉 YOU SAVED ₹${totalSavingsVal.toFixed(0)} ON THIS ORDER! / તમે ₹${totalSavingsVal.toFixed(0)} બચાવ્યા! 🎉`, 580, savingsY + 20);
+      }
 
       ctx.textAlign = 'left';
 
-      // Terms Box
+      // Terms Box (Left column of the footer)
       ctx.fillStyle = '#F8FAFC';
-      ctx.fillRect(40, currentY + 60, 340, 95);
+      ctx.fillRect(40, totalsY, 340, 95);
       ctx.strokeStyle = '#E2E8F0';
-      ctx.strokeRect(40, currentY + 60, 340, 95);
+      ctx.strokeRect(40, totalsY, 340, 95);
 
       ctx.fillStyle = '#0F172A';
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('⚠️ નિયમો / Terms:', 55, currentY + 80);
+      ctx.fillText('⚠️ નિયમો / Terms:', 55, totalsY + 22);
 
       ctx.fillStyle = '#475569';
       ctx.font = '10px sans-serif';
-      ctx.fillText('૧. ઓર્ડરનું પેમેન્ટ ઓર્ડર આપવા આવો ત્યારે આપવાનું રહેશે.', 55, currentY + 105);
-      ctx.fillText('૨. કોઈ વસ્તુ પાછી આપવાની હોય તો ૨૪ કલાકમાં શોપ પર આવવાનું રહેશે.', 55, currentY + 125);
+      ctx.fillText('૧. ઓર્ડરનું પેમેન્ટ ઓર્ડર આપવા આવો ત્યારે આપવાનું રહેશે.', 55, totalsY + 45);
+      ctx.fillText('૨. કોઈ વસ્તુ પાછી આપવાની હોય તો ૨૪ કલાકમાં શોપ પર આવવાનું રહેશે.', 55, totalsY + 68);
 
-      // Thank you
+      // Thank you (Centered at the very bottom)
+      const thankYouY = canvasHeight - 25;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#00884F';
       ctx.font = 'bold italic 13px sans-serif';
-      ctx.fillText('Thank you for shopping with us! / મુલાકાત બદલ આભાર 🙏', canvasWidth / 2, canvasHeight - 25);
+      ctx.fillText('Thank you for shopping with us! / મુલાકાત બદલ આભાર 🙏', canvasWidth / 2, thankYouY);
 
-      // PDF export
+      // PDF export with multi-page pagination algorithm
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const { jsPDF } = await import('jspdf');
       
       const pdfWidth = 210;
-      const pdfHeight = (canvasHeight * pdfWidth) / canvasWidth;
+      const pdfHeight = 297; // A4 standard height
+      
+      const imgWidth = 210;
+      const imgHeight = (canvasHeight * imgWidth) / canvasWidth;
 
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: [pdfWidth, pdfHeight]
+        format: 'a4'
       });
 
-      doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      if (imgHeight <= pdfHeight) {
+        // Fits perfectly on single page
+        doc.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+      } else {
+        // Multi-page pagination
+        let yOffset = 0;
+        while (yOffset < imgHeight) {
+          doc.addImage(imgData, 'JPEG', 0, -yOffset, imgWidth, imgHeight);
+          yOffset += pdfHeight;
+          if (yOffset < imgHeight) {
+            doc.addPage();
+          }
+        }
+      }
+
       doc.save(`invoice_${order.id}.pdf`);
       showToast('બિલ ડાઉનલોડ થઈ ગયું! / Invoice PDF downloaded successfully! 🎉', 'success');
 
