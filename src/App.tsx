@@ -156,11 +156,16 @@ export default function App() {
       mobile: '+91 97245 5778',
       whatsapp: '91972455778',
       address: '123 Market Road, Rajkot, Gujarat',
+      announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
     };
     // Auto-migrate if old dummy number is in local storage
     if (settings.whatsapp === '919876543210') {
       settings.whatsapp = '91972455778';
       settings.mobile = '+91 97245 5778';
+      localStorage.setItem('shopSettings', JSON.stringify(settings));
+    }
+    if (!settings.announcementText) {
+      settings.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
       localStorage.setItem('shopSettings', JSON.stringify(settings));
     }
     return settings;
@@ -442,7 +447,11 @@ export default function App() {
           mobile: '+91 97245 5778',
           whatsapp: '91972455778',
           address: '123 Market Road, Rajkot, Gujarat',
+          announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
         };
+        if (!shopSettingsInit.announcementText) {
+          shopSettingsInit.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
+        }
         const savedSettings = localStorage.getItem('settings');
         const settingsInit = savedSettings ? JSON.parse(savedSettings) : {};
         const defaultSettings = {
@@ -1674,6 +1683,7 @@ export default function App() {
                       mobile: fd.get('mobile') as string,
                       whatsapp: fd.get('whatsapp') as string,
                       address: fd.get('address') as string,
+                      announcementText: fd.get('announcementText') as string,
                     });
                   }}
                   className="space-y-4"
@@ -1702,8 +1712,14 @@ export default function App() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Physical Store Address</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Physical Store Address / દુકાનનું સરનામું</label>
                     <textarea required name="address" defaultValue={shopSettings.address} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden resize-none" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Scrolling Announcement Text / પટ્ટી માં ચાલતું લખાણ</label>
+                    <input required type="text" name="announcementText" defaultValue={shopSettings.announcementText || ""} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden" />
+                    <span className="text-[10px] text-slate-400 block pl-1">હોમ પેજ પર ચાલતી પટ્ટીમાં જે લખાણ બતાવવું હોય તે અહીં લખો.</span>
                   </div>
 
                   <motion.button
@@ -1965,6 +1981,9 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* 📢 Scrolling Announcement Bar */}
+                {!selectedCategory && <ScrollingAnnouncement text={shopSettings.announcementText} />}
+
                 {/* 🚚 Welcome Popup Notice */}
                 <WelcomeDeliveryPopup />
 
@@ -2197,6 +2216,34 @@ export default function App() {
     </div>
   );
 }
+
+interface ScrollingAnnouncementProps {
+  text?: string;
+}
+
+// 📢 Scrolling Announcement Bar (Marquee Notice)
+const ScrollingAnnouncement: React.FC<ScrollingAnnouncementProps> = ({ text }) => {
+  const noticeText = text || "🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.";
+  
+  return (
+    <div className="relative overflow-hidden w-full bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-y border-amber-200/50 py-2 sm:py-2.5 my-3 shadow-2xs backdrop-blur-xs rounded-xl sm:rounded-2xl">
+      <div className="animate-marquee whitespace-nowrap flex gap-12 items-center">
+        <span className="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-2">
+          {noticeText}
+        </span>
+        <span className="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-2">
+          {noticeText}
+        </span>
+        <span className="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-2">
+          {noticeText}
+        </span>
+        <span className="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-2">
+          {noticeText}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 // 🚚 Welcome Delivery Popup Component (shows on first visit)
 const WelcomeDeliveryPopup: React.FC = () => {
