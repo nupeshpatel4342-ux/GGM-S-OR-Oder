@@ -1029,6 +1029,7 @@ export default function App() {
       showToast('કૂપન સફળતાપૂર્વક ઉમેરાઈ ગઈ / Coupon created successfully', 'success');
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, `coupons/${coupon.code}`);
+      showToast('કૂપન ઉમેરવામાં ભૂલ આવી / Error creating coupon: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
   };
 
@@ -1048,6 +1049,7 @@ export default function App() {
       showToast('કૂપન સફળતાપૂર્વક અપડેટ થઈ ગઈ / Coupon updated successfully', 'success');
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `coupons/${id}`);
+      showToast('કૂપન અપડેટ કરવામાં ભૂલ આવી / Error updating coupon: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
   };
 
@@ -1058,6 +1060,7 @@ export default function App() {
       showToast('કૂપન સફળતાપૂર્વક ડીલીટ થઈ ગઈ / Coupon deleted successfully', 'success');
     } catch (error) {
       handleLocalDataError(error, OperationType.DELETE, `coupons/${id}`);
+      showToast('કૂપન ડીલીટ કરવામાં ભૂલ આવી / Error deleting coupon: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
   };
 
