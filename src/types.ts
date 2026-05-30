@@ -74,6 +74,7 @@ export interface CustomerProfile {
   createdAt: string;
   savedAddresses: SavedAddress[];
   wishlist: string[];
+  profileImage?: string;
 }
 
 export interface ToastMessage {

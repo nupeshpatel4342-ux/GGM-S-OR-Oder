@@ -574,6 +574,19 @@ export default function App() {
     }
   };
 
+  const handleCartClick = () => {
+    if (location.pathname !== '/') {
+      navigate('/');
+      setTimeout(() => {
+        const basket = document.getElementById('customer-basket');
+        basket?.scrollIntoView({ behavior: 'smooth' });
+      }, 250);
+    } else {
+      const basket = document.getElementById('customer-basket');
+      basket?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const addCategory = async (cat: Omit<CategoryItem, 'id'>) => {
     const id = cat.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
     try {
@@ -2028,27 +2041,52 @@ export default function App() {
               </motion.button>
             )}
             {!isAdminView && (
-              customerUser ? (
+              <div className="flex items-center gap-2">
+                {/* Cart Icon in Navbar */}
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/account')}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCartClick}
+                  className="relative p-2.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/30 transition-all cursor-pointer shadow-xs shrink-0"
                 >
-                  <User className="w-4.5 h-4.5 text-emerald-650" />
-                  <span>{customerProfile?.name || customerUser.displayName || 'My Account'}</span>
+                  <ShoppingCart className="w-5 h-5" />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs font-mono">
+                      {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                    </span>
+                  )}
                 </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setShowAuthModal(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-emerald-700"
-                >
-                  <UserPlus className="w-4.5 h-4.5" />
-                  <span>Login / લૉગિન</span>
-                </motion.button>
-              )
+
+                {customerUser ? (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => navigate('/account')}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50"
+                  >
+                    {customerProfile?.profileImage ? (
+                      <img 
+                        src={customerProfile.profileImage} 
+                        alt="Profile" 
+                        className="w-5 h-5 rounded-full object-cover shrink-0 border border-emerald-250" 
+                      />
+                    ) : (
+                      <User className="w-4.5 h-4.5 text-emerald-650" />
+                    )}
+                    <span>{customerProfile?.name || customerUser.displayName || 'My Account'}</span>
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowAuthModal(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-[#00884F]"
+                  >
+                    <UserPlus className="w-4.5 h-4.5" />
+                    <span>Login / લૉગિન</span>
+                  </motion.button>
+                )}
+              </div>
             )}
           </div>
         </header>
@@ -2100,6 +2138,10 @@ export default function App() {
                     products={products}
                     onAdd={addToCart}
                     onLogout={handleCustomerLogout}
+                    cart={cart}
+                    setCart={setCart}
+                    cartTotal={cartTotal}
+                    updateCartQuantity={updateCartQuantity}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -4631,10 +4673,94 @@ export const MyAccountPage: React.FC<{
   products: Product[];
   onAdd: (p: Product, qty: number, variant?: ProductVariant) => void;
   onLogout: () => void;
-}> = ({ customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist'>('orders');
+  cart: CartItem[];
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+  cartTotal: number;
+  updateCartQuantity: (id: string, delta: number) => void;
+}> = ({ 
+  customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
+  cart, setCart, cartTotal, updateCartQuantity 
+}) => {
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile'>('orders');
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  
+  // Profile Edit State
+  const [profileName, setProfileName] = useState(customerProfile?.name || '');
+  const [profilePhone, setProfilePhone] = useState(customerProfile?.phone || '');
+  const [profileImg, setProfileImg] = useState(customerProfile?.profileImage || '');
+  const [profileUpdating, setProfileUpdating] = useState(false);
+
+  // Sync profile edits when customerProfile loads
+  useEffect(() => {
+    if (customerProfile) {
+      setProfileName(customerProfile.name);
+      setProfilePhone(customerProfile.phone);
+      setProfileImg(customerProfile.profileImage || '');
+    }
+  }, [customerProfile]);
+
+  // Image Upload handler
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      compressImage(file, 300, 300, 0.7, (base64) => {
+        setProfileImg(base64);
+      });
+    }
+  };
+
+  // Handle Profile Update
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName || !profilePhone) {
+      showToast('કૃપા કરીને નામ અને નંબર ભરો / Please fill name and phone.', 'error');
+      return;
+    }
+    const cleanPhone = normalizePhone(profilePhone);
+    if (!/^[6-9]\d{9}$/.test(profilePhone.replace(/\D/g, ''))) {
+      showToast('કૃપા કરીને સાચો ૧૦ આંકડાનો WhatsApp નંબર લખો / Enter a valid 10-digit number.', 'error');
+      return;
+    }
+
+    setProfileUpdating(true);
+    try {
+      // 1. Update Firebase Auth Email if phone changed
+      if (cleanPhone !== customerProfile?.phone) {
+        const newEmail = `${cleanPhone}@ggms.app`;
+        try {
+          const { updateEmail } = await import('firebase/auth');
+          await updateEmail(customerUser, newEmail);
+        } catch (authError: any) {
+          console.error('Firebase Auth email update failed:', authError);
+          if (authError.code === 'auth/requires-recent-login') {
+            showToast('સેક્યુરિટીના કારણે નંબર બદલવા માટે ફરીથી લોગિન કરવું પડશે / For security, please log out and log in again to change phone number', 'error');
+            setProfileUpdating(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Update Firebase Auth Profile name
+      await updateProfile(customerUser, { displayName: profileName });
+
+      // 3. Update Firestore Profile Doc
+      const updatedProfile = {
+        ...customerProfile,
+        name: profileName,
+        phone: cleanPhone,
+        profileImage: profileImg
+      };
+      await setDoc(doc(db, 'customers', customerUser.uid), updatedProfile, { merge: true });
+      setCustomerProfile(updatedProfile as CustomerProfile);
+      showToast('પ્રોફાઇલ અપડેટ થઈ ગઈ! / Profile updated successfully! 🎉', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('પ્રોફાઇલ અપડેટ નિષ્ફળ ગઈ / Profile update failed', 'error');
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
   
   // Address Form State
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -4766,8 +4892,12 @@ export const MyAccountPage: React.FC<{
         {/* User Card */}
         <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-            <div className="w-16 h-16 rounded-3xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
-              <User className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 overflow-hidden border border-emerald-150 shadow-xs">
+              {customerProfile?.profileImage ? (
+                <img src={customerProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-8 h-8" />
+              )}
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900">{customerProfile?.name || customerUser.displayName || 'ગ્રાહક / Customer'}</h2>
@@ -4825,6 +4955,30 @@ export const MyAccountPage: React.FC<{
             >
               <Heart className="w-4 h-4" />
               Wishlist / મનપસંદ ({wishlistProducts.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('cart')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'cart' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              My Cart / બાસ્કેટ ({cart.reduce((sum, item) => sum + item.quantity, 0)})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
+                activeTab === 'profile' 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              Edit Profile / માય પ્રોફાઇલ
             </button>
           </div>
 
@@ -5084,6 +5238,211 @@ export const MyAccountPage: React.FC<{
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Cart Tab */}
+            {activeTab === 'cart' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-base font-black text-slate-900 uppercase">My Basket / મારું કાર્ટ</h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે ખરીદવા માટે પસંદ કરેલી વસ્તુઓ</p>
+                </div>
+
+                {cart.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                      <ShoppingCart className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-slate-900 font-black">Your Basket is Empty</h4>
+                    <p className="text-slate-400 text-xs mt-1">તમારું બાસ્કેટ ખાલી છે. હોમ પેજ પરથી પ્રોડક્ટ્સ ઉમેરો.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Cart Items List */}
+                    <div className="divide-y divide-slate-100 border border-slate-150 rounded-2xl overflow-hidden shadow-xs bg-white">
+                      {cart.map((item, idx) => {
+                        const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
+                        return (
+                          <div key={idx} className="p-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors">
+                            {item.image ? (
+                              <img src={item.image} alt={item.name} className="w-12 h-12 object-contain shrink-0 rounded-lg bg-white border border-slate-100 p-1" />
+                            ) : (
+                              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 shrink-0">
+                                <ShoppingCart className="w-5 h-5" />
+                              </div>
+                            )}
+                            
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-black text-slate-800 uppercase truncate leading-snug">{item.name}</h4>
+                              {item.gujaratiName && (
+                                <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
+                              )}
+                              <p className="text-[9px] font-extrabold text-slate-500 mt-1 font-mono">
+                                ₹{item.price} / {item.unit}
+                              </p>
+                            </div>
+
+                            {/* Qty edit buttons */}
+                            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-0.5 gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => updateCartQuantity(cartItemId, -1)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                              >
+                                -
+                              </button>
+                              <span className="text-center font-black text-slate-900 text-xs w-4 font-mono">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateCartQuantity(cartItemId, 1)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {/* Subtotal */}
+                            <div className="text-right shrink-0 w-16">
+                              <p className="text-xs font-black text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
+                            </div>
+
+                            {/* Remove item */}
+                            <button
+                              type="button"
+                              onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
+                              className="p-1 text-slate-350 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary & Checkout button */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-[24px] p-5 space-y-4">
+                      <div className="space-y-2 text-xs font-bold text-slate-600">
+                        <div className="flex justify-between">
+                          <span>Subtotal / કુલ કિંમત</span>
+                          <span className="font-mono">₹{cartTotal.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700">
+                          <span>Delivery / ડિલિવરી ચાર્જ</span>
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[9px] font-black">FREE</span>
+                        </div>
+                        <div className="flex justify-between pt-3 border-t border-slate-200 text-sm font-black text-slate-900">
+                          <span>Grand Total</span>
+                          <span className="font-mono text-emerald-700 text-base">₹{cartTotal.toFixed(0)}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigate('/');
+                          setTimeout(() => {
+                            const basket = document.getElementById('customer-basket');
+                            basket?.scrollIntoView({ behavior: 'smooth' });
+                          }, 250);
+                        }}
+                        className="w-full py-3.5 bg-[#00884F] hover:bg-[#007041] active:scale-[0.98] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        Proceed to Checkout / ઓર્ડર પૂરો કરો
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Profile Tab */}
+            {activeTab === 'profile' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-base font-black text-slate-900 uppercase">Edit Profile / પ્રોફાઇલ વિગતો</h3>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમારી પર્સનલ માહિતી અને ફોટો બદલો</p>
+                </div>
+
+                <form onSubmit={handleUpdateProfile} className="space-y-5 max-w-lg">
+                  {/* Photo Editor */}
+                  <div className="space-y-2 text-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Profile Picture / તમારો ફોટો</label>
+                    <div className="relative w-24 h-24 mx-auto group">
+                      {profileImg ? (
+                        <img 
+                          src={profileImg} 
+                          alt="Profile Preview" 
+                          className="w-full h-full rounded-full object-cover border-2 border-emerald-500 shadow-md" 
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center text-emerald-650 font-black text-2xl">
+                          {(profileName || customerUser.displayName || 'C').slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      <label className="absolute bottom-0 right-0 bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-full cursor-pointer shadow-md transition-all active:scale-90 flex items-center justify-center border-2 border-white">
+                        <Camera className="w-3.5 h-3.5" />
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleImageChange} 
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Name Input */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Full Name / તમારું પૂરું નામ</label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        required
+                        type="text"
+                        placeholder="નામ અને અટક"
+                        value={profileName}
+                        onChange={e => setProfileName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone Input */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">WhatsApp Number / વૉટ્સએપ નંબર</label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        required
+                        type="tel"
+                        placeholder="વૉટ્સએપ નંબર"
+                        value={profilePhone}
+                        onChange={e => setProfilePhone(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-bold mt-0.5 pl-1">
+                      ⚠️ નોંધ: વૉટ્સએપ નંબર બદલવાથી તમારું લૉગિન આઈડી (ID) પણ બદલાઈ જશે.
+                    </p>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={profileUpdating}
+                      className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2"
+                    >
+                      {profileUpdating ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Save Changes / સાચવો'
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
 
