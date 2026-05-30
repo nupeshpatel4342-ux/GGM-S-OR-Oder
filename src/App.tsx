@@ -486,8 +486,21 @@ export default function App() {
       if (user) {
         try {
           const profileSnap = await getDoc(doc(db, 'customers', user.uid));
+          let profile: CustomerProfile;
           if (profileSnap.exists()) {
-            setCustomerProfile(profileSnap.data() as CustomerProfile);
+            profile = profileSnap.data() as CustomerProfile;
+            setCustomerProfile(profile);
+          } else {
+            profile = {
+              uid: user.uid,
+              name: user.displayName || 'Customer',
+              phone: user.email ? user.email.split('@')[0].slice(-10) : '',
+              createdAt: new Date().toISOString(),
+              savedAddresses: [],
+              wishlist: []
+            };
+            await setDoc(doc(db, 'customers', user.uid), profile);
+            setCustomerProfile(profile);
           }
           const cartSnap = await getDoc(doc(db, 'customerCarts', user.uid));
           if (cartSnap.exists() && cartSnap.data().items?.length > 0) {
@@ -529,6 +542,7 @@ export default function App() {
   // Wishlist toggle
   const toggleWishlist = async (productId: string) => {
     if (!customerUser || !customerProfile) {
+      setAuthRedirectAction(() => () => toggleWishlist(productId));
       setShowAuthModal(true);
       return;
     }
@@ -3079,7 +3093,14 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onSubmit, isDisabled, cartT
       return;
     }
     setShowDeliveryWarning(false);
-    setDetails(prev => ({ ...prev, deliveryMode: mode, address: mode === 'pickup' ? 'Pick Up At Store' : (prev.address === 'Pick Up At Store' ? '' : prev.address) }));
+    const defaultAddr = customerProfile?.savedAddresses?.find(a => a.isDefault)?.address || '';
+    setDetails(prev => ({ 
+      ...prev, 
+      deliveryMode: mode, 
+      address: mode === 'pickup' 
+        ? 'Pick Up At Store' 
+        : (prev.address === 'Pick Up At Store' || prev.address === '' ? (defaultAddr || prev.address) : prev.address) 
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
