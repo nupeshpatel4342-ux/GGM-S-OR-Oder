@@ -1208,18 +1208,24 @@ export default function App() {
     if (cart.length === 0) return;
 
     const deliveryMode = customerDetails.deliveryMode || 'pickup';
+    const cleanCustomer: CustomerDetails = {
+      name: customerDetails.name || '',
+      phone: customerDetails.phone || '',
+      address: customerDetails.address || '',
+      ...(customerDetails.deliveryMode ? { deliveryMode: customerDetails.deliveryMode } : {})
+    };
 
     const newOrder: Order = {
       id: `ORD-${Date.now().toString().slice(-6)}`,
       items: [...cart],
-      customer: customerDetails,
+      customer: cleanCustomer,
       total: finalTotal,
       status: 'pending',
       createdAt: new Date().toISOString(),
       deliveryMode: deliveryMode,
-      customerId: customerUser?.uid || undefined,
-      couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-      couponDiscount: couponDiscount > 0 ? couponDiscount : undefined
+      ...(customerUser?.uid ? { customerId: customerUser.uid } : {}),
+      ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
+      ...(couponDiscount > 0 ? { couponDiscount } : {})
     };
 
     try {
@@ -1246,6 +1252,7 @@ export default function App() {
       }
     } catch (error) {
       handleLocalDataError(error, OperationType.CREATE, 'orders');
+      showToast('ઓર્ડર સેવ કરવામાં ભૂલ આવી / Error saving order: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 
     // Construct WhatsApp message
