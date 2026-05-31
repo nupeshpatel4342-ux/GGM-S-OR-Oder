@@ -2467,88 +2467,91 @@ export default function App() {
     <div className="min-h-screen bg-bg-page">
       <div className="max-w-7xl mx-auto px-4 py-6">
         
-        {/* Responsive Navbar */}
-        <header className="flex flex-col md:flex-row items-center justify-between px-2 py-4 mb-4 gap-4">
+        {/* Responsive Navbar - Professional Mobile Header */}
+        <header className="flex items-center justify-between px-1 py-3 mb-1 gap-2">
+          {/* Left: Logo + Shop Name */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3 cursor-pointer"
+            className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
             onClick={() => navigate('/')}
           >
-            <div className="w-12 h-12 bg-primary-green rounded-2xl flex items-center justify-center shadow-lg shadow-primary-green/20">
-              <ShoppingCart className="w-7 h-7 text-white" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-green rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-primary-green/20 shrink-0">
+              <ShoppingCart className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight truncate">
                 {shopSettings.shopName}
               </h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest truncate">
                 {shopSettings.tagline}
               </p>
             </div>
           </motion.div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-
-
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {isAdminView && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-black shadow-xs transition-all border-2 bg-white text-emerald-600 border-emerald-600 hover:bg-emerald-50"
+                className="flex items-center gap-1.5 px-3 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black shadow-xs transition-all border-2 bg-white text-emerald-600 border-emerald-600 hover:bg-emerald-50"
               >
-                <Store className="w-4 h-4" />
-                View Customer Shop
+                <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">View Customer Shop</span>
+                <span className="sm:hidden">Shop</span>
               </motion.button>
             )}
             {!isAdminView && (
-              <div className="flex items-center gap-2">
-                {/* Cart Icon in Navbar */}
+              <>
+                {/* Cart Icon */}
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleCartClick}
-                  className="relative p-2.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/30 transition-all cursor-pointer shadow-xs shrink-0"
+                  className="relative p-2 sm:p-2.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/30 transition-all cursor-pointer shadow-xs shrink-0"
                 >
-                  <ShoppingCart className="w-5 h-5" />
+                  <ShoppingCart className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                   {cart.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs font-mono">
+                    <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-black w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs font-mono">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
                     </span>
                   )}
                 </motion.button>
 
+                {/* Account Button */}
                 {customerUser ? (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => navigate('/account')}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50"
+                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100/50 max-w-[140px] sm:max-w-none"
                   >
                     {customerProfile?.profileImage ? (
                       <img 
                         src={customerProfile.profileImage} 
                         alt="Profile" 
-                        className="w-5 h-5 rounded-full object-cover shrink-0 border border-emerald-250" 
+                        className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0 border border-emerald-250" 
                       />
                     ) : (
-                      <User className="w-4.5 h-4.5 text-emerald-650" />
+                      <User className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-650 shrink-0" />
                     )}
-                    <span>{customerProfile?.name || customerUser.displayName || 'My Account'}</span>
+                    <span className="truncate hidden sm:inline">{customerProfile?.name || customerUser.displayName || 'My Account'}</span>
                   </motion.button>
                 ) : (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setShowAuthModal(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-[#00884F]"
+                    className="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-[#00884F]"
                   >
-                    <UserPlus className="w-4.5 h-4.5" />
-                    <span>Login / લૉગિન</span>
+                    <UserPlus className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                    <span className="hidden sm:inline">Login / લૉગિન</span>
+                    <span className="sm:hidden">Login</span>
                   </motion.button>
                 )}
-              </div>
+              </>
             )}
           </div>
         </header>
@@ -2637,30 +2640,18 @@ export default function App() {
                 className="space-y-8 pb-32 lg:pb-12"
               >
                 {/* Search Bar - Sticky */}
-                <div className="sticky top-0 z-40 bg-bg-page/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
-                  <div className="flex flex-col gap-3 sm:gap-4">
-                    <div className="flex justify-between items-baseline px-2">
-                      <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-                        <span className="relative inline-block">
-                          <span className="absolute -inset-1 rounded-lg bg-emerald-100/60 -skew-y-2"></span>
-                          <span className="relative text-emerald-700 font-black px-1.5">GGM&S</span>
-                        </span>
-                        <span className="text-slate-900 ml-2">Grocery Store</span>
-                      </h2>
-
+                <div className="sticky top-0 z-40 bg-bg-page/95 backdrop-blur-md -mx-4 px-4 py-2.5 sm:py-3">
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
                     </div>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-primary-green transition-colors" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Search pantry items, spices, pulses..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-4 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-xs"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search pantry items, spices, pulses..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-3.5 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-xs"
+                    />
                   </div>
                 </div>
 
@@ -2706,7 +2697,7 @@ export default function App() {
                 ) : (
                   <>
                     {/* Sticky category selection bar */}
-                    <div className="sticky top-[110px] sm:top-[135px] z-30 bg-bg-page/90 backdrop-blur-xl -mx-4 px-4 py-3 border-b border-slate-200/50">
+                    <div className="sticky top-[52px] sm:top-[58px] z-30 bg-bg-page/90 backdrop-blur-xl -mx-4 px-4 py-3 border-b border-slate-200/50">
                       <div className="flex items-center gap-3">
                         <button 
                           onClick={() => setSelectedCategory(null)}
