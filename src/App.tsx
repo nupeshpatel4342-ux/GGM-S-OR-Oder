@@ -17,7 +17,7 @@ import {
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
-  Gift, Percent, Sun, Moon, Monitor
+  Gift, Percent, Sun, Moon, Monitor, ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -2489,24 +2489,7 @@ export default function App() {
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {/* Theme Toggle Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                const nextTheme = activeBaseTheme === 'light' ? 'dark' : 'light';
-                handleThemeChange(nextTheme);
-                showToast(`Theme: ${nextTheme === 'light' ? 'Light Mode / લાઈટ મોડ' : 'Dark Mode / ડાર્ક મોડ'}`, 'info');
-              }}
-              className="p-2.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:text-primary-green hover:border-primary-green hover:bg-light-green/30 transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:text-primary-green"
-              title="Toggle Theme / થીમ બદલો"
-            >
-              {activeBaseTheme === 'light' ? (
-                <Moon className="w-5 h-5 text-indigo-500" />
-              ) : (
-                <Sun className="w-5 h-5 text-amber-500" />
-              )}
-            </motion.button>
+
 
             {isAdminView && (
               <motion.button
@@ -2664,7 +2647,7 @@ export default function App() {
                         </span>
                         <span className="text-slate-900 ml-2">Grocery Store</span>
                       </h2>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Fast WhatsApp Delivery</span>
+
                     </div>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -6540,23 +6523,23 @@ export const MyAccountPage: React.FC<{
             
             {/* Profile Card (Left) */}
             <div className="lg:col-span-4">
-              <div className="bg-white dark:bg-slate-800 rounded-[28px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 flex flex-col items-center text-center relative">
+              <div className="bg-white dark:bg-slate-800 rounded-[28px] border border-slate-200 dark:border-slate-700 shadow-sm p-6 flex flex-col items-center text-center relative">
                 
                 {/* Edit Profile Icon (top-right corner) */}
                 <button 
                   onClick={() => setActiveTab('profile')}
-                  className="absolute top-5 right-5 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all"
+                  className="absolute top-5 right-5 p-2.5 bg-white dark:bg-slate-800 border border-blue-500 dark:border-blue-400 rounded-xl text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                   title="Edit Profile"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
 
                 {/* Avatar */}
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-emerald-100 dark:border-emerald-900 shadow-lg mb-4 mt-2 bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center">
+                <div className="w-32 h-32 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm mb-4 mt-2 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-center">
                   {customerProfile?.profileImage ? (
                     <img src={customerProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                    <span className="text-4xl font-black text-emerald-600 dark:text-emerald-400">
                       {(customerProfile?.name || customerUser.displayName || 'C').slice(0, 1).toUpperCase()}
                     </span>
                   )}
@@ -6573,12 +6556,53 @@ export const MyAccountPage: React.FC<{
                   {customerProfile?.phone || customerUser.email?.split('@')[0]}
                 </p>
 
+                {/* Theme Selector Section inside Profile Card */}
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 w-full flex flex-col items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Theme / થીમ પસંદ કરો
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 bg-slate-50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700 w-full">
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('light')}
+                      className={`py-1.5 px-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${preferredTheme === 'light' ? 'bg-white dark:bg-slate-700 text-amber-500 shadow-xs border border-slate-200/50 dark:border-slate-650' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'}`}
+                    >
+                      <Sun className="w-3.5 h-3.5" />
+                      <span>Light</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('dark')}
+                      className={`py-1.5 px-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${preferredTheme === 'dark' ? 'bg-white dark:bg-slate-700 text-indigo-400 shadow-xs border border-slate-200/50 dark:border-slate-650' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'}`}
+                    >
+                      <Moon className="w-3.5 h-3.5" />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('system')}
+                      className={`py-1.5 px-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${preferredTheme === 'system' ? 'bg-white dark:bg-slate-700 text-slate-500 shadow-xs border border-slate-200/50 dark:border-slate-650' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'}`}
+                    >
+                      <Monitor className="w-3.5 h-3.5" />
+                      <span>System</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('time_based')}
+                      className={`py-1.5 px-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 ${preferredTheme === 'time_based' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs border border-slate-200/50 dark:border-slate-650' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'}`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Auto</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Logout Button */}
                 <button
                   onClick={onLogout}
-                  className="mt-6 px-6 py-2.5 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 active:scale-95 text-rose-500 dark:text-rose-400 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 border border-rose-100 dark:border-rose-800"
+                  className="mt-6 px-6 py-2 bg-white dark:bg-slate-800 border border-rose-500 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 active:scale-95 text-rose-500 dark:text-rose-450 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-xs"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 text-rose-500" />
                   Logout
                 </button>
               </div>
@@ -6591,86 +6615,51 @@ export const MyAccountPage: React.FC<{
                 {/* My Orders Card */}
                 <button
                   onClick={() => setActiveTab('orders')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-200 dark:border-slate-700 shadow-xs p-6 md:p-8 flex flex-col items-center justify-center gap-3.5 text-center hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 hover:-translate-y-0.5 transition-all active:scale-[0.97] group min-h-[160px]"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
-                    <ClipboardList className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+                  <ShoppingBag className="w-9 h-9 text-blue-500 dark:text-blue-400 group-hover:scale-105 transition-transform" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-slate-850 dark:text-white">My Orders</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">મારા ઓર્ડર્સ</span>
                   </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">My Orders</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">મારા ઓર્ડર્સ</span>
-                  {customerOrders.length > 0 && (
-                    <span className="text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2.5 py-0.5 rounded-full">{customerOrders.length} orders</span>
-                  )}
                 </button>
 
                 {/* Wishlist Card */}
                 <button
                   onClick={() => setActiveTab('wishlist')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-rose-200 dark:hover:border-rose-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-200 dark:border-slate-700 shadow-xs p-6 md:p-8 flex flex-col items-center justify-center gap-3.5 text-center hover:shadow-md hover:border-rose-400 dark:hover:border-rose-500 hover:-translate-y-0.5 transition-all active:scale-[0.97] group min-h-[160px]"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center group-hover:bg-rose-100 dark:group-hover:bg-rose-900/50 transition-colors">
-                    <Heart className="w-6 h-6 text-rose-500 dark:text-rose-400" />
+                  <Heart className="w-9 h-9 text-rose-500 dark:text-rose-400 group-hover:scale-105 transition-transform" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-slate-855 dark:text-white">Wishlist</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">મનપસંદ</span>
                   </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">Wishlist</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">મનપસંદ</span>
-                  {wishlistProducts.length > 0 && (
-                    <span className="text-[9px] font-black bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2.5 py-0.5 rounded-full">{wishlistProducts.length} items</span>
-                  )}
                 </button>
 
                 {/* Cart Card */}
                 <button
                   onClick={() => setActiveTab('cart')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-200 dark:border-slate-700 shadow-xs p-6 md:p-8 flex flex-col items-center justify-center gap-3.5 text-center hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-0.5 transition-all active:scale-[0.97] group min-h-[160px]"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50 transition-colors">
-                    <ShoppingCart className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  <ShoppingCart className="w-9 h-9 text-emerald-600 dark:text-emerald-450 group-hover:scale-105 transition-transform" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-slate-855 dark:text-white">Cart</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">બાસ્કેટ</span>
                   </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">Cart</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">બાસ્કેટ</span>
-                  {cart.length > 0 && (
-                    <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full">{cart.reduce((sum, item) => sum + item.quantity, 0)} items · ₹{cartTotal.toFixed(0)}</span>
-                  )}
                 </button>
 
                 {/* Addresses Card */}
                 <button
                   onClick={() => setActiveTab('addresses')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-amber-200 dark:hover:border-amber-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-200 dark:border-slate-700 shadow-xs p-6 md:p-8 flex flex-col items-center justify-center gap-3.5 text-center hover:shadow-md hover:border-amber-400 dark:hover:border-amber-500 hover:-translate-y-0.5 transition-all active:scale-[0.97] group min-h-[160px]"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center group-hover:bg-amber-100 dark:group-hover:bg-amber-900/50 transition-colors">
-                    <MapPin className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+                  <MapPin className="w-9 h-9 text-amber-500 dark:text-amber-400 group-hover:scale-105 transition-transform" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-slate-855 dark:text-white">Addresses</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">સરનામાં</span>
                   </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">Addresses</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">સરનામાં</span>
-                  {(customerProfile?.savedAddresses?.length || 0) > 0 && (
-                    <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full">{customerProfile?.savedAddresses?.length} saved</span>
-                  )}
                 </button>
 
-                {/* Edit Profile Card */}
-                <button
-                  onClick={() => setActiveTab('profile')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-violet-200 dark:hover:border-violet-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
-                    <User className="w-6 h-6 text-violet-500 dark:text-violet-400" />
-                  </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">Edit Profile</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">પ્રોફાઇલ બદલો</span>
-                </button>
-
-                {/* Theme Settings Card */}
-                <button
-                  onClick={() => setActiveTab('theme')}
-                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
-                    <Settings className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
-                  </div>
-                  <span className="text-sm font-black text-slate-800 dark:text-white">Theme Settings</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">થીમ સેટિંગ્સ</span>
-                </button>
               </div>
             </div>
           </div>
