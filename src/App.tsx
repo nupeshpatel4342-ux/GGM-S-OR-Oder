@@ -17,12 +17,12 @@ import {
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
-  Gift, Percent, Sun, Moon, Monitor, ShoppingBag
+  Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage } from './types.ts';
+import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord } from './types.ts';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from './firebase.ts';
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User as FirebaseAuthUser } from 'firebase/auth';
@@ -85,6 +85,103 @@ const compressImage = (
     };
   };
   reader.readAsDataURL(file);
+};
+
+interface VoiceIntent {
+  product: string;
+  quantity?: number;
+  unit?: string;
+}
+
+const parseTextNumber = (text: string): number => {
+  if (!isNaN(Number(text))) return Number(text);
+  switch (text.toLowerCase()) {
+    case 'one': return 1;
+    case 'two': return 2;
+    case 'three': return 3;
+    case 'four': return 4;
+    case 'five': return 5;
+    case 'ten': return 10;
+    case 'half':
+    case 'અડધો':
+    case 'આધા':
+      return 0.5;
+    default: return 1;
+  }
+};
+
+const parseVoiceIntent = (text: string): VoiceIntent => {
+  const normalizedText = text
+    .toLowerCase()
+    .trim()
+    .replace(/[૧]/g, '1')
+    .replace(/[૨]/g, '2')
+    .replace(/[૩]/g, '3')
+    .replace(/[૪]/g, '4')
+    .replace(/[૫]/g, '5')
+    .replace(/[૬]/g, '6')
+    .replace(/[૭]/g, '7')
+    .replace(/[૮]/g, '8')
+    .replace(/[૯]/g, '9')
+    .replace(/[૦]/g, '0');
+
+  const numRegex = /(?:\d+(?:\.\d+)?|one|two|three|four|five|ten|half|અડધો|આધા)/;
+  const unitRegex = /(?:kilo|kilos|kg|grams|gram|gm|g|litres|litre|liter|ltr|ltrs|l|ml|packet|packets|pack|packs|box|boxes|bottle|bottles|dozen|pcs|pc|piece|pieces|કિલો|કીલો|ગ્રામ|લિટર|લીટર|પેકેટ|નંગ|બોટલ|ડબ્બો|ડબ્બા|किलो|ग्राम|लीटर|पैकेट|नंग|बोतल|डिब्बा)/;
+
+  const qtyUnitPattern = new RegExp(`(${numRegex.source})\\s*(${unitRegex.source})`, 'i');
+  const justQtyPattern = new RegExp(`\\b(${numRegex.source})\\b`, 'i');
+
+  let quantity: number | undefined;
+  let unit: string | undefined;
+  let product = normalizedText;
+
+  const match = normalizedText.match(qtyUnitPattern);
+  if (match) {
+    const rawNum = match[1];
+    const rawUnit = match[2];
+    
+    quantity = parseTextNumber(rawNum);
+    unit = rawUnit;
+
+    product = normalizedText.replace(match[0], '').replace(/\s+/g, ' ').trim();
+  } else {
+    const numMatch = normalizedText.match(justQtyPattern);
+    if (numMatch) {
+      const rawNum = numMatch[1];
+      quantity = parseTextNumber(rawNum);
+      product = normalizedText.replace(numMatch[0], '').replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  product = product
+    .replace(/^\s*(of|with|for|અને|और|&)\s+/i, '')
+    .replace(/\s+(of|with|for|અને|और|&)\s*$/i, '')
+    .trim();
+
+  return { product, quantity, unit };
+};
+
+const SUGGESTIONS_MAP: Record<string, string[]> = {
+  'tea': ['Tea Powder', 'Sugar', 'Biscuit'],
+  'coffee': ['Milk', 'Sugar', 'Cookies'],
+  'milk': ['Bread', 'Butter', 'Eggs'],
+  'sugar': ['Tea Powder', 'Coffee Powder', 'Milk'],
+  'bread': ['Butter', 'Jam', 'Cheese'],
+  'doodh': ['Bread', 'Butter', 'Amul Butter'],
+  'દૂધ': ['બ્રેડ', 'માખણ', 'ચા'],
+  'oil': ['Masala', 'Salt', 'Spices'],
+  'rice': ['Pulses', 'Salt', 'Ghee']
+};
+
+const getSmartSuggestions = (query: string): string[] => {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  for (const [key, suggestions] of Object.entries(SUGGESTIONS_MAP)) {
+    if (q.includes(key) || key.includes(q)) {
+      return suggestions;
+    }
+  }
+  return [];
 };
 
 const DEFAULT_CATEGORIES = [
@@ -241,6 +338,21 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Voice Search States
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceErrorText, setVoiceErrorText] = useState('');
+  const [voiceActiveLanguage, setVoiceActiveLanguage] = useState<'en' | 'hi' | 'gu'>('en');
+  const [voiceIntent, setVoiceIntent] = useState<VoiceIntent | null>(null);
+  const [voiceSearchHistory, setVoiceSearchHistory] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('voiceSearchHistory') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [voiceSearchAnalytics, setVoiceSearchAnalytics] = useState<VoiceSearchRecord[]>([]);
+
   const [qrValue, setQrValue] = useState<string>(() => {
     const storedSettings = localStorage.getItem('settings');
     if (storedSettings) {
@@ -287,7 +399,7 @@ export default function App() {
   });
 
   // Admin tab navigation state
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons' | 'voice'>('dashboard');
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -412,6 +524,21 @@ export default function App() {
     return () => unsub();
   }, [isAdminUnlocked]);
 
+  useEffect(() => {
+    if (!isAdminUnlocked) return;
+    const unsub = onSnapshot(collection(db, 'voiceSearches'), (snapshot) => {
+      const list: VoiceSearchRecord[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as VoiceSearchRecord);
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setVoiceSearchAnalytics(list);
+    }, (error) => {
+      console.error("Firestore voiceSearches read error:", error);
+    });
+    return () => unsub();
+  }, [isAdminUnlocked]);
+
   const themeStats = useMemo(() => {
     const total = customerProfilesList.length;
     let lightCount = 0;
@@ -441,6 +568,20 @@ export default function App() {
       timeBasedPercent: getPercent(timeBasedCount)
     };
   }, [customerProfilesList]);
+
+  const popularProducts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    voiceSearchAnalytics.forEach(v => {
+      if (v.extractedProduct) {
+        const p = v.extractedProduct.toLowerCase().trim();
+        counts[p] = (counts[p] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .map(([product, count]) => ({ product, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [voiceSearchAnalytics]);
 
   // Coupon System state
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -848,12 +989,31 @@ export default function App() {
 
   const filteredProducts = useMemo(() => {
     let result = products;
-    if (selectedCategory && selectedCategory !== 'All Products') {
+    const q = searchQuery.toLowerCase().trim();
+    if (q) {
+      const subQueries = q.split(/\band\b|\bऔर\b|\bઅને\b|\+|,/).map(item => item.trim()).filter(Boolean);
+      
+      if (subQueries.length > 1) {
+        result = result.filter(p => {
+          return subQueries.some(subQ => 
+            p.name.toLowerCase().includes(subQ) || 
+            p.category.toLowerCase().includes(subQ) ||
+            (p.gujaratiName && p.gujaratiName.toLowerCase().includes(subQ)) ||
+            (p.hindiName && p.hindiName.toLowerCase().includes(subQ)) ||
+            (p.voiceKeywords && p.voiceKeywords.some(keyword => keyword.toLowerCase().includes(subQ) || subQ.includes(keyword.toLowerCase())))
+          );
+        });
+      } else {
+        result = result.filter(p => 
+          p.name.toLowerCase().includes(q) || 
+          p.category.toLowerCase().includes(q) ||
+          (p.gujaratiName && p.gujaratiName.toLowerCase().includes(q)) ||
+          (p.hindiName && p.hindiName.toLowerCase().includes(q)) ||
+          (p.voiceKeywords && p.voiceKeywords.some(keyword => keyword.toLowerCase().includes(q) || q.includes(keyword.toLowerCase())))
+        );
+      }
+    } else if (selectedCategory && selectedCategory !== 'All Products') {
       result = result.filter(p => p.category === selectedCategory);
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
     }
     return result;
   }, [products, selectedCategory, searchQuery]);
@@ -1714,6 +1874,9 @@ export default function App() {
             <button onClick={() => setAdminTab('qr')} className={`admin-sidebar-btn ${adminTab === 'qr' ? 'active' : ''}`}>
               <Smartphone className="w-4 h-4" /> COUNTER QR
             </button>
+            <button onClick={() => setAdminTab('voice')} className={`admin-sidebar-btn ${adminTab === 'voice' ? 'active' : ''}`}>
+              <Mic className="w-4 h-4" /> VOICE SEARCH ANALYTICS
+            </button>
             <button onClick={() => setAdminTab('settings')} className={`admin-sidebar-btn ${adminTab === 'settings' ? 'active' : ''}`}>
               <Settings className="w-4 h-4" /> SHOP SETTINGS
             </button>
@@ -2457,11 +2620,284 @@ export default function App() {
               />
             )}
 
+            {/* Voice Search Analytics Tab */}
+            {adminTab === 'voice' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="admin-stat-card">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Total Voice Searches</span>
+                    <span className="text-2xl font-black text-slate-900">{voiceSearchAnalytics.length}</span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Success Rate</span>
+                    <span className="text-2xl font-black text-emerald-600">
+                      {voiceSearchAnalytics.length > 0 
+                        ? `${(voiceSearchAnalytics.filter(v => v.status === 'success').length / voiceSearchAnalytics.length * 100).toFixed(0)}%`
+                        : '0%'
+                      }
+                    </span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Successful Searches</span>
+                    <span className="text-2xl font-black text-emerald-500">
+                      {voiceSearchAnalytics.filter(v => v.status === 'success').length}
+                    </span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Failed (No Match)</span>
+                    <span className="text-2xl font-black text-rose-500">
+                      {voiceSearchAnalytics.filter(v => v.status === 'failed').length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Popular Spoken Products */}
+                  <div className="bg-white border border-slate-200 rounded-[24px] p-6 shadow-xs">
+                    <h4 className="font-extrabold text-slate-900 text-sm mb-4 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      <span>Most Spoken Products / લોકપ્રિય પ્રોડક્ટ્સ</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {popularProducts.length === 0 ? (
+                        <p className="text-xs italic text-slate-400 py-6 text-center">No product matches yet.</p>
+                      ) : (
+                        popularProducts.map((p, idx) => (
+                          <div key={p.product} className="flex justify-between items-center text-xs">
+                            <span className="font-semibold text-slate-600 uppercase flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px] text-slate-500">{idx + 1}</span>
+                              {p.product}
+                            </span>
+                            <span className="font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">{p.count} searches</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Failed Voice Searches (Opportunities) */}
+                  <div className="bg-white border border-slate-200 rounded-[24px] p-6 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm mb-4 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-500" />
+                        <span>Failed Searches / વણઉકેલાયેલી પૂછપરછ</span>
+                      </h4>
+                      <div className="space-y-3 max-h-[220px] overflow-y-auto no-scrollbar">
+                        {voiceSearchAnalytics.filter(v => v.status === 'failed').length === 0 ? (
+                          <p className="text-xs italic text-slate-400 py-6 text-center">No failed searches recorded! Perfect matching.</p>
+                        ) : (
+                          voiceSearchAnalytics.filter(v => v.status === 'failed').slice(0, 7).map(v => (
+                            <div key={v.id} className="flex justify-between items-center text-xs py-1 border-b border-slate-55">
+                              <span className="font-semibold text-slate-600 truncate mr-2">“{v.query}”</span>
+                              <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold">Failed</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mt-4">
+                      💡 Tip: Add these as alternate pronunciations to matching products to improve search accuracy.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Voice Searches Table */}
+                <div className="bg-white border border-slate-200 rounded-[24px] overflow-hidden shadow-xs">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-black text-slate-900 text-base">Recent Voice Searches</h3>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{voiceSearchAnalytics.length} total requests</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left admin-table border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                          <th className="p-4">Timestamp</th>
+                          <th className="p-4">Spoken Query</th>
+                          <th className="p-4">Extracted Intent</th>
+                          <th className="p-4">Lang</th>
+                          <th className="p-4">Match Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs">
+                        {voiceSearchAnalytics.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center italic text-slate-400">No voice search logs found.</td>
+                          </tr>
+                        ) : (
+                          voiceSearchAnalytics.slice(0, 20).map(log => (
+                            <tr key={log.id} className="hover:bg-slate-50">
+                              <td className="p-4 text-slate-500 font-semibold">{new Date(log.timestamp).toLocaleString()}</td>
+                              <td className="p-4 font-bold text-slate-800">“{log.query}”</td>
+                              <td className="p-4 text-slate-600">
+                                {log.extractedProduct ? (
+                                  <span className="inline-flex flex-col">
+                                    <span className="font-bold text-slate-800 uppercase">{log.extractedProduct}</span>
+                                    {log.extractedQuantity && (
+                                      <span className="text-[10px] text-slate-400">Qty: {log.extractedQuantity} {log.extractedUnit}</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 italic">None</span>
+                                )}
+                              </td>
+                              <td className="p-4 font-bold uppercase text-slate-500">{log.language}</td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${log.status === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                  {log.status === 'success' ? 'Match Successful' : 'No Match'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </>
       )}
     </div>
   );
+
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef('');
+
+  const startVoiceSearch = (lang: 'en' | 'hi' | 'gu') => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceErrorText('Speech recognition not supported on this browser.');
+      showToast('Speech recognition not supported / વોઈસ સર્ચ ઉપલબ્ધ નથી', 'error');
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    if (lang === 'gu') {
+      recognition.lang = 'gu-IN';
+    } else if (lang === 'hi') {
+      recognition.lang = 'hi-IN';
+    } else {
+      recognition.lang = 'en-US';
+    }
+
+    recognition.onstart = () => {
+      setVoiceListening(true);
+      setVoiceTranscript('');
+      transcriptRef.current = '';
+      setVoiceErrorText('');
+    };
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      const activeText = finalTranscript || interimTranscript;
+      setVoiceTranscript(activeText);
+      transcriptRef.current = activeText;
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'no-speech') {
+        setVoiceErrorText('Could not hear properly. Try again. / સરખી રીતે સંભળાયું નથી. ફરી બોલો.');
+      } else if (event.error === 'not-allowed') {
+        setVoiceErrorText('Microphone permission blocked. Please enable it. / માઈક્રોફોન પરમિશન બ્લોક છે.');
+      } else {
+        setVoiceErrorText('Try again / ફરી પ્રયાસ કરો');
+      }
+      setVoiceListening(false);
+    };
+
+    recognition.onend = () => {
+      setVoiceListening(false);
+      if (transcriptRef.current.trim()) {
+        handleVoiceSearchComplete(transcriptRef.current);
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start speech recognition:', e);
+      setVoiceErrorText('Could not access microphone.');
+    }
+  };
+
+  const stopVoiceSearch = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+    }
+    setVoiceListening(false);
+  };
+
+  const handleVoiceSearchComplete = async (transcriptText: string) => {
+    if (!transcriptText.trim()) return;
+
+    const { product, quantity, unit } = parseVoiceIntent(transcriptText);
+
+    const intent: VoiceIntent = { product, quantity, unit };
+    setVoiceIntent(intent);
+
+    setSearchQuery(product);
+    setSelectedCategory(null);
+
+    const queryStr = transcriptText.trim();
+    setVoiceSearchHistory(prev => {
+      const updated = [queryStr, ...prev.filter(item => item !== queryStr)].slice(0, 5);
+      localStorage.setItem('voiceSearchHistory', JSON.stringify(updated));
+      return updated;
+    });
+
+    const normalizedQuery = product.toLowerCase();
+    const hasMatch = products.some(p => 
+      p.name.toLowerCase().includes(normalizedQuery) ||
+      p.category.toLowerCase().includes(normalizedQuery) ||
+      (p.gujaratiName && p.gujaratiName.toLowerCase().includes(normalizedQuery)) ||
+      (p.hindiName && p.hindiName.toLowerCase().includes(normalizedQuery)) ||
+      (p.voiceKeywords && p.voiceKeywords.some(kw => kw.toLowerCase().includes(normalizedQuery)))
+    );
+
+    const newRecord: VoiceSearchRecord = {
+      id: `voice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      query: queryStr,
+      extractedProduct: product,
+      extractedQuantity: quantity,
+      extractedUnit: unit,
+      timestamp: new Date().toISOString(),
+      status: hasMatch ? 'success' : 'failed',
+      language: voiceActiveLanguage
+    };
+
+    try {
+      await setDoc(doc(db, 'voiceSearches', newRecord.id), newRecord);
+    } catch (e) {
+      console.error('Failed to log voice search analytic:', e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg-page">
@@ -2610,6 +3046,7 @@ export default function App() {
                     shopSettings={shopSettings}
                     preferredTheme={preferredTheme}
                     handleThemeChange={handleThemeChange}
+                    voiceIntent={voiceIntent}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -2649,20 +3086,85 @@ export default function App() {
                       type="text"
                       placeholder="Search pantry items, spices, pulses..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-4 py-3 sm:py-3.5 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-xs"
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        if (!e.target.value.trim()) setVoiceIntent(null);
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-20 py-3 sm:py-3.5 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-xs"
                     />
+                    {searchQuery.trim() && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setVoiceIntent(null);
+                        }}
+                        className="absolute inset-y-0 right-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors w-8 h-full"
+                        type="button"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoiceListening(true);
+                        startVoiceSearch(voiceActiveLanguage);
+                      }}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center justify-center text-slate-400 hover:text-primary-green active:scale-95 transition-all w-10 h-full"
+                      title="Voice Search / વોઈસ સર્ચ"
+                      id="voice-search-mic-btn"
+                    >
+                      <Mic className="h-5 w-5" />
+                    </button>
                   </div>
+
+                  {/* Smart suggestions & history container */}
+                  {((searchQuery.trim() && getSmartSuggestions(searchQuery).length > 0) || (!searchQuery.trim() && voiceSearchHistory.length > 0)) && (
+                    <div className="mt-2 flex flex-wrap gap-2 items-center">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        {searchQuery.trim() ? 'Suggested / સંબંધિત:' : 'Recent Voice Searches / વોઈસ સર્ચ ઇતિહાસ:'}
+                      </span>
+                      {searchQuery.trim() 
+                        ? getSmartSuggestions(searchQuery).map(suggestion => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => {
+                                setSearchQuery(suggestion);
+                                setVoiceIntent(null);
+                              }}
+                              className="text-[10px] font-bold bg-white hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2.5 py-1 rounded-full transition-all text-slate-600 flex items-center gap-1 shadow-xs"
+                            >
+                              <span>{suggestion}</span>
+                            </button>
+                          ))
+                        : voiceSearchHistory.map((hist, idx) => (
+                            <button
+                              key={hist + '-' + idx}
+                              type="button"
+                              onClick={() => {
+                                setSearchQuery(hist);
+                                handleVoiceSearchComplete(hist);
+                              }}
+                              className="text-[10px] font-bold bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2.5 py-1 rounded-full transition-all text-slate-600 flex items-center gap-1"
+                            >
+                              <Mic className="w-2.5 h-2.5 text-slate-400" />
+                              <span>{hist}</span>
+                            </button>
+                          ))
+                      }
+                    </div>
+                  )}
                 </div>
 
                 {/* 📢 Scrolling Announcement Bar */}
-                {!selectedCategory && <ScrollingAnnouncement text={shopSettings.announcementText} />}
+                {!selectedCategory && !searchQuery.trim() && <ScrollingAnnouncement text={shopSettings.announcementText} />}
 
                 {/* 🚚 Welcome Popup Notice */}
                 <WelcomeDeliveryPopup />
 
                 {/* Banner Ad Slider - Mobile Friendly */}
-                {!selectedCategory && (
+                {!selectedCategory && !searchQuery.trim() && (
                   <BannerSlider 
                     banners={banners} 
                     onSelectCategory={setSelectedCategory} 
@@ -2670,7 +3172,7 @@ export default function App() {
                 )}
 
                 {/* Categories Layout */}
-                {!selectedCategory ? (
+                {(!selectedCategory && !searchQuery.trim()) ? (
                   <div className="space-y-8 py-4">
                     <div className="text-center space-y-2">
                       <h2 className="text-3xl font-black text-slate-950 tracking-tight">Shop by Department</h2>
@@ -2700,7 +3202,7 @@ export default function App() {
                     <div className="sticky top-[52px] sm:top-[58px] z-30 bg-bg-page/90 backdrop-blur-xl -mx-4 px-4 py-3 border-b border-slate-200/50">
                       <div className="flex items-center gap-3">
                         <button 
-                          onClick={() => setSelectedCategory(null)}
+                          onClick={() => { setSelectedCategory(null); setSearchQuery(''); }}
                           className="bg-white p-2.5 rounded-xl border border-slate-200 text-slate-900 hover:text-primary-green hover:border-primary-green transition-all shadow-xs shrink-0"
                         >
                           <ChevronLeft className="w-4 h-4" />
@@ -2730,7 +3232,9 @@ export default function App() {
                     <div className="space-y-6">
                       <div className="flex items-baseline gap-2 px-1">
                         <h3 className="text-xl font-black text-slate-900 uppercase">
-                          {selectedCategory === 'All Products' ? 'Everything in Stock' : selectedCategory}
+                          {searchQuery.trim() 
+                            ? `Search Results for "${searchQuery}"` 
+                            : (selectedCategory === 'All Products' ? 'Everything in Stock' : selectedCategory)}
                         </h3>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                           ({filteredProducts.length} items)
@@ -2745,6 +3249,7 @@ export default function App() {
                             onAdd={addToCart} 
                             isWishlisted={Boolean(customerProfile?.wishlist?.includes(p.id))}
                             onToggleWishlist={toggleWishlist}
+                            voiceIntent={voiceIntent}
                           />
                         ))}
                         {filteredProducts.length === 0 && (
@@ -3094,6 +3599,113 @@ export default function App() {
         />
 
         <ToastContainer toasts={toasts} />
+
+        {/* Voice Search Bottom Sheet / વોઈસ સર્ચ બોટમ શીટ */}
+        <AnimatePresence>
+          {voiceListening && (
+            <>
+              {/* Overlay Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                onClick={stopVoiceSearch}
+                className="fixed inset-0 bg-black z-50 pointer-events-auto"
+              />
+
+              {/* Bottom Sheet Drawer */}
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] p-6 z-55 shadow-2xl border-t border-slate-100 pointer-events-auto max-w-lg mx-auto flex flex-col items-center gap-6"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full cursor-pointer hover:bg-slate-300 transition-colors" onClick={stopVoiceSearch} />
+
+                {/* Header with Language Tabs */}
+                <div className="w-full flex justify-between items-center px-2">
+                  <h3 className="font-black text-slate-800 text-sm tracking-tight flex items-center gap-2">
+                    <Mic className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <span>Voice Search / વોઈસ સર્ચ</span>
+                  </h3>
+                  
+                  {/* Language Selector */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/50" onClick={e => e.stopPropagation()}>
+                    {(['en', 'hi', 'gu'] as const).map(lang => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => {
+                          setVoiceActiveLanguage(lang);
+                          startVoiceSearch(lang);
+                        }}
+                        className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${voiceActiveLanguage === lang ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                      >
+                        {lang === 'en' ? 'EN' : lang === 'hi' ? 'HI' : 'GUJ'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pulsing Mic & Waveform Visualizer */}
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  {/* Outer Pulsing Glow */}
+                  <div className="absolute inset-0 bg-emerald-500/10 rounded-full animate-ping pointer-events-none" />
+                  <div className="absolute inset-4 bg-emerald-500/20 rounded-full animate-pulse pointer-events-none" />
+
+                  {/* Audio wave bar animation */}
+                  <div className="absolute flex gap-1 items-center justify-center inset-0 pointer-events-none">
+                    <div className="w-1 bg-emerald-500 rounded-full h-8 animate-voice-wave-1" />
+                    <div className="w-1 bg-emerald-500 rounded-full h-12 animate-voice-wave-2" />
+                    <div className="w-1 bg-emerald-500 rounded-full h-16 animate-voice-wave-3" />
+                    <div className="w-1 bg-emerald-500 rounded-full h-12 animate-voice-wave-2" />
+                    <div className="w-1 bg-emerald-500 rounded-full h-8 animate-voice-wave-1" />
+                  </div>
+
+                  {/* Microphone Button */}
+                  <button
+                    type="button"
+                    onClick={stopVoiceSearch}
+                    className="relative w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 active:scale-95 transition-all shadow-lg hover:shadow-emerald-200 hover:shadow-xl z-10"
+                  >
+                    <Mic className="w-8 h-8" />
+                  </button>
+                </div>
+
+                {/* Status and Live Transcription Text */}
+                <div className="text-center w-full max-w-sm space-y-2 min-h-[4rem]">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {voiceTranscript ? 'Speaking / તમે કહો છો:' : 'Listening... speak now / સાંભળી રહ્યા છીએ... બોલો:'}
+                  </p>
+                  
+                  {voiceErrorText ? (
+                    <p className="text-xs font-bold text-rose-500 animate-pulse">
+                      {voiceErrorText}
+                    </p>
+                  ) : (
+                    <p className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug">
+                      {voiceTranscript || '“Milk”, “2 kilo sugar”, “Amul butter”...'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions / Info */}
+                <div className="w-full flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2 border-t border-slate-100">
+                  <span>Languages: English, Hindi, Gujarati</span>
+                  <button
+                    type="button"
+                    onClick={stopVoiceSearch}
+                    className="text-rose-500 hover:underline"
+                  >
+                    Cancel / બંધ કરો
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -4959,6 +5571,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const [unit, setUnit] = useState(initialData?.unit || availableUnits[0] || 'kg');
   const [image, setImage] = useState<string | null>(initialData?.image || null);
   const [gujaratiName, setGujaratiName] = useState(initialData?.gujaratiName || '');
+  const [hindiName, setHindiName] = useState(initialData?.hindiName || '');
+  const [voiceKeywords, setVoiceKeywords] = useState(initialData?.voiceKeywords?.join(', ') || '');
 
   const [uploadType, setUploadType] = useState<'url' | 'file'>(() => {
     const img = initialData?.image || '';
@@ -5100,6 +5714,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
       unit: finalUnit, 
       image: finalImage,
       gujaratiName: gujaratiName || undefined,
+      hindiName: hindiName || undefined,
+      voiceKeywords: voiceKeywords ? voiceKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean) : undefined,
       variants: variantType !== 'none' ? calculatedVariants.map(v => ({ id: v.id, name: v.name, price: v.price, mrp: v.mrp || null })) : null
     };
 
@@ -5111,6 +5727,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
       setPrice('');
       setMrp('');
       setGujaratiName('');
+      setHindiName('');
+      setVoiceKeywords('');
       setImage(null);
       setProductImageUrl('');
       setSelectedSizes([]);
@@ -5208,6 +5826,28 @@ const ProductForm: React.FC<ProductFormProps> = ({
           onChange={e => setGujaratiName(e.target.value)}
           placeholder="ચોખા ૧ કિલો"
           className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden font-sans"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Product Name (HIN - Optional)</label>
+        <input
+          type="text"
+          value={hindiName}
+          onChange={e => setHindiName(e.target.value)}
+          placeholder="चावल 1 किलो"
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden font-sans"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Voice Keywords / Alternate Pronunciations (Optional, comma-separated)</label>
+        <input
+          type="text"
+          value={voiceKeywords}
+          onChange={e => setVoiceKeywords(e.target.value)}
+          placeholder="doodh, milk, dudh, dood"
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:border-primary-green outline-hidden"
         />
       </div>
 
@@ -5457,15 +6097,59 @@ interface ProductCardProps {
   onAdd: (p: Product, qty: number, variant?: ProductVariant) => void;
   isWishlisted: boolean;
   onToggleWishlist: (productId: string) => void;
+  voiceIntent?: VoiceIntent | null;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, isWishlisted, onToggleWishlist }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, isWishlisted, onToggleWishlist, voiceIntent }) => {
   const navigate = useNavigate();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | undefined>(() => {
     return product.variants && product.variants.length > 0 ? product.variants[0] : undefined;
   });
+
+  const isMatchedByVoice = useMemo(() => {
+    if (!voiceIntent) return false;
+    const pName = product.name.toLowerCase();
+    const pGuj = product.gujaratiName?.toLowerCase() || '';
+    const pHindi = product.hindiName?.toLowerCase() || '';
+    const pKeys = product.voiceKeywords?.map(k => k.toLowerCase()) || [];
+    const intentProd = voiceIntent.product.toLowerCase();
+    return pName.includes(intentProd) || 
+           pGuj.includes(intentProd) || 
+           pHindi.includes(intentProd) ||
+           pKeys.some(k => k.includes(intentProd) || intentProd.includes(k));
+  }, [voiceIntent, product]);
+
+  useEffect(() => {
+    if (voiceIntent && isMatchedByVoice) {
+      if (voiceIntent.quantity) {
+        setQty(voiceIntent.quantity);
+      }
+      if (voiceIntent.unit && product.variants && product.variants.length > 0) {
+        const targetUnit = voiceIntent.unit.toLowerCase();
+        const targetQtyStr = voiceIntent.quantity ? String(voiceIntent.quantity) : '';
+        
+        const matchedVar = product.variants.find(v => {
+          const vName = v.name.toLowerCase();
+          if (targetQtyStr && targetUnit) {
+            return vName.includes(targetQtyStr) && (vName.includes(targetUnit) || (targetUnit === 'kilo' && vName.includes('kg')));
+          }
+          if (targetQtyStr) {
+            return vName.includes(targetQtyStr);
+          }
+          if (targetUnit) {
+            return vName.includes(targetUnit);
+          }
+          return false;
+        });
+
+        if (matchedVar) {
+          setSelectedVariant(matchedVar);
+        }
+      }
+    }
+  }, [voiceIntent, product, isMatchedByVoice]);
   
   const currentPrice = selectedVariant ? selectedVariant.price : product.price;
   const currentMrp = selectedVariant ? selectedVariant.mrp : product.mrp;
@@ -5487,9 +6171,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd, isWishlisted,
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{ opacity: 1, scale: isMatchedByVoice ? 1.02 : 1 }}
       onClick={() => navigate(`/product/${product.id}`)}
-      className="bg-white rounded-[24px] overflow-hidden flex flex-col h-full group border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-100 transition-all duration-300 cursor-pointer relative"
+      className={`bg-white rounded-[24px] overflow-hidden flex flex-col h-full group border shadow-xs hover:shadow-md hover:border-emerald-100 transition-all duration-300 cursor-pointer relative ${
+        isMatchedByVoice 
+          ? 'ring-4 ring-emerald-500/20 border-emerald-500 shadow-emerald-100 shadow-md' 
+          : 'border-slate-200/80'
+      }`}
     >
       <div className="aspect-square relative overflow-hidden bg-white flex items-center justify-center p-3">
         {product.image ? (
@@ -5975,10 +6663,11 @@ export const MyAccountPage: React.FC<{
   shopSettings: any;
   preferredTheme: 'light' | 'dark' | 'system' | 'time_based';
   handleThemeChange: (theme: 'light' | 'dark' | 'system' | 'time_based') => Promise<void>;
+  voiceIntent?: VoiceIntent | null;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
   cart, setCart, cartTotal, updateCartQuantity, shopSettings,
-  preferredTheme, handleThemeChange
+  preferredTheme, handleThemeChange, voiceIntent
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
@@ -6925,6 +7614,7 @@ export const MyAccountPage: React.FC<{
                               console.error(e);
                             }
                           }}
+                          voiceIntent={voiceIntent}
                         />
                       );
                     })}

@@ -558,3 +558,64 @@
   background: var(--border-slate);
   border-radius: 3px;
 }
+
+/* --- Voice Search Animations & Styling --- */
+
+@keyframes voice-wave-grow-1 {
+  0%, 100% { height: 16px; }
+  50% { height: 36px; }
+}
+@keyframes voice-wave-grow-2 {
+  0%, 100% { height: 24px; }
+  50% { height: 48px; }
+}
+@keyframes voice-wave-grow-3 {
+  0%, 100% { height: 32px; }
+  50% { height: 64px; }
+}
+@keyframes shake-text {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.animate-voice-wave-1 {
+  animation: voice-wave-grow-1 1.2s ease-in-out infinite;
+}
+.animate-voice-wave-2 {
+  animation: voice-wave-grow-2 0.9s ease-in-out infinite;
+}
+.animate-voice-wave-3 {
+  animation: voice-wave-grow-3 1.1s ease-in-out infinite;
+}
+.animate-shake {
+  animation: shake-text 0.3s ease-in-out 2;
+}
+
+.z-55 {
+  z-index: 55;
+}
+
+/* Dark mode compatibility fixes for voice search bottom sheet and keywords */
+.dark .fixed.bottom-0.bg-white {
+  background-color: var(--dark-card) !important;
+  border-top-color: var(--border-slate) !important;
+}
+.dark .text-slate-800 {
+  color: var(--dark-text) !important;
+}
+.dark .bg-slate-100 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--border-slate) !important;
+}
+.dark .bg-slate-50 {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  border-color: var(--border-slate) !important;
+}
+.dark .bg-white {
+  background-color: var(--dark-card) !important;
+  border-color: var(--border-slate) !important;
+}
+.dark .border-slate-55 {
+  border-color: var(--border-slate) !important;
+}

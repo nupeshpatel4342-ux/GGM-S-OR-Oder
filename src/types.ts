@@ -24,7 +24,10 @@ export interface Product {
   gujaratiName?: string;
   order?: number;
   variants?: ProductVariant[];
+  hindiName?: string;
+  voiceKeywords?: string[];
 }
+
 
 export interface CartItem extends Product {
   quantity: number;
@@ -116,5 +119,17 @@ export interface CouponUsage {
   discountAmount: number;
   usedAt: string;
 }
+
+export interface VoiceSearchRecord {
+  id: string;
+  query: string;
+  extractedProduct?: string;
+  extractedQuantity?: number;
+  extractedUnit?: string;
+  timestamp: string;
+  status: 'success' | 'failed';
+  language: 'en' | 'hi' | 'gu';
+}
+
 
 
