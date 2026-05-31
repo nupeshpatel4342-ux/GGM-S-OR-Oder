@@ -2464,7 +2464,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFB]">
+    <div className="min-h-screen bg-bg-page">
       <div className="max-w-7xl mx-auto px-4 py-6">
         
         {/* Responsive Navbar */}
@@ -2654,7 +2654,7 @@ export default function App() {
                 className="space-y-8 pb-32 lg:pb-12"
               >
                 {/* Search Bar - Sticky */}
-                <div className="sticky top-0 z-40 bg-[#F8FAFB]/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
+                <div className="sticky top-0 z-40 bg-bg-page/95 backdrop-blur-md -mx-4 px-4 py-3 sm:py-4 pt-5 sm:pt-6">
                   <div className="flex flex-col gap-3 sm:gap-4">
                     <div className="flex justify-between items-baseline px-2">
                       <h2 className="text-xl sm:text-2xl font-black tracking-tight">
@@ -2723,7 +2723,7 @@ export default function App() {
                 ) : (
                   <>
                     {/* Sticky category selection bar */}
-                    <div className="sticky top-[110px] sm:top-[135px] z-30 bg-[#F8FAFB]/90 backdrop-blur-xl -mx-4 px-4 py-3 border-b border-slate-200/50">
+                    <div className="sticky top-[110px] sm:top-[135px] z-30 bg-bg-page/90 backdrop-blur-xl -mx-4 px-4 py-3 border-b border-slate-200/50">
                       <div className="flex items-center gap-3">
                         <button 
                           onClick={() => setSelectedCategory(null)}
@@ -6514,123 +6514,181 @@ export const MyAccountPage: React.FC<{
   }, [customerProfile?.wishlist, products]);
 
   return (
-    <div className="bg-slate-50 min-h-screen py-8 px-4 md:px-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="bg-slate-50 dark:bg-slate-900 min-h-screen py-8 px-4 md:px-8">
+      <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* User Card */}
-        <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4 text-center md:text-left flex-col md:flex-row">
-            <div className="w-16 h-16 rounded-3xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 overflow-hidden border border-emerald-150 shadow-xs">
-              {customerProfile?.profileImage ? (
-                <img src={customerProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-8 h-8" />
-              )}
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">{customerProfile?.name || customerUser.displayName || 'ગ્રાહક / Customer'}</h2>
-              <p className="text-xs font-bold text-slate-400 mt-1 flex items-center justify-center md:justify-start gap-1">
-                <Smartphone className="w-3.5 h-3.5" />
-                +{customerProfile?.phone || customerUser.email?.split('@')[0]}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onLogout}
-            className="px-6 py-3 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout / લૉગ આઉટ
-          </button>
+        {/* Page Header */}
+        <div className="text-center mb-2">
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">My Account</h1>
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">Manage your profile, orders, and more / તમારી પ્રોફાઈલ, ઓર્ડર્સ અને વધુ મેનેજ કરો</p>
         </div>
 
-        {/* Dashboard Tabs & Content */}
-        <div className="grid lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Tabs Menu */}
-          <div className="lg:col-span-3 bg-white border border-slate-100 rounded-[28px] p-4 space-y-1 shadow-sm">
-            <button
-              onClick={() => setActiveTab('orders')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'orders' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <ClipboardList className="w-4 h-4" />
-              My Orders / ઓર્ડર્સ ({customerOrders.length})
-            </button>
+        {/* Back button when inside a tab */}
+        {activeTab && (
+          <button
+            onClick={() => setActiveTab(null)}
+            className="flex items-center gap-2 text-xs font-black text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 uppercase tracking-wider transition-all group mb-2"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Back to Menu / મેનૂ પર પાછા જાઓ
+          </button>
+        )}
+
+        {/* ========== LANDING MENU VIEW ========== */}
+        {!activeTab && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            <button
-              onClick={() => setActiveTab('addresses')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'addresses' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <MapPin className="w-4 h-4" />
-              Addresses / સરનામું ({customerProfile?.savedAddresses?.length || 0})
-            </button>
+            {/* Profile Card (Left) */}
+            <div className="lg:col-span-4">
+              <div className="bg-white dark:bg-slate-800 rounded-[28px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 flex flex-col items-center text-center relative">
+                
+                {/* Edit Profile Icon (top-right corner) */}
+                <button 
+                  onClick={() => setActiveTab('profile')}
+                  className="absolute top-5 right-5 p-2 bg-slate-50 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all"
+                  title="Edit Profile"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
 
-            <button
-              onClick={() => setActiveTab('wishlist')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'wishlist' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Heart className="w-4 h-4" />
-              Wishlist / મનપસંદ ({wishlistProducts.length})
-            </button>
+                {/* Avatar */}
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-emerald-100 dark:border-emerald-900 shadow-lg mb-4 mt-2 bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center">
+                  {customerProfile?.profileImage ? (
+                    <img src={customerProfile.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                      {(customerProfile?.name || customerUser.displayName || 'C').slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </div>
 
-            <button
-              onClick={() => setActiveTab('cart')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'cart' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <ShoppingCart className="w-4 h-4" />
-              My Cart / બાસ્કેટ ({cart.reduce((sum, item) => sum + item.quantity, 0)})
-            </button>
+                {/* Name */}
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                  {customerProfile?.name || customerUser.displayName || 'ગ્રાહક / Customer'}
+                </h2>
+                
+                {/* Phone */}
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5" />
+                  {customerProfile?.phone || customerUser.email?.split('@')[0]}
+                </p>
 
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'profile' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              Edit Profile / માય પ્રોફાઇલ
-            </button>
+                {/* Logout Button */}
+                <button
+                  onClick={onLogout}
+                  className="mt-6 px-6 py-2.5 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 active:scale-95 text-rose-500 dark:text-rose-400 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 border border-rose-100 dark:border-rose-800"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
 
-            <button
-              onClick={() => setActiveTab('theme')}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 transition-all ${
-                activeTab === 'theme' 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              Theme Settings / થીમ સેટિંગ્સ
-            </button>
+            {/* Menu Cards Grid (Right) */}
+            <div className="lg:col-span-8">
+              <div className="grid grid-cols-2 gap-4">
+                
+                {/* My Orders Card */}
+                <button
+                  onClick={() => setActiveTab('orders')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                    <ClipboardList className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">My Orders</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">મારા ઓર્ડર્સ</span>
+                  {customerOrders.length > 0 && (
+                    <span className="text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2.5 py-0.5 rounded-full">{customerOrders.length} orders</span>
+                  )}
+                </button>
+
+                {/* Wishlist Card */}
+                <button
+                  onClick={() => setActiveTab('wishlist')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-rose-200 dark:hover:border-rose-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center group-hover:bg-rose-100 dark:group-hover:bg-rose-900/50 transition-colors">
+                    <Heart className="w-6 h-6 text-rose-500 dark:text-rose-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">Wishlist</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">મનપસંદ</span>
+                  {wishlistProducts.length > 0 && (
+                    <span className="text-[9px] font-black bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 px-2.5 py-0.5 rounded-full">{wishlistProducts.length} items</span>
+                  )}
+                </button>
+
+                {/* Cart Card */}
+                <button
+                  onClick={() => setActiveTab('cart')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50 transition-colors">
+                    <ShoppingCart className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">Cart</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">બાસ્કેટ</span>
+                  {cart.length > 0 && (
+                    <span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full">{cart.reduce((sum, item) => sum + item.quantity, 0)} items · ₹{cartTotal.toFixed(0)}</span>
+                  )}
+                </button>
+
+                {/* Addresses Card */}
+                <button
+                  onClick={() => setActiveTab('addresses')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-amber-200 dark:hover:border-amber-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center group-hover:bg-amber-100 dark:group-hover:bg-amber-900/50 transition-colors">
+                    <MapPin className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">Addresses</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">સરનામાં</span>
+                  {(customerProfile?.savedAddresses?.length || 0) > 0 && (
+                    <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full">{customerProfile?.savedAddresses?.length} saved</span>
+                  )}
+                </button>
+
+                {/* Edit Profile Card */}
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-violet-200 dark:hover:border-violet-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
+                    <User className="w-6 h-6 text-violet-500 dark:text-violet-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">Edit Profile</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">પ્રોફાઇલ બદલો</span>
+                </button>
+
+                {/* Theme Settings Card */}
+                <button
+                  onClick={() => setActiveTab('theme')}
+                  className="bg-white dark:bg-slate-800 rounded-[24px] border border-slate-100 dark:border-slate-700 shadow-sm p-6 md:p-8 flex flex-col items-center justify-center gap-3 text-center hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 hover:-translate-y-0.5 transition-all active:scale-[0.97] group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
+                    <Settings className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
+                  </div>
+                  <span className="text-sm font-black text-slate-800 dark:text-white">Theme Settings</span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">થીમ સેટિંગ્સ</span>
+                </button>
+              </div>
+            </div>
           </div>
+        )}
 
-          {/* Content Area */}
-          <div className="lg:col-span-9 bg-white border border-slate-100 rounded-[32px] p-6 shadow-sm min-h-[50vh]">
+        {/* ========== TAB CONTENT VIEW ========== */}
+        {activeTab && (
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-[32px] p-6 shadow-sm min-h-[50vh]">
             
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-black text-slate-900 uppercase">Order History / તમારો ઓર્ડર ઇતિહાસ</h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે કરેલા તમામ ઓર્ડર્સની વિગત</p>
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-blue-500" />
+                    Order History / તમારો ઓર્ડર ઇતિહાસ
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">તમે કરેલા તમામ ઓર્ડર્સની વિગત</p>
                 </div>
 
                 {ordersLoading ? (
@@ -6639,28 +6697,28 @@ export const MyAccountPage: React.FC<{
                   </div>
                 ) : customerOrders.length === 0 ? (
                   <div className="py-16 text-center">
-                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                    <div className="w-14 h-14 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 dark:text-slate-500 border border-slate-100 dark:border-slate-600">
                       <ClipboardList className="w-6 h-6" />
                     </div>
-                    <h4 className="text-slate-900 font-black">No Orders Found</h4>
-                    <p className="text-slate-400 text-xs mt-1">તમે હજુ સુધી કોઈ ઓર્ડર આપ્યો નથી.</p>
+                    <h4 className="text-slate-900 dark:text-white font-black">No Orders Found</h4>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">તમે હજુ સુધી કોઈ ઓર્ડર આપ્યો નથી.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {customerOrders.map(order => (
-                      <div key={order.id} className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
-                        <div className="bg-slate-50 p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-150">
+                      <div key={order.id} className="border border-slate-200/80 dark:border-slate-600 rounded-2xl overflow-hidden shadow-xs">
+                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-150 dark:border-slate-600">
                           <div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">ORDER ID</span>
-                            <span className="text-sm font-black text-slate-800">{order.id}</span>
+                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">ORDER ID</span>
+                            <span className="text-sm font-black text-slate-800 dark:text-white">{order.id}</span>
                           </div>
                           <div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">DATE</span>
-                            <span className="text-xs font-bold text-slate-600">{new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">DATE</span>
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{new Date(order.createdAt).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                           </div>
                           <div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">TOTAL</span>
-                            <span className="text-sm font-black text-[#00884F]">₹{order.total.toFixed(0)}</span>
+                            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">TOTAL</span>
+                            <span className="text-sm font-black text-[#00884F] dark:text-emerald-400">₹{order.total.toFixed(0)}</span>
                           </div>
                           <div>
                             <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider ${
@@ -6674,14 +6732,14 @@ export const MyAccountPage: React.FC<{
                           </div>
                           <button
                             onClick={() => handleReorder(order)}
-                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Reorder
                           </button>
                           <button
                             onClick={() => handleDownloadInvoice(order)}
-                            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
                           >
                             <Download className="w-3.5 h-3.5" />
                             Download Bill / બિલ
@@ -6689,17 +6747,17 @@ export const MyAccountPage: React.FC<{
                         </div>
                         
                         {/* Order Items */}
-                        <div className="p-4 divide-y divide-slate-100">
+                        <div className="p-4 divide-y divide-slate-100 dark:divide-slate-700">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="py-2.5 flex items-center justify-between gap-4 text-xs font-bold text-slate-700 first:pt-0 last:pb-0">
+                            <div key={idx} className="py-2.5 flex items-center justify-between gap-4 text-xs font-bold text-slate-700 dark:text-slate-300 first:pt-0 last:pb-0">
                               <div className="flex-1">
-                                <p className="text-slate-800 uppercase font-black">{item.name}</p>
+                                <p className="text-slate-800 dark:text-white uppercase font-black">{item.name}</p>
                                 {item.selectedVariant && (
-                                  <p className="text-[9px] text-slate-400 font-bold mt-0.5">{item.selectedVariant.name}</p>
+                                  <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">{item.selectedVariant.name}</p>
                                 )}
                               </div>
-                              <span className="text-slate-500 shrink-0 font-mono">{item.quantity} x ₹{item.price.toFixed(0)}</span>
-                              <span className="text-slate-900 font-black font-mono">₹{(item.price * item.quantity).toFixed(0)}</span>
+                              <span className="text-slate-500 dark:text-slate-400 shrink-0 font-mono">{item.quantity} x ₹{item.price.toFixed(0)}</span>
+                              <span className="text-slate-900 dark:text-white font-black font-mono">₹{(item.price * item.quantity).toFixed(0)}</span>
                             </div>
                           ))}
                         </div>
@@ -6713,10 +6771,13 @@ export const MyAccountPage: React.FC<{
             {/* Addresses Tab */}
             {activeTab === 'addresses' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4 flex justify-between items-center">
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4 flex justify-between items-center">
                   <div>
-                    <h3 className="text-base font-black text-slate-900 uppercase">Saved Addresses / તમારા સરનામા</h3>
-                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">ડિલિવરી ઝડપી કરવા માટે સરનામાં સેવ કરો</p>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-amber-500" />
+                      Saved Addresses / તમારા સરનામા
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">ડિલિવરી ઝડપી કરવા માટે સરનામાં સેવ કરો</p>
                   </div>
                   {!showAddressForm && (
                     <button
@@ -6735,32 +6796,32 @@ export const MyAccountPage: React.FC<{
                 </div>
 
                 {showAddressForm && (
-                  <form onSubmit={handleSaveAddress} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl space-y-4 animate-in slide-in-from-top duration-200">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  <form onSubmit={handleSaveAddress} className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 p-5 rounded-2xl space-y-4 animate-in slide-in-from-top duration-200">
+                    <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
                       {editingAddrId ? 'Edit Address / સરનામું સુધારો' : 'New Address / નવું સરનામું ઉમેરો'}
                     </h4>
                     
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Label / નામ (દા.ત. Home, Office)</label>
+                      <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Label / નામ (દા.ત. Home, Office)</label>
                       <input
                         required
                         type="text"
                         placeholder="દા.ત. ઘર, ઓફિસ"
                         value={addrLabel}
                         onChange={e => setAddrLabel(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden text-slate-900 dark:text-white"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Address details / સંપૂર્ણ સરનામું</label>
+                      <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Address details / સંપૂર્ણ સરનામું</label>
                       <textarea
                         required
                         rows={3}
                         placeholder="ઘર નંબર, સોસાયટી, શેરી, ગામ/શહેર, પિનકોડ"
                         value={addrText}
                         onChange={e => setAddrText(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden resize-none"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-xs font-bold focus:border-emerald-500 outline-hidden resize-none text-slate-900 dark:text-white"
                       />
                     </div>
 
@@ -6777,7 +6838,7 @@ export const MyAccountPage: React.FC<{
                           setShowAddressForm(false);
                           setEditingAddrId(null);
                         }}
-                        className="px-6 py-3 bg-slate-200 hover:bg-slate-350 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="px-6 py-3 bg-slate-200 dark:bg-slate-600 hover:bg-slate-350 dark:hover:bg-slate-500 text-slate-700 dark:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                       >
                         Cancel
                       </button>
@@ -6788,19 +6849,19 @@ export const MyAccountPage: React.FC<{
                 {/* Addresses List */}
                 <div className="space-y-4">
                   {(customerProfile?.savedAddresses || []).length === 0 ? (
-                    <div className="py-12 text-center text-slate-400 text-xs font-bold">
+                    <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs font-bold">
                       કોઈ સરનામું સેવ કરેલું નથી. Add Address બટનથી ઉમેરો.
                     </div>
                   ) : (
                     (customerProfile?.savedAddresses || []).map(addr => (
                       <div key={addr.id} className={`p-5 rounded-2xl border-2 transition-all flex flex-col justify-between md:flex-row md:items-start gap-4 ${
                         addr.isDefault 
-                          ? 'border-emerald-500 bg-emerald-50/20' 
-                          : 'border-slate-150 hover:border-slate-300'
+                          ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-900/10' 
+                          : 'border-slate-150 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
                       }`}>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 bg-slate-250 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                            <span className="px-2.5 py-1 bg-slate-250 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[9px] font-black uppercase tracking-wider">
                               {addr.label}
                             </span>
                             {addr.isDefault && (
@@ -6810,7 +6871,7 @@ export const MyAccountPage: React.FC<{
                               </span>
                             )}
                           </div>
-                          <p className="text-xs font-bold text-slate-700 leading-relaxed max-w-lg">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-relaxed max-w-lg">
                             {addr.address}
                           </p>
                         </div>
@@ -6819,20 +6880,20 @@ export const MyAccountPage: React.FC<{
                           {!addr.isDefault && (
                             <button
                               onClick={() => handleSetDefaultAddress(addr.id)}
-                              className="px-3 py-1.5 text-[9px] font-black uppercase tracking-wider border border-emerald-500 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              className="px-3 py-1.5 text-[9px] font-black uppercase tracking-wider border border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
                             >
                               Set Default
                             </button>
                           )}
                           <button
                             onClick={() => handleEditAddress(addr)}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 transition-colors"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteAddress(addr.id)}
-                            className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
+                            className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -6847,18 +6908,21 @@ export const MyAccountPage: React.FC<{
             {/* Wishlist Tab */}
             {activeTab === 'wishlist' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-black text-slate-900 uppercase">My Wishlist / તમારી મનપસંદ વસ્તુઓ</h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે સેવ કરેલી વસ્તુઓનું લિસ્ટ</p>
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-rose-500" />
+                    My Wishlist / તમારી મનપસંદ વસ્તુઓ
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">તમે સેવ કરેલી વસ્તુઓનું લિસ્ટ</p>
                 </div>
 
                 {wishlistProducts.length === 0 ? (
                   <div className="py-16 text-center">
-                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                    <div className="w-14 h-14 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 dark:text-slate-500 border border-slate-100 dark:border-slate-600">
                       <Heart className="w-6 h-6" />
                     </div>
-                    <h4 className="text-slate-900 font-black">Wishlist is Empty</h4>
-                    <p className="text-slate-400 text-xs mt-1">તમારી મનપસંદ પ્રોડક્ટ્સ અહીં સેવ કરો.</p>
+                    <h4 className="text-slate-900 dark:text-white font-black">Wishlist is Empty</h4>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">તમારી મનપસંદ પ્રોડક્ટ્સ અહીં સેવ કરો.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -6891,77 +6955,80 @@ export const MyAccountPage: React.FC<{
             {/* Cart Tab */}
             {activeTab === 'cart' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-black text-slate-900 uppercase">My Basket / મારું કાર્ટ</h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમે ખરીદવા માટે પસંદ કરેલી વસ્તુઓ</p>
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    My Basket / મારું કાર્ટ
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">તમે ખરીદવા માટે પસંદ કરેલી વસ્તુઓ</p>
                 </div>
 
                 {cart.length === 0 ? (
                   <div className="py-16 text-center">
-                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 border border-slate-100">
+                    <div className="w-14 h-14 bg-slate-50 dark:bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-300 dark:text-slate-500 border border-slate-100 dark:border-slate-600">
                       <ShoppingCart className="w-6 h-6" />
                     </div>
-                    <h4 className="text-slate-900 font-black">Your Basket is Empty</h4>
-                    <p className="text-slate-400 text-xs mt-1">તમારું બાસ્કેટ ખાલી છે. હોમ પેજ પરથી પ્રોડક્ટ્સ ઉમેરો.</p>
+                    <h4 className="text-slate-900 dark:text-white font-black">Your Basket is Empty</h4>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">તમારું બાસ્કેટ ખાલી છે. હોમ પેજ પરથી પ્રોડક્ટ્સ ઉમેરો.</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Cart Items List */}
-                    <div className="divide-y divide-slate-100 border border-slate-150 rounded-2xl overflow-hidden shadow-xs bg-white">
+                    <div className="divide-y divide-slate-100 dark:divide-slate-700 border border-slate-150 dark:border-slate-600 rounded-2xl overflow-hidden shadow-xs bg-white dark:bg-slate-800">
                       {cart.map((item, idx) => {
                         const cartItemId = item.id + (item.selectedVariant ? '-' + item.selectedVariant.id : '');
                         return (
-                          <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 transition-colors">
+                          <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
                             {/* Left: Product Image & Details */}
                             <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                              <div className="w-12 h-12 bg-white border border-slate-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
+                              <div className="w-12 h-12 bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl overflow-hidden shrink-0 flex items-center justify-center p-1">
                                 {item.image ? (
                                   <img src={item.image} alt={item.name} className="max-h-full max-w-full object-contain" />
                                 ) : (
-                                  <div className="w-full h-full bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                                  <div className="w-full h-full bg-slate-100 dark:bg-slate-600 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500">
                                     <ShoppingCart className="w-5 h-5" />
                                   </div>
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-xs font-black text-slate-800 uppercase truncate leading-snug">{item.name}</h4>
+                                <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase truncate leading-snug">{item.name}</h4>
                                 {item.gujaratiName && (
-                                  <p className="text-[9px] font-bold text-slate-400 leading-none mt-0.5">{item.gujaratiName}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 leading-none mt-0.5">{item.gujaratiName}</p>
                                 )}
-                                <p className="text-[10px] font-extrabold text-slate-500 mt-1 font-mono">
+                                <p className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 mt-1 font-mono">
                                   ₹{item.price} / {item.unit}
                                 </p>
                               </div>
                             </div>
 
                             {/* Right: Controls (Qty, Subtotal, Delete) */}
-                            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 shrink-0">
-                              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-xl p-0.5 gap-2 shrink-0">
+                            <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 dark:border-slate-700 shrink-0">
+                              <div className="flex items-center bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-0.5 gap-2 shrink-0">
                                 <button
                                   type="button"
                                   onClick={() => updateCartQuantity(cartItemId, -1)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-slate-600 text-slate-900 dark:text-white font-black border border-slate-100 dark:border-slate-500 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
                                 >
                                   -
                                 </button>
-                                <span className="text-center font-black text-slate-900 text-xs w-4 font-mono">{item.quantity}</span>
+                                <span className="text-center font-black text-slate-900 dark:text-white text-xs w-4 font-mono">{item.quantity}</span>
                                 <button
                                   type="button"
                                   onClick={() => updateCartQuantity(cartItemId, 1)}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-900 font-black border border-slate-100 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-slate-600 text-slate-900 dark:text-white font-black border border-slate-100 dark:border-slate-500 shadow-2xs active:scale-90 transition-all font-mono text-[10px]"
                                 >
                                   +
                                 </button>
                               </div>
 
                               <div className="text-right shrink-0 min-w-[70px]">
-                                <p className="text-xs font-black text-slate-900 font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
+                                <p className="text-xs font-black text-slate-900 dark:text-white font-mono">₹{(item.price * item.quantity).toFixed(0)}</p>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => updateCartQuantity(cartItemId, -item.quantity)}
-                                className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all shrink-0"
+                                className="p-1.5 text-slate-350 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all shrink-0"
                                 title="Remove item"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -6973,19 +7040,19 @@ export const MyAccountPage: React.FC<{
                     </div>
 
                     {/* Summary & Checkout button */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-[24px] p-5 space-y-4">
-                      <div className="space-y-2 text-xs font-bold text-slate-600">
+                    <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-[24px] p-5 space-y-4">
+                      <div className="space-y-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                         <div className="flex justify-between">
                           <span>Subtotal / કુલ કિંમત</span>
                           <span className="font-mono">₹{cartTotal.toFixed(0)}</span>
                         </div>
-                        <div className="flex justify-between text-emerald-700">
+                        <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                           <span>Delivery / ડિલિવરી ચાર્જ</span>
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[9px] font-black">FREE</span>
+                          <span className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-400 px-2 py-0.5 rounded-full text-[9px] font-black">FREE</span>
                         </div>
-                        <div className="flex justify-between pt-3 border-t border-slate-200 text-sm font-black text-slate-900">
+                        <div className="flex justify-between pt-3 border-t border-slate-200 dark:border-slate-600 text-sm font-black text-slate-900 dark:text-white">
                           <span>Grand Total</span>
-                          <span className="font-mono text-emerald-700 text-base">₹{cartTotal.toFixed(0)}</span>
+                          <span className="font-mono text-emerald-700 dark:text-emerald-400 text-base">₹{cartTotal.toFixed(0)}</span>
                         </div>
                       </div>
 
@@ -7012,15 +7079,18 @@ export const MyAccountPage: React.FC<{
             {/* Profile Tab */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-black text-slate-900 uppercase">Edit Profile / પ્રોફાઇલ વિગતો</h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">તમારી પર્સનલ માહિતી અને ફોટો બદલો</p>
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <User className="w-5 h-5 text-violet-500" />
+                    Edit Profile / પ્રોફાઇલ વિગતો
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">તમારી પર્સનલ માહિતી અને ફોટો બદલો</p>
                 </div>
 
                 <form onSubmit={handleUpdateProfile} className="space-y-5 max-w-lg">
                   {/* Photo Editor */}
                   <div className="space-y-2 text-center">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Profile Picture / તમારો ફોટો</label>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Profile Picture / તમારો ફોટો</label>
                     <div className="relative w-24 h-24 mx-auto group">
                       {profileImg ? (
                         <img 
@@ -7029,11 +7099,11 @@ export const MyAccountPage: React.FC<{
                           className="w-full h-full rounded-full object-cover border-2 border-emerald-500 shadow-md" 
                         />
                       ) : (
-                        <div className="w-full h-full rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center text-emerald-650 font-black text-2xl">
+                        <div className="w-full h-full rounded-full bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-100 dark:border-emerald-800 flex items-center justify-center text-emerald-650 dark:text-emerald-400 font-black text-2xl">
                           {(profileName || customerUser.displayName || 'C').slice(0, 1).toUpperCase()}
                         </div>
                       )}
-                      <label className="absolute bottom-0 right-0 bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-full cursor-pointer shadow-md transition-all active:scale-90 flex items-center justify-center border-2 border-white">
+                      <label className="absolute bottom-0 right-0 bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-full cursor-pointer shadow-md transition-all active:scale-90 flex items-center justify-center border-2 border-white dark:border-slate-800">
                         <Camera className="w-3.5 h-3.5" />
                         <input 
                           type="file" 
@@ -7047,35 +7117,35 @@ export const MyAccountPage: React.FC<{
 
                   {/* Name Input */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Full Name / તમારું પૂરું નામ</label>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Full Name / તમારું પૂરું નામ</label>
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                       <input
                         required
                         type="text"
                         placeholder="નામ અને અટક"
                         value={profileName}
                         onChange={e => setProfileName(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-600 outline-hidden transition-all text-slate-900 dark:text-white"
                       />
                     </div>
                   </div>
 
                   {/* Phone Input */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">WhatsApp Number / વૉટ્સએપ નંબર</label>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">WhatsApp Number / વૉટ્સએપ નંબર</label>
                     <div className="relative">
-                      <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                       <input
                         required
                         type="tel"
                         placeholder="વૉટ્સએપ નંબર"
                         value={profilePhone}
                         onChange={e => setProfilePhone(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-600 outline-hidden transition-all text-slate-900 dark:text-white"
                       />
                     </div>
-                    <p className="text-[9px] text-slate-400 font-bold mt-0.5 pl-1">
+                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold mt-0.5 pl-1">
                       ⚠️ નોંધ: વૉટ્સએપ નંબર બદલવાથી તમારું લૉગિન આઈડી (ID) પણ બદલાઈ જશે.
                     </p>
                   </div>
@@ -7101,9 +7171,12 @@ export const MyAccountPage: React.FC<{
             {/* Theme Settings Tab */}
             {activeTab === 'theme' && (
               <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-black text-slate-900 uppercase">Theme Preferences / થીમ પસંદગી</h3>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">પસંદ કરો કે વેબસાઈટ લાઈટ મોડમાં જોવી છે કે ડાર્ક મોડમાં</p>
+                <div className="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-indigo-500" />
+                    Theme Preferences / થીમ પસંદગી
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">પસંદ કરો કે વેબસાઈટ લાઈટ મોડમાં જોવી છે કે ડાર્ક મોડમાં</p>
                 </div>
                 
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -7113,12 +7186,12 @@ export const MyAccountPage: React.FC<{
                     className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
                       preferredTheme === 'light' 
                         ? 'border-primary-green bg-light-green/30 text-primary-green' 
-                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                        : 'border-slate-250 dark:border-slate-600 hover:border-slate-350 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-white'
                     }`}
                   >
                     <Sun className="w-8 h-8 text-amber-500" />
                     <span className="text-xs font-black">Light Mode / લાઈટ મોડ</span>
-                    <span className="text-[10px] text-slate-400 leading-relaxed">નિયમિત તેજસ્વી થીમ / Standard Bright UI theme</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">નિયમિત તેજસ્વી થીમ / Standard Bright UI theme</span>
                   </div>
                   
                   {/* Dark Mode Option */}
@@ -7127,12 +7200,12 @@ export const MyAccountPage: React.FC<{
                     className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
                       preferredTheme === 'dark' 
                         ? 'border-primary-green bg-light-green/30 text-primary-green' 
-                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                        : 'border-slate-250 dark:border-slate-600 hover:border-slate-350 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-white'
                     }`}
                   >
                     <Moon className="w-8 h-8 text-indigo-400" />
                     <span className="text-xs font-black">Dark Mode / ડાર્ક મોડ</span>
-                    <span className="text-[10px] text-slate-400 leading-relaxed">રાત્રિના સમય અને આંખની સુરક્ષા માટે અનુકૂળ થીમ / Soft background optimized for low-light</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">રાત્રિના સમય અને આંખની સુરક્ષા માટે અનુકૂળ થીમ / Soft background optimized for low-light</span>
                   </div>
 
                   {/* System Match Option */}
@@ -7141,12 +7214,12 @@ export const MyAccountPage: React.FC<{
                     className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
                       preferredTheme === 'system' 
                         ? 'border-primary-green bg-light-green/30 text-primary-green' 
-                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                        : 'border-slate-250 dark:border-slate-600 hover:border-slate-350 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-white'
                     }`}
                   >
-                    <Monitor className="w-8 h-8 text-slate-500" />
+                    <Monitor className="w-8 h-8 text-slate-500 dark:text-slate-400" />
                     <span className="text-xs font-black">System Match / સિસ્ટમ મુજબ</span>
-                    <span className="text-[10px] text-slate-400 leading-relaxed">તમારા ફોન અથવા કોમ્પ્યુટર સેટિંગ્સ મુજબ બદલાશે / Follows OS settings automatically</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">તમારા ફોન અથવા કોમ્પ્યુટર સેટિંગ્સ મુજબ બદલાશે / Follows OS settings automatically</span>
                   </div>
 
                   {/* Time-Based Option */}
@@ -7155,20 +7228,20 @@ export const MyAccountPage: React.FC<{
                     className={`cursor-pointer border-2 rounded-2xl p-5 flex flex-col items-center gap-3 text-center transition-all ${
                       preferredTheme === 'time_based' 
                         ? 'border-primary-green bg-light-green/30 text-primary-green' 
-                        : 'border-slate-250 hover:border-slate-350 hover:bg-slate-50/50 text-slate-800'
+                        : 'border-slate-250 dark:border-slate-600 hover:border-slate-350 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-white'
                     }`}
                   >
-                    <Clock className="w-8 h-8 text-emerald-600" />
+                    <Clock className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                     <span className="text-xs font-black">Time-based Auto / સમય આધારિત ઓટો</span>
-                    <span className="text-[10px] text-slate-400 leading-relaxed">રાત્રે (7 PM - 6 AM) ડાર્ક અને દિવસે લાઈટ મોડ / Light by day, Dark by night (7 PM - 6 AM)</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">રાત્રે (7 PM - 6 AM) ડાર્ક અને દિવસે લાઈટ મોડ / Light by day, Dark by night (7 PM - 6 AM)</span>
                   </div>
                 </div>
               </div>
             )}
 
           </div>
+        )}
 
-        </div>
       </div>
     </div>
   );
