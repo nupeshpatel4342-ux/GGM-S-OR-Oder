@@ -284,7 +284,12 @@
   @apply absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-light-text;
 }
 
-/* Global utility overrides for Dark Mode to guarantee complete page-wide styling */
+/* ===================================================================
+   COMPREHENSIVE DARK MODE OVERRIDES
+   Guarantees ALL elements are visible and properly styled in dark mode.
+   =================================================================== */
+
+/* --- Backgrounds: Slate / Neutral --- */
 .dark .bg-white {
   background-color: var(--bg-card) !important;
 }
@@ -294,7 +299,65 @@
 .dark .bg-slate-100 {
   background-color: var(--bg-slate-50) !important;
 }
+.dark .bg-slate-200 {
+  background-color: #334155 !important; /* slate-700 */
+}
+.dark .bg-slate-900 {
+  background-color: #475569 !important; /* slate-600: lighter dark for buttons */
+}
+.dark .bg-slate-800 {
+  background-color: #3e5066 !important;
+}
+.dark .bg-slate-700 {
+  background-color: #475569 !important;
+}
+
+/* --- Backgrounds: Emerald tints --- */
+.dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.3) !important; /* dark emerald tint */
+}
+.dark .bg-emerald-100 {
+  background-color: rgba(6, 78, 59, 0.45) !important;
+}
+
+/* --- Backgrounds: Amber/Status tints --- */
+.dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.25) !important;
+}
+.dark .bg-amber-100 {
+  background-color: rgba(120, 53, 15, 0.4) !important;
+}
+
+/* --- Backgrounds: Red/Rose tints --- */
+.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.25) !important;
+}
+.dark .bg-rose-50 {
+  background-color: rgba(136, 19, 55, 0.2) !important;
+}
+.dark .bg-rose-100 {
+  background-color: rgba(136, 19, 55, 0.35) !important;
+}
+
+/* --- Backgrounds: Blue tints --- */
+.dark .bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.25) !important;
+}
+.dark .bg-blue-100 {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+}
+
+/* --- Text: Slate (all shades) --- */
+.dark .text-slate-950 {
+  color: var(--dark-text) !important;
+}
 .dark .text-slate-900 {
+  color: var(--dark-text) !important;
+}
+.dark .text-slate-855 {
+  color: var(--dark-text) !important;
+}
+.dark .text-slate-850 {
   color: var(--dark-text) !important;
 }
 .dark .text-slate-800 {
@@ -309,12 +372,142 @@
 .dark .text-slate-500 {
   color: var(--light-text) !important;
 }
+.dark .text-slate-400 {
+  color: #64748B !important; /* stays as muted secondary text */
+}
+.dark .text-slate-350 {
+  color: #64748B !important;
+}
+.dark .text-slate-300 {
+  color: #64748B !important;
+}
+.dark .text-slate-200 {
+  color: #94A3B8 !important;
+}
+
+/* --- Text: Emerald (dark shades that need lightening) --- */
+.dark .text-emerald-900 {
+  color: #6EE7B7 !important; /* emerald-300 */
+}
+.dark .text-emerald-800 {
+  color: #6EE7B7 !important; /* emerald-300 */
+}
+.dark .text-emerald-700 {
+  color: #34D399 !important; /* emerald-400 */
+}
+.dark .text-emerald-650 {
+  color: #34D399 !important;
+}
+.dark .text-emerald-600 {
+  color: #10B981 !important; /* stays vibrant */
+}
+
+/* --- Text: Amber (dark shades) --- */
+.dark .text-amber-900 {
+  color: #FCD34D !important; /* amber-300 */
+}
+.dark .text-amber-800 {
+  color: #FCD34D !important;
+}
+.dark .text-amber-700 {
+  color: #FBBF24 !important; /* amber-400 */
+}
+.dark .text-amber-600 {
+  color: #F59E0B !important;
+}
+
+/* --- Text: Red --- */
+.dark .text-red-700 {
+  color: #FCA5A5 !important; /* red-300 */
+}
+.dark .text-red-500 {
+  color: #F87171 !important; /* red-400 */
+}
+
+/* --- Text: Blue --- */
+.dark .text-blue-800 {
+  color: #93C5FD !important; /* blue-300 */
+}
+.dark .text-blue-700 {
+  color: #93C5FD !important;
+}
+.dark .text-blue-600 {
+  color: #60A5FA !important; /* blue-400 */
+}
+
+/* --- Text: Rose --- */
+.dark .text-rose-800 {
+  color: #FDA4AF !important;
+}
+.dark .text-rose-700 {
+  color: #FB7185 !important;
+}
+.dark .text-rose-600 {
+  color: #FB7185 !important;
+}
+
+
+
+/* --- Borders: Slate --- */
 .dark .border-slate-100 {
   border-color: var(--border-slate) !important;
 }
 .dark .border-slate-200 {
   border-color: var(--border-slate) !important;
 }
+.dark .border-slate-300 {
+  border-color: var(--border-slate) !important;
+}
+
+/* --- Borders: Emerald --- */
+.dark .border-emerald-100 {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+.dark .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+.dark .border-emerald-250 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+.dark .border-emerald-255 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+.dark .border-emerald-500 {
+  border-color: #10B981 !important;
+}
+
+/* --- Borders: Amber --- */
+.dark .border-amber-200 {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+/* --- Borders: Red/Rose --- */
+.dark .border-red-100 {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+.dark .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+/* --- Borders: Blue --- */
+.dark .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* --- Border Dashed / Decorative --- */
+.dark .border-dashed {
+  border-color: var(--border-slate) !important;
+}
+
+/* --- Divide Colors --- */
+.dark .divide-slate-100 > :not(:last-child) {
+  border-color: var(--border-slate) !important;
+}
+.dark .divide-slate-200 > :not(:last-child) {
+  border-color: var(--border-slate) !important;
+}
+
+/* --- Inputs, Selects, Textareas --- */
 .dark input[type="text"], .dark input[type="password"], .dark input[type="tel"], .dark input[type="date"], .dark input[type="number"], .dark select, .dark textarea {
   background-color: var(--bg-input) !important;
   color: var(--dark-text) !important;
@@ -324,6 +517,26 @@
   color: var(--light-text) !important;
   opacity: 0.8;
 }
+
+/* --- Shadows --- */
 .dark .shadow-xs, .dark .shadow-sm, .dark .shadow-md, .dark .shadow-lg {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* --- Ring Focus Colors --- */
+.dark .focus\:ring-primary-green\/5:focus {
+  --tw-ring-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* --- Scrollbar for Dark Mode --- */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-page);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--border-slate);
+  border-radius: 3px;
 }
