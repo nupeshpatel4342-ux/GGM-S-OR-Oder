@@ -342,7 +342,7 @@ export default function App() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceErrorText, setVoiceErrorText] = useState('');
-  const [voiceActiveLanguage, setVoiceActiveLanguage] = useState<'en' | 'hi' | 'gu'>('en');
+
   const [voiceIntent, setVoiceIntent] = useState<VoiceIntent | null>(null);
   const [voiceSearchHistory, setVoiceSearchHistory] = useState<string[]>(() => {
     try {
@@ -508,21 +508,7 @@ export default function App() {
     }
   };
 
-  const [customerProfilesList, setCustomerProfilesList] = useState<CustomerProfile[]>([]);
 
-  useEffect(() => {
-    if (!isAdminUnlocked) return;
-    const unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
-      const list: CustomerProfile[] = [];
-      snapshot.forEach((doc) => {
-        list.push(doc.data() as CustomerProfile);
-      });
-      setCustomerProfilesList(list);
-    }, (error) => {
-      console.error("Firestore customers list query error:", error);
-    });
-    return () => unsub();
-  }, [isAdminUnlocked]);
 
   useEffect(() => {
     if (!isAdminUnlocked) return;
@@ -539,35 +525,7 @@ export default function App() {
     return () => unsub();
   }, [isAdminUnlocked]);
 
-  const themeStats = useMemo(() => {
-    const total = customerProfilesList.length;
-    let lightCount = 0;
-    let darkCount = 0;
-    let systemCount = 0;
-    let timeBasedCount = 0;
 
-    customerProfilesList.forEach((profile) => {
-      const theme = profile.preferredTheme || 'system';
-      if (theme === 'light') lightCount++;
-      else if (theme === 'dark') darkCount++;
-      else if (theme === 'time_based') timeBasedCount++;
-      else systemCount++;
-    });
-
-    const getPercent = (count: number) => total > 0 ? ((count / total) * 100).toFixed(0) : '0';
-
-    return {
-      total,
-      lightCount,
-      lightPercent: getPercent(lightCount),
-      darkCount,
-      darkPercent: getPercent(darkCount),
-      systemCount,
-      systemPercent: getPercent(systemCount),
-      timeBasedCount,
-      timeBasedPercent: getPercent(timeBasedCount)
-    };
-  }, [customerProfilesList]);
 
   const popularProducts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -1920,7 +1878,7 @@ export default function App() {
 
                 <div className="grid md:grid-cols-12 gap-6">
                   {/* Stock Breakdown */}
-                  <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6">
+                  <div className="md:col-span-6 bg-white border border-slate-200 rounded-[24px] p-6">
                     <h4 className="font-extrabold text-slate-900 text-sm mb-4">Stock Breakdown</h4>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto no-scrollbar">
                       {categoryItems.map(cat => {
@@ -1935,34 +1893,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Customer Theme Analytics */}
-                  <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6">
-                    <h4 className="font-extrabold text-slate-900 text-sm mb-4">Theme Analytics / થીમ એનાલિટિક્સ</h4>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">☀️ Light Mode</span>
-                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.lightCount} ({themeStats.lightPercent}%)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">🌙 Dark Mode</span>
-                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.darkCount} ({themeStats.darkPercent}%)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">🖥️ System Match</span>
-                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.systemCount} ({themeStats.systemPercent}%)</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-semibold text-slate-600 flex items-center gap-1.5">⏰ Time-based Auto</span>
-                        <span className="font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">{themeStats.timeBasedCount} ({themeStats.timeBasedPercent}%)</span>
-                      </div>
-                      <div className="border-t border-slate-100 pt-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
-                        Total Users Tracked: {themeStats.total}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Recent Orders */}
-                  <div className="md:col-span-4 bg-white border border-slate-200 rounded-[24px] p-6 flex flex-col justify-between">
+                  <div className="md:col-span-6 bg-white border border-slate-200 rounded-[24px] p-6 flex flex-col justify-between">
                     <div>
                       <h4 className="font-extrabold text-slate-900 text-sm mb-4">Recent Orders</h4>
                       <div className="divide-y divide-slate-100 overflow-x-auto">
@@ -2766,7 +2698,7 @@ export default function App() {
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef('');
 
-  const startVoiceSearch = (lang: 'en' | 'hi' | 'gu') => {
+  const startVoiceSearch = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setVoiceErrorText('Speech recognition not supported on this browser.');
@@ -2786,13 +2718,8 @@ export default function App() {
     recognition.continuous = false;
     recognition.interimResults = true;
 
-    if (lang === 'gu') {
-      recognition.lang = 'gu-IN';
-    } else if (lang === 'hi') {
-      recognition.lang = 'hi-IN';
-    } else {
-      recognition.lang = 'en-US';
-    }
+    // Use gu-IN for bilingual (Gujarati & English) recognition
+    recognition.lang = 'gu-IN';
 
     recognition.onstart = () => {
       setVoiceListening(true);
@@ -2816,6 +2743,9 @@ export default function App() {
       const activeText = finalTranscript || interimTranscript;
       setVoiceTranscript(activeText);
       transcriptRef.current = activeText;
+      
+      // Update the search query inline in real-time
+      setSearchQuery(activeText);
     };
 
     recognition.onerror = (event: any) => {
@@ -2854,15 +2784,57 @@ export default function App() {
     setVoiceListening(false);
   };
 
+  const GUJARATI_TO_ENGLISH_MAP: Record<string, string> = {
+    'મિલ્ક': 'milk',
+    'સુગર': 'sugar',
+    'બટર': 'butter',
+    'ચીઝ': 'cheese',
+    'કોલ્ડ્રિંક': 'cold drink',
+    'કોલ્ડ્રિંક્સ': 'cold drinks',
+    'બિસ્કિટ': 'biscuit',
+    'બિસ્કીટ': 'biscuit',
+    'કોફી': 'coffee',
+    'બ્રેડ': 'bread',
+    'પાવડર': 'powder',
+    'સાબુ': 'soap',
+    'શેમ્પૂ': 'shampoo',
+    'ડ્રાય ફ્રૂટ્સ': 'dry fruits',
+    'નાસ્તો': 'snacks',
+    'તેલ': 'oil',
+    'ઘી': 'ghee',
+    'ચોખા': 'rice',
+    'ચા': 'tea',
+    'ખાંડ': 'sugar',
+    'દૂધ': 'milk',
+    'અથાણું': 'pickle',
+    'પાપડ': 'papad',
+    'બદામ': 'almond',
+    'કાજુ': 'cashew',
+    'દ્રાક્ષ': 'raisin',
+    'મસાલા': 'masala',
+    'હળદર': 'haldar',
+    'નમકીન': 'namkeen'
+  };
+
   const handleVoiceSearchComplete = async (transcriptText: string) => {
     if (!transcriptText.trim()) return;
 
     const { product, quantity, unit } = parseVoiceIntent(transcriptText);
 
+    // Map Gujarati terms/phonetic sounds to English and query both
+    let searchTerms = [product];
+    const trimmedProduct = product.trim().toLowerCase();
+    for (const [guj, eng] of Object.entries(GUJARATI_TO_ENGLISH_MAP)) {
+      if (trimmedProduct.includes(guj)) {
+        searchTerms.push(eng);
+      }
+    }
+    const finalSearchQuery = searchTerms.join(' + ');
+
     const intent: VoiceIntent = { product, quantity, unit };
     setVoiceIntent(intent);
 
-    setSearchQuery(product);
+    setSearchQuery(finalSearchQuery);
     setSelectedCategory(null);
 
     const queryStr = transcriptText.trim();
@@ -2889,7 +2861,7 @@ export default function App() {
       extractedUnit: unit,
       timestamp: new Date().toISOString(),
       status: hasMatch ? 'success' : 'failed',
-      language: voiceActiveLanguage
+      language: 'gu'
     };
 
     try {
@@ -3084,13 +3056,13 @@ export default function App() {
                     </div>
                     <input
                       type="text"
-                      placeholder="Search pantry items, spices, pulses..."
+                      placeholder={voiceListening ? "🎤 Listening... speak now / બોલો..." : "Search pantry items, spices, pulses..."}
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
                         if (!e.target.value.trim()) setVoiceIntent(null);
                       }}
-                      className="w-full bg-white border border-slate-200 rounded-xl sm:rounded-2xl pl-12 pr-20 py-3 sm:py-3.5 text-sm focus:border-primary-green focus:ring-4 focus:ring-primary-green/5 outline-hidden transition-all shadow-xs"
+                      className={`w-full bg-white border rounded-xl sm:rounded-2xl pl-12 pr-20 py-3 sm:py-3.5 text-sm focus:ring-4 outline-hidden transition-all shadow-xs ${voiceListening ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/5' : 'border-slate-200 focus:border-primary-green focus:ring-primary-green/5'}`}
                     />
                     {searchQuery.trim() && (
                       <button
@@ -3107,10 +3079,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        setVoiceListening(true);
-                        startVoiceSearch(voiceActiveLanguage);
+                        if (voiceListening) {
+                          stopVoiceSearch();
+                        } else {
+                          startVoiceSearch();
+                        }
                       }}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center justify-center text-slate-400 hover:text-primary-green active:scale-95 transition-all w-10 h-full"
+                      className={`absolute inset-y-0 right-0 pr-4 flex items-center justify-center transition-all w-10 h-full ${voiceListening ? 'text-rose-500 animate-pulse scale-110' : 'text-slate-400 hover:text-primary-green active:scale-95'}`}
                       title="Voice Search / વોઈસ સર્ચ"
                       id="voice-search-mic-btn"
                     >
@@ -3118,41 +3093,25 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Smart suggestions & history container */}
-                  {((searchQuery.trim() && getSmartSuggestions(searchQuery).length > 0) || (!searchQuery.trim() && voiceSearchHistory.length > 0)) && (
+                  {/* Smart suggestions container */}
+                  {searchQuery.trim() && getSmartSuggestions(searchQuery).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2 items-center">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                        {searchQuery.trim() ? 'Suggested / સંબંધિત:' : 'Recent Voice Searches / વોઈસ સર્ચ ઇતિહાસ:'}
+                        Suggested / સંબંધિત:
                       </span>
-                      {searchQuery.trim() 
-                        ? getSmartSuggestions(searchQuery).map(suggestion => (
-                            <button
-                              key={suggestion}
-                              type="button"
-                              onClick={() => {
-                                setSearchQuery(suggestion);
-                                setVoiceIntent(null);
-                              }}
-                              className="text-[10px] font-bold bg-white hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2.5 py-1 rounded-full transition-all text-slate-600 flex items-center gap-1 shadow-xs"
-                            >
-                              <span>{suggestion}</span>
-                            </button>
-                          ))
-                        : voiceSearchHistory.map((hist, idx) => (
-                            <button
-                              key={hist + '-' + idx}
-                              type="button"
-                              onClick={() => {
-                                setSearchQuery(hist);
-                                handleVoiceSearchComplete(hist);
-                              }}
-                              className="text-[10px] font-bold bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2.5 py-1 rounded-full transition-all text-slate-600 flex items-center gap-1"
-                            >
-                              <Mic className="w-2.5 h-2.5 text-slate-400" />
-                              <span>{hist}</span>
-                            </button>
-                          ))
-                      }
+                      {getSmartSuggestions(searchQuery).map(suggestion => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(suggestion);
+                            setVoiceIntent(null);
+                          }}
+                          className="text-[10px] font-bold bg-white hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 hover:border-emerald-200 px-2.5 py-1 rounded-full transition-all text-slate-600 flex items-center gap-1 shadow-xs"
+                        >
+                          <span>{suggestion}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -3600,112 +3559,7 @@ export default function App() {
 
         <ToastContainer toasts={toasts} />
 
-        {/* Voice Search Bottom Sheet / વોઈસ સર્ચ બોટમ શીટ */}
-        <AnimatePresence>
-          {voiceListening && (
-            <>
-              {/* Overlay Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.5 }}
-                exit={{ opacity: 0 }}
-                onClick={stopVoiceSearch}
-                className="fixed inset-0 bg-black z-50 pointer-events-auto"
-              />
 
-              {/* Bottom Sheet Drawer */}
-              <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] p-6 z-55 shadow-2xl border-t border-slate-100 pointer-events-auto max-w-lg mx-auto flex flex-col items-center gap-6"
-              >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full cursor-pointer hover:bg-slate-300 transition-colors" onClick={stopVoiceSearch} />
-
-                {/* Header with Language Tabs */}
-                <div className="w-full flex justify-between items-center px-2">
-                  <h3 className="font-black text-slate-800 text-sm tracking-tight flex items-center gap-2">
-                    <Mic className="w-4 h-4 text-emerald-600 animate-pulse" />
-                    <span>Voice Search / વોઈસ સર્ચ</span>
-                  </h3>
-                  
-                  {/* Language Selector */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200/50" onClick={e => e.stopPropagation()}>
-                    {(['en', 'hi', 'gu'] as const).map(lang => (
-                      <button
-                        key={lang}
-                        type="button"
-                        onClick={() => {
-                          setVoiceActiveLanguage(lang);
-                          startVoiceSearch(lang);
-                        }}
-                        className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${voiceActiveLanguage === lang ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                      >
-                        {lang === 'en' ? 'EN' : lang === 'hi' ? 'HI' : 'GUJ'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pulsing Mic & Waveform Visualizer */}
-                <div className="relative w-32 h-32 flex items-center justify-center">
-                  {/* Outer Pulsing Glow */}
-                  <div className="absolute inset-0 bg-emerald-500/10 rounded-full animate-ping pointer-events-none" />
-                  <div className="absolute inset-4 bg-emerald-500/20 rounded-full animate-pulse pointer-events-none" />
-
-                  {/* Audio wave bar animation */}
-                  <div className="absolute flex gap-1 items-center justify-center inset-0 pointer-events-none">
-                    <div className="w-1 bg-emerald-500 rounded-full h-8 animate-voice-wave-1" />
-                    <div className="w-1 bg-emerald-500 rounded-full h-12 animate-voice-wave-2" />
-                    <div className="w-1 bg-emerald-500 rounded-full h-16 animate-voice-wave-3" />
-                    <div className="w-1 bg-emerald-500 rounded-full h-12 animate-voice-wave-2" />
-                    <div className="w-1 bg-emerald-500 rounded-full h-8 animate-voice-wave-1" />
-                  </div>
-
-                  {/* Microphone Button */}
-                  <button
-                    type="button"
-                    onClick={stopVoiceSearch}
-                    className="relative w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center hover:bg-emerald-600 active:scale-95 transition-all shadow-lg hover:shadow-emerald-200 hover:shadow-xl z-10"
-                  >
-                    <Mic className="w-8 h-8" />
-                  </button>
-                </div>
-
-                {/* Status and Live Transcription Text */}
-                <div className="text-center w-full max-w-sm space-y-2 min-h-[4rem]">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {voiceTranscript ? 'Speaking / તમે કહો છો:' : 'Listening... speak now / સાંભળી રહ્યા છીએ... બોલો:'}
-                  </p>
-                  
-                  {voiceErrorText ? (
-                    <p className="text-xs font-bold text-rose-500 animate-pulse">
-                      {voiceErrorText}
-                    </p>
-                  ) : (
-                    <p className="text-sm font-bold text-slate-800 line-clamp-2 leading-snug">
-                      {voiceTranscript || '“Milk”, “2 kilo sugar”, “Amul butter”...'}
-                    </p>
-                  )}
-                </div>
-
-                {/* Actions / Info */}
-                <div className="w-full flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2 border-t border-slate-100">
-                  <span>Languages: English, Hindi, Gujarati</span>
-                  <button
-                    type="button"
-                    onClick={stopVoiceSearch}
-                    className="text-rose-500 hover:underline"
-                  >
-                    Cancel / બંધ કરો
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );
