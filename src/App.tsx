@@ -7769,7 +7769,7 @@ export const MyAccountPage: React.FC<{
         )}
 
       </div>
-      {process.env.NODE_ENV === "development" && <Agentation />}
+      {(import.meta as any).env?.DEV && <Agentation />}
     </div>
   );
 };
