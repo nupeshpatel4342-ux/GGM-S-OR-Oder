@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect, ChangeEvent, FormEvent, useCallback, useRef } from 'react';
+import { Agentation } from 'agentation';
 // Flag to prevent multiple tabs/devices from re-seeding Firestore
 let hasSeededProducts = false;
 let hasSeededCategories = false;
@@ -7768,6 +7769,7 @@ export const MyAccountPage: React.FC<{
         )}
 
       </div>
+      {process.env.NODE_ENV === "development" && <Agentation />}
     </div>
   );
 };
