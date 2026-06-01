@@ -28,5 +28,8 @@ service cloud.firestore {
     match /couponUsages/{id} {
       allow read, write: if true;
     }
+    match /aiChatAnalytics/{id} {
+      allow read, write: if true;
+    }
   }
 }

@@ -18,7 +18,7 @@ import {
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
-  Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic
+  Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic, Sparkles, Bot, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -260,6 +260,10 @@ export default function App() {
       announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
       defaultTheme: 'system',
       festivalThemeActive: 'none',
+      aiEnabled: true,
+      aiModelName: 'gemini-2.5-flash',
+      aiPromptTemplate: '',
+      aiApiKey: '',
     };
     // Auto-migrate if old dummy number is in local storage
     if (settings.whatsapp === '919876543210') {
@@ -277,6 +281,13 @@ export default function App() {
     }
     if (!settings.festivalThemeActive) {
       settings.festivalThemeActive = 'none';
+      localStorage.setItem('shopSettings', JSON.stringify(settings));
+    }
+    if (settings.aiEnabled === undefined) {
+      settings.aiEnabled = true;
+      settings.aiModelName = 'gemini-2.5-flash';
+      settings.aiPromptTemplate = '';
+      settings.aiApiKey = '';
       localStorage.setItem('shopSettings', JSON.stringify(settings));
     }
     return settings;
@@ -353,6 +364,7 @@ export default function App() {
     }
   });
   const [voiceSearchAnalytics, setVoiceSearchAnalytics] = useState<VoiceSearchRecord[]>([]);
+  const [aiChatLogs, setAiChatLogs] = useState<any[]>([]);
 
   const [qrValue, setQrValue] = useState<string>(() => {
     const storedSettings = localStorage.getItem('settings');
@@ -400,12 +412,26 @@ export default function App() {
   });
 
   // Admin tab navigation state
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons' | 'voice'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons' | 'voice' | 'ai_assistant'>('dashboard');
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+
+  // AI Assistant Chatbot State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<any[]>(() => [
+    {
+      id: 'welcome',
+      sender: 'assistant',
+      text: 'નમસ્તે! હું તમારો એઆઈ ગ્રોસરી મદદગાર છું. 🛒\nતમને આજે રસોઈ બનાવવા માટે અથવા ખરીદી માટે શું મદદ કરું? (ઉદાહરણ તરીકે પૂછો: "ચા બનાવવા શું જોઈએ?")',
+      timestamp: new Date().toISOString()
+    }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSpeechListening, setChatSpeechListening] = useState(false);
 
   // Admin Auth state
   const [adminUsername, setAdminUsername] = useState('admin');
@@ -522,6 +548,21 @@ export default function App() {
       setVoiceSearchAnalytics(list);
     }, (error) => {
       console.error("Firestore voiceSearches read error:", error);
+    });
+    return () => unsub();
+  }, [isAdminUnlocked]);
+
+  useEffect(() => {
+    if (!isAdminUnlocked) return;
+    const unsub = onSnapshot(collection(db, 'aiChatAnalytics'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id });
+      });
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setAiChatLogs(list);
+    }, (error) => {
+      console.error("Firestore aiChatAnalytics read error:", error);
     });
     return () => unsub();
   }, [isAdminUnlocked]);
@@ -681,6 +722,10 @@ export default function App() {
         const data = snapshot.data();
         if (data.shopSettings) {
           const settingsObj = {
+            aiEnabled: true,
+            aiModelName: 'gemini-2.5-flash',
+            aiPromptTemplate: '',
+            aiApiKey: '',
             ...data.shopSettings,
             defaultTheme: data.shopSettings.defaultTheme || 'system',
             festivalThemeActive: data.shopSettings.festivalThemeActive || 'none',
@@ -716,12 +761,20 @@ export default function App() {
           announcementText: '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.',
           defaultTheme: 'system',
           festivalThemeActive: 'none',
+          aiEnabled: true,
+          aiModelName: 'gemini-2.5-flash',
+          aiPromptTemplate: '',
+          aiApiKey: '',
         };
         if (!shopSettingsInit.announcementText) {
           shopSettingsInit.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
         }
         if (!shopSettingsInit.defaultTheme) shopSettingsInit.defaultTheme = 'system';
         if (!shopSettingsInit.festivalThemeActive) shopSettingsInit.festivalThemeActive = 'none';
+        if (shopSettingsInit.aiEnabled === undefined) shopSettingsInit.aiEnabled = true;
+        if (!shopSettingsInit.aiModelName) shopSettingsInit.aiModelName = 'gemini-2.5-flash';
+        if (shopSettingsInit.aiPromptTemplate === undefined) shopSettingsInit.aiPromptTemplate = '';
+        if (shopSettingsInit.aiApiKey === undefined) shopSettingsInit.aiApiKey = '';
 
         const savedSettings = localStorage.getItem('settings');
         const settingsInit = savedSettings ? JSON.parse(savedSettings) : {};
@@ -1836,6 +1889,9 @@ export default function App() {
             <button onClick={() => setAdminTab('voice')} className={`admin-sidebar-btn ${adminTab === 'voice' ? 'active' : ''}`}>
               <Mic className="w-4 h-4" /> VOICE SEARCH ANALYTICS
             </button>
+            <button onClick={() => setAdminTab('ai_assistant')} className={`admin-sidebar-btn ${adminTab === 'ai_assistant' ? 'active' : ''}`}>
+              <Sparkles className="w-4 h-4 text-purple-500" /> AI ASSISTANT
+            </button>
             <button onClick={() => setAdminTab('settings')} className={`admin-sidebar-btn ${adminTab === 'settings' ? 'active' : ''}`}>
               <Settings className="w-4 h-4" /> SHOP SETTINGS
             </button>
@@ -2447,6 +2503,142 @@ export default function App() {
               </div>
             )}
 
+            {/* AI Assistant Settings and Analytics Tab */}
+            {adminTab === 'ai_assistant' && (
+              <div className="space-y-6 max-w-4xl mx-auto">
+                <div className="bg-white border border-slate-200 rounded-[24px] p-6">
+                  <h3 className="font-black text-slate-900 text-lg mb-6 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                    AI Grocery Assistant Settings
+                  </h3>
+                  
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      const updatedSettings = {
+                        ...shopSettings,
+                        aiEnabled: fd.get('aiEnabled') === 'true',
+                        aiModelName: fd.get('aiModelName') as string,
+                        aiPromptTemplate: fd.get('aiPromptTemplate') as string,
+                        aiApiKey: fd.get('aiApiKey') as string,
+                      };
+                      await saveSettings(updatedSettings);
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Enable AI Chatbot / એઆઈ મદદગાર ચાલુ કરો</label>
+                        <select name="aiEnabled" defaultValue={String(shopSettings.aiEnabled ?? true)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden">
+                          <option value="true">Enabled / ચાલુ</option>
+                          <option value="false">Disabled / બંધ</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">AI Model Name / એઆઈ મોડલ</label>
+                        <select name="aiModelName" defaultValue={shopSettings.aiModelName || 'gemini-2.5-flash'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden">
+                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Gemini API Key Override (Optional) / એપીઆઈ કી</label>
+                      <input type="password" name="aiApiKey" defaultValue={shopSettings.aiApiKey || ''} placeholder="Leave blank to use environment default GEMINI_API_KEY" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden" />
+                      <span className="text-[10px] text-slate-400 block pl-1">જો ખાલી રાખશો, તો સર્વર તેના પોતાના ડિફોલ્ટ એન્વાયરમેન્ટ કીનો ઉપયોગ કરશે.</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Custom System Instructions / કસ્ટમ સૂચનાઓ (Prompt)</label>
+                      <textarea name="aiPromptTemplate" defaultValue={shopSettings.aiPromptTemplate || ''} rows={6} placeholder="Describe store rules, specialized recipe ingredients, promo contexts, etc. If left blank, default grocery instructions will be used." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden resize-none" />
+                      <span className="text-[10px] text-slate-400 block pl-1">એઆઈ આસિસ્ટન્ટને વર્તન અને પ્રી-સેટ જવાબો કસ્ટમાઇઝ કરવા માટે સૂચનાઓ આપો.</span>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      type="submit"
+                      className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg mt-4"
+                    >
+                      Save AI Settings
+                    </motion.button>
+                  </form>
+                </div>
+
+                {/* Analytics Section */}
+                <div className="bg-white border border-slate-200 rounded-[24px] p-6 space-y-4">
+                  <h3 className="font-black text-slate-900 text-md flex items-center gap-2">
+                    <Bot className="w-5 h-5 text-indigo-600" />
+                    AI Assistant Chat Analytics / ચેટ વિશ્લેષણ
+                  </h3>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider block">Total Questions</span>
+                      <span className="text-2xl font-black text-slate-900">{aiChatLogs.length}</span>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider block">Matched Products</span>
+                      <span className="text-2xl font-black text-emerald-600">
+                        {aiChatLogs.filter(log => log.status === 'success').length}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider block">Failed / General Queries</span>
+                      <span className="text-2xl font-black text-amber-500">
+                        {aiChatLogs.filter(log => log.status === 'failed').length}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Recent Chat Log Interactions</h4>
+                    
+                    {aiChatLogs.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic pl-1">No AI chat queries logged yet.</p>
+                    ) : (
+                      <div className="max-h-[300px] overflow-y-auto space-y-3 pr-1">
+                        {aiChatLogs.map((log) => (
+                          <div key={log.id} className="border border-slate-150 rounded-2xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-all space-y-2">
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-xs font-black text-slate-800 bg-white border border-slate-200 px-3 py-1 rounded-full flex items-center gap-1">
+                                <User className="w-3 h-3 text-slate-400" />
+                                User: "{log.query}"
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400 shrink-0 mt-1">
+                                {new Date(log.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-600 leading-relaxed bg-white border border-slate-150 p-3 rounded-xl">
+                              <span className="font-extrabold text-indigo-600 flex items-center gap-1 mb-1">
+                                <Bot className="w-3.5 h-3.5" /> AI Response:
+                              </span>
+                              {log.responseMessage}
+                            </div>
+                            {log.recommendedProductIds && log.recommendedProductIds.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 items-center pt-1">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Recommended:</span>
+                                {log.recommendedProductIds.map((pId: string) => {
+                                  const prod = products.find(p => p.id === pId);
+                                  return (
+                                    <span key={pId} className="text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md">
+                                      {prod?.name || pId}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Banners Tab */}
             {adminTab === 'banners' && (
               <div className="grid lg:grid-cols-12 gap-8">
@@ -2698,6 +2890,94 @@ export default function App() {
 
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef('');
+
+  const handleSendChatMessage = async (textToSend?: string) => {
+    const text = (textToSend ?? chatInput).trim();
+    if (!text) return;
+
+    const userMsg = {
+      id: `msg-${Date.now()}-user`,
+      sender: 'user' as const,
+      text,
+      timestamp: new Date().toISOString()
+    };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const history = chatMessages.slice(-10).map(m => ({
+        role: m.sender,
+        text: m.text
+      }));
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history })
+      });
+
+      if (!res.ok) {
+        throw new Error('સર્વર સાથે જોડાણ થઈ શક્યું નથી.');
+      }
+
+      const data = await res.json();
+      
+      const botMsg = {
+        id: `msg-${Date.now()}-bot`,
+        sender: 'assistant' as const,
+        text: data.message,
+        products: data.products || [],
+        timestamp: new Date().toISOString()
+      };
+
+      setChatMessages(prev => [...prev, botMsg]);
+    } catch (err) {
+      console.error("AI chat error:", err);
+      const errorMsg = {
+        id: `msg-${Date.now()}-err`,
+        sender: 'assistant' as const,
+        text: 'માફ કરશો, એઆઈ સર્વરમાં કોઈ ખામી સર્જાઈ છે. કૃપા કરીને થોડીવાર પછી ફરી પ્રયત્ન કરો.',
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const startChatVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('Speech recognition not supported / વોઈસ ઇનપુટ ઉપલબ્ધ નથી', 'error');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'gu-IN';
+
+    recognition.onstart = () => {
+      setChatSpeechListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const resultText = event.results[0][0].transcript;
+      setChatInput(resultText);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setChatSpeechListening(false);
+    };
+
+    recognition.onend = () => {
+      setChatSpeechListening(false);
+    };
+
+    recognition.start();
+  };
 
   const startVoiceSearch = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -3560,6 +3840,179 @@ export default function App() {
 
         <ToastContainer toasts={toasts} />
 
+        {/* AI Assistant Chatbot UI */}
+        {!isAdminView && shopSettings.aiEnabled !== false && (
+          <div className="fixed bottom-6 right-6 z-40 font-sans text-left">
+            {/* Floating Circle Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-2xl cursor-pointer relative border-none outline-hidden"
+            >
+              {isChatOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Sparkles className="w-6 h-6 text-white animate-pulse" />
+              )}
+              {!isChatOpen && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+              )}
+            </motion.button>
+
+            {/* Chat Window Panel */}
+            <AnimatePresence>
+              {isChatOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 50, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-16 right-0 w-[92vw] sm:w-[380px] h-[520px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[28px] shadow-2xl flex flex-col overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="bg-indigo-600 p-4 text-white flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center shrink-0">
+                        <Sparkles className="w-5 h-5 text-amber-300" />
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-sm leading-tight text-white">AI Grocery Assistant</h4>
+                        <p className="text-[10px] text-indigo-200 flex items-center gap-1 mt-0.5 font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                          Online | એઆઈ મદદગાર
+                        </p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setIsChatOpen(false)} className="p-1 hover:bg-white/10 rounded-lg transition-all cursor-pointer border-none text-white bg-transparent">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Messages Feed */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-950">
+                    {chatMessages.map((msg) => (
+                      <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} space-y-1.5`}>
+                        <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs font-semibold shadow-xs whitespace-pre-wrap leading-relaxed ${
+                          msg.sender === 'user' 
+                            ? 'bg-indigo-600 text-white rounded-tr-none text-right' 
+                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-150 dark:border-slate-700 rounded-tl-none text-left'
+                        }`}>
+                          {msg.text}
+                        </div>
+
+                        {/* Recommended Products Carousel */}
+                        {msg.products && msg.products.length > 0 && (
+                          <div className="w-full py-1.5 overflow-x-auto flex gap-3 scrollbar-none no-scrollbar snap-x shrink-0">
+                            {msg.products.map((prod: Product) => {
+                              const discount = prod.mrp && prod.mrp > prod.price ? Math.round(((prod.mrp - prod.price) / prod.mrp) * 100) : 0;
+                              const handleAdd = () => {
+                                addToCart(prod, 1);
+                                showToast(`${prod.name} added to cart!`, 'success');
+                              };
+
+                              return (
+                                <div key={prod.id} className="w-[130px] bg-white dark:bg-slate-850 border border-slate-150 dark:border-slate-700 rounded-2xl p-2 shrink-0 snap-start flex flex-col justify-between shadow-xs">
+                                  <div className="relative border-none">
+                                    <img src={prod.image} alt={prod.name} className="w-full h-16 object-cover rounded-xl mb-1.5" />
+                                    {discount > 0 && (
+                                      <span className="absolute top-1 left-1 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md">
+                                        -{discount}%
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1">
+                                    <h5 className="text-[10px] font-black text-slate-800 dark:text-slate-100 truncate line-clamp-1">{prod.name}</h5>
+                                    <p className="text-[9px] font-bold text-slate-400 truncate">{prod.gujaratiName || ''}</p>
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="text-xs font-black text-slate-900 dark:text-white">₹{prod.price}</span>
+                                      {discount > 0 && <span className="text-[9px] text-slate-400 line-through">₹{prod.mrp}</span>}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleAdd}
+                                    className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border-none cursor-pointer"
+                                  >
+                                    Add to Cart
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-3.5 rounded-2xl rounded-tl-none border border-slate-150 dark:border-slate-700 w-16 shadow-xs justify-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.2s]"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.4s]"></span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Suggestion Chips */}
+                  <div className="p-2 border-t border-slate-150 dark:border-slate-800 flex gap-1.5 overflow-x-auto shrink-0 bg-slate-50/50 dark:bg-slate-900/50 no-scrollbar">
+                    {[
+                      "ચા માટે શું જોઈએ?",
+                      "પંજાબી શાક બનાવવા શું જોઈએ?",
+                      "Healthy snacks suggest કરો",
+                      "Cold drink સાથે શું સારું જશે?"
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => handleSendChatMessage(chip)}
+                        className="text-[9px] font-black bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-750 hover:border-indigo-400 hover:bg-indigo-50/20 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full shrink-0 transition-all cursor-pointer"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Input Form */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendChatMessage();
+                    }}
+                    className="p-3 bg-white dark:bg-slate-900 border-t border-slate-150 dark:border-slate-800 flex gap-2 items-center shrink-0"
+                  >
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="તમારો પ્રશ્ન પૂછો... Ask AI Assistant"
+                      className="flex-1 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-bold focus:border-indigo-500 outline-hidden dark:text-white"
+                    />
+                    {/* Voice dictation */}
+                    <button
+                      type="button"
+                      onClick={startChatVoiceInput}
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                        chatSpeechListening 
+                          ? 'bg-red-500 border-red-500 text-white animate-pulse' 
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-250 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750'
+                      }`}
+                    >
+                      <Mic className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="submit"
+                      className="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer shadow-md border-none flex items-center justify-center shrink-0"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
       </div>
     </div>
@@ -7769,7 +8222,6 @@ export const MyAccountPage: React.FC<{
         )}
 
       </div>
-      {(import.meta as any).env?.DEV && <Agentation />}
     </div>
   );
 };
