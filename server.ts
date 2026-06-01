@@ -5,10 +5,19 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp as initializeFirebaseApp } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocs, collection, setDoc } from "firebase/firestore";
-import firebaseConfig from "./firebase-applet-config.json";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const firebaseConfig = {
+  projectId: "ggms-grocery",
+  appId: "1:791346737085:web:3d5100d4bb751389dcecd4",
+  apiKey: "AIzaSyBPzlJ35Qa69Hdnr0fH-sHh5_Mw70Lm0kQ",
+  authDomain: "ggms-grocery.firebaseapp.com",
+  storageBucket: "ggms-grocery.firebasestorage.app",
+  messagingSenderId: "791346737085",
+  measurementId: "G-LT2YR4BK2Q"
+};
 
 const firebaseApp = initializeFirebaseApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
