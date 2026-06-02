@@ -18,7 +18,8 @@ import {
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
-  Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic, Sparkles, Bot, MessageSquare
+  Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic, Sparkles, Bot, MessageSquare,
+  Bell, WifiOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -340,7 +341,22 @@ export default function App() {
     return [];
   });
 
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const storedCart = localStorage.getItem('ggms_cart');
+      return storedCart ? JSON.parse(storedCart) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // PWA & Network States
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<string>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
 
   const [orders, setOrders] = useState<Order[]>(() => {
     const storedOrders = localStorage.getItem('orders');
@@ -532,6 +548,71 @@ export default function App() {
       } catch (error) {
         console.error("Error updating preferred theme:", error);
       }
+    }
+  };
+
+  // Synchronize network status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Listen for custom install prompt event
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallPrompt(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Sync cart to localStorage
+  useEffect(() => {
+    localStorage.setItem('ggms_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Install PWA Helper Function
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA Installation Outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
+  // Push Notifications permissions setup
+  const requestNotificationPermission = async () => {
+    if (typeof Notification === 'undefined') return;
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        showToast('Notifications enabled successfully! / સૂચનાઓ સક્રિય થઈ ગઈ છે!', 'success');
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          console.log('Ready for push manager subscription:', reg);
+        }
+      } else {
+        showToast('Notification permission denied. / સૂચનાઓની પરવાનગી નકારી કાઢવામાં આવી.', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to request notification permission:', err);
     }
   };
 
@@ -849,6 +930,22 @@ export default function App() {
           const cartSnap = await getDoc(doc(db, 'customerCarts', user.uid));
           if (cartSnap.exists() && cartSnap.data().items?.length > 0) {
             setCart(cartSnap.data().items);
+          } else {
+            try {
+              const storedCart = localStorage.getItem('ggms_cart');
+              if (storedCart) {
+                const parsed = JSON.parse(storedCart);
+                if (parsed.length > 0) {
+                  await setDoc(doc(db, 'customerCarts', user.uid), {
+                    items: parsed,
+                    updatedAt: new Date().toISOString()
+                  });
+                  setCart(parsed);
+                }
+              }
+            } catch (err) {
+              console.error('Error syncing local cart with Firestore:', err);
+            }
           }
         } catch (error) {
           console.error('Error loading customer data:', error);
@@ -856,6 +953,7 @@ export default function App() {
       } else {
         setCustomerProfile(null);
         setCart([]);
+        localStorage.removeItem('ggms_cart');
       }
       setCustomerAuthLoading(false);
     });
@@ -3245,6 +3343,62 @@ export default function App() {
           </div>
         </header>
 
+        {/* Offline Banner */}
+        <AnimatePresence>
+          {!isOnline && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-rose-600 dark:bg-rose-700 text-white text-xs font-black text-center py-3 px-4 flex items-center justify-center gap-2 shadow-inner shrink-0 z-50 rounded-2xl mb-4"
+            >
+              <WifiOff className="w-4 h-4 text-white animate-pulse" />
+              <span>તમે ઓફલાઇન છો - ઇન્ટરનેટ કનેક્શન તપાસો / You are offline - check connection</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Install App Promo Prompt */}
+        <AnimatePresence>
+          {showInstallPrompt && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="bg-slate-900 dark:bg-slate-950 text-white rounded-[24px] p-4.5 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-800 shadow-xl"
+            >
+              <div className="flex items-center gap-3.5 text-left w-full">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
+                  <Store className="w-6 h-6 text-emerald-450" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm leading-tight text-white flex items-center gap-1.5">
+                    GGM&S Grocery App
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Fast & Offline</span>
+                  </h4>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-normal">હોમ સ્ક્રીન પર એપ ડાઉનલોડ કરો / Install for the best mobile experience</p>
+                </div>
+              </div>
+              <div className="flex gap-2.5 w-full sm:w-auto shrink-0 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowInstallPrompt(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer border-none bg-transparent"
+                >
+                  નહિ, આભાર / Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
+                >
+                  ડાઉનલોડ કરો / Install
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* View Routing */}
         <AnimatePresence mode="wait">
           <Routes>
@@ -3300,6 +3454,8 @@ export default function App() {
                     preferredTheme={preferredTheme}
                     handleThemeChange={handleThemeChange}
                     voiceIntent={voiceIntent}
+                    notificationPermission={notificationPermission}
+                    requestNotificationPermission={requestNotificationPermission}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -6972,10 +7128,13 @@ export const MyAccountPage: React.FC<{
   preferredTheme: 'light' | 'dark' | 'system' | 'time_based';
   handleThemeChange: (theme: 'light' | 'dark' | 'system' | 'time_based') => Promise<void>;
   voiceIntent?: VoiceIntent | null;
+  notificationPermission?: string;
+  requestNotificationPermission?: () => Promise<void>;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
   cart, setCart, cartTotal, updateCartQuantity, shopSettings,
-  preferredTheme, handleThemeChange, voiceIntent
+  preferredTheme, handleThemeChange, voiceIntent,
+  notificationPermission = 'default', requestNotificationPermission
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
@@ -7584,6 +7743,30 @@ export const MyAccountPage: React.FC<{
                       <span>Auto</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Push Notifications Setup Section */}
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 w-full flex flex-col items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    Notifications / પુશ નોટિફિકેશન
+                  </span>
+                  <button
+                    type="button"
+                    onClick={requestNotificationPermission}
+                    disabled={notificationPermission === 'granted'}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                      notificationPermission === 'granted'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50 cursor-default'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-700/50 active:scale-[0.98]'
+                    }`}
+                  >
+                    <Bell className="w-3.5 h-3.5" />
+                    <span>
+                      {notificationPermission === 'granted' 
+                        ? 'Notifications Active' 
+                        : (notificationPermission === 'denied' ? 'Permission Denied' : 'Enable Notifications')}
+                    </span>
+                  </button>
                 </div>
 
                 {/* Logout Button */}

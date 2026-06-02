@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ઑફલાઇન મોડ | GGM&S Grocery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-500: #64748b;
+      --slate-100: #f1f5f9;
+      --emerald-600: #059669;
+      --emerald-500: #10b981;
+      --emerald-50: #ecfdf5;
+      --white: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-page: #0f172a;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --card-bg: #1e293b;
+        --border-color: #334155;
+      }
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-page: #f8fafc;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --card-bg: #ffffff;
+        --border-color: #e2e8f0;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: background-color 0.3s ease;
+    }
+
+    .container {
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 32px;
+      padding: 40px 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    }
+
+    .icon-container {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      background: var(--emerald-50);
+      color: var(--emerald-600);
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 32px;
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--emerald-600);
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--slate-900);
+      color: var(--white);
+      border: none;
+      padding: 16px 32px;
+      font-size: 14px;
+      font-weight: 800;
+      border-radius: 18px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 16px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+      transition: all 0.2s ease;
+    }
+
+    .retry-btn:hover {
+      background: var(--slate-800);
+      transform: translateY(-1px);
+    }
+
+    .retry-btn:active {
+      transform: translateY(1px);
+    }
+
+    .footer {
+      margin-top: 32px;
+      font-size: 11px;
+      color: var(--slate-500);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* Light Theme Tweaks for Icon background */
+    @media (prefers-color-scheme: dark) {
+      .icon-container {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--emerald-500);
+      }
+      .retry-btn {
+        background: var(--emerald-600);
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+      }
+      .retry-btn:hover {
+        background: var(--emerald-500);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon-container">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.5M5 12.5a10.94 10.94 0 0 1 5.83-2.84M8.53 16.11A6.7 6.7 0 0 1 12 15a6.7 6.7 0 0 1 2 .3M12 20h.01"/>
+      </svg>
+    </div>
+
+    <h1>કોઈ કનેક્શન નથી</h1>
+    <h2>You are Offline</h2>
+
+    <p>લાગે છે કે તમે ઇન્ટરનેટથી ડિસ્કનેક્ટ થઈ ગયા છો. કૃપા કરીને તમારું નેટવર્ક કનેક્શન તપાસો.</p>
+    <p>તમે પહેલાં ખોલેલા પેજ અને તમારા કાર્ટમાં રહેલી વસ્તુઓ જોઈ શકો છો.</p>
+
+    <button class="retry-btn" onclick="retryConnection()">
+      ફરી પ્રયત્ન કરો / Retry
+    </button>
+  </div>
+
+  <div class="footer">
+    GGM&S Grocery
+  </div>
+
+  <script>
+    function retryConnection() {
+      // Check if we are online
+      if (navigator.onLine) {
+        window.location.href = '/';
+      } else {
+        // Visual feedback
+        const btn = document.querySelector('.retry-btn');
+        const originalText = btn.innerText;
+        btn.innerText = 'તપાસી રહ્યું છે... / Checking...';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.disabled = false;
+        }, 1000);
+      }
+    }
+
+    // Automatically redirect back to home when online again
+    window.addEventListener('online', () => {
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>
