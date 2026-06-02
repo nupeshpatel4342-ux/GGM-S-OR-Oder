@@ -360,29 +360,48 @@ export default function App() {
 
   // Premium Mobile App States
   const [showSplash, setShowSplash] = useState(() => {
+    const userAgent = window.navigator.userAgent || '';
+    const isWebView = 
+      /; wv\)/.test(userAgent) || 
+      /WebView/i.test(userAgent) || 
+      /android-app/i.test(userAgent) ||
+      /Capacitor/i.test(userAgent) ||
+      /Cordova/i.test(userAgent);
+
     const isStandalone = 
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone ||
       document.referrer.includes('android-app://') ||
       window.location.search.includes('utm_source=apk') ||
       window.location.search.includes('source=apk') ||
+      isWebView ||
       localStorage.getItem('ggms_apk_mode') === 'true';
     return isStandalone;
   });
   const [showIntro, setShowIntro] = useState(() => {
+    const userAgent = window.navigator.userAgent || '';
+    const isWebView = 
+      /; wv\)/.test(userAgent) || 
+      /WebView/i.test(userAgent) || 
+      /android-app/i.test(userAgent) ||
+      /Capacitor/i.test(userAgent) ||
+      /Cordova/i.test(userAgent);
+
     const isStandalone = 
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone ||
       document.referrer.includes('android-app://') ||
       window.location.search.includes('utm_source=apk') ||
       window.location.search.includes('source=apk') ||
+      isWebView ||
       localStorage.getItem('ggms_apk_mode') === 'true';
 
     // Persist APK mode in case navigation strips URL query parameters
     if (
       window.location.search.includes('utm_source=apk') || 
       window.location.search.includes('source=apk') ||
-      document.referrer.includes('android-app://')
+      document.referrer.includes('android-app://') ||
+      isWebView
     ) {
       localStorage.setItem('ggms_apk_mode', 'true');
     }
@@ -632,10 +651,19 @@ export default function App() {
 
   // Handle Android back button exit confirmation
   useEffect(() => {
+    const userAgent = window.navigator.userAgent || '';
+    const isWebView = 
+      /; wv\)/.test(userAgent) || 
+      /WebView/i.test(userAgent) || 
+      /android-app/i.test(userAgent) ||
+      /Capacitor/i.test(userAgent) ||
+      /Cordova/i.test(userAgent);
+
     const isStandalone = 
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone ||
       document.referrer.includes('android-app://') ||
+      isWebView ||
       localStorage.getItem('ggms_apk_mode') === 'true';
 
     if (!isStandalone) return; // Skip back-button intercept on normal browsers
