@@ -8,7 +8,9 @@
   "id": "/",
   "scope": "/",
   "scope_extensions": [
-    { "origin": "https://ggm-s-or-oder.vercel.app" }
+    { "origin": "https://*.firebaseapp.com" },
+    { "origin": "https://*.google.com" },
+    { "origin": "https://*.googleusercontent.com" }
   ],
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
