@@ -68,5 +68,41 @@
       "form_factor": "wide",
       "label": "GGM&S Grocery Shop Interface"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Shop Grocery",
+      "short_name": "Shop",
+      "description": "Start shopping fresh groceries",
+      "url": "/?ref=shortcut_shop",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "My Cart",
+      "short_name": "Cart",
+      "description": "View items in your shopping cart",
+      "url": "/?ref=shortcut_cart",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/?file-handler",
+      "accept": {
+        "application/json": [".json"],
+        "text/csv": [".csv"]
+      },
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "single-client"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }
