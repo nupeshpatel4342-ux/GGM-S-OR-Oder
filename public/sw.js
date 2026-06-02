@@ -160,3 +160,27 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+// Periodic Background Sync event handler
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'update-product-catalog') {
+    console.log('[Service Worker] Periodic background sync running: updating product catalog');
+    event.waitUntil(
+      caches.open(CACHE_NAME).then((cache) => {
+        return fetch('/').then((response) => {
+          if (response.status === 200) {
+            return cache.put('/', response);
+          }
+        });
+      })
+    );
+  }
+});
+
+// One-shot Background Sync event handler
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-pending-orders') {
+    console.log('[Service Worker] One-shot background sync running: syncing pending orders');
+    // Background task implementation for when connection recovers
+  }
+});

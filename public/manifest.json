@@ -13,7 +13,7 @@
     { "origin": "https://*.googleusercontent.com" }
   ],
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": ["window-controls-overlay", "tabbed", "standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#0f172a",
   "orientation": "portrait",
@@ -149,5 +149,8 @@
   ],
   "edge_side_panel": {
     "preferred_width": 480
+  },
+  "note_taking": {
+    "new_note_url": "/?ref=note-taking"
   }
 }
