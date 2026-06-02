@@ -359,8 +359,37 @@ export default function App() {
   );
 
   // Premium Mobile App States
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone ||
+      document.referrer.includes('android-app://') ||
+      window.location.search.includes('utm_source=apk') ||
+      window.location.search.includes('source=apk') ||
+      localStorage.getItem('ggms_apk_mode') === 'true';
+    return isStandalone;
+  });
   const [showIntro, setShowIntro] = useState(() => {
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone ||
+      document.referrer.includes('android-app://') ||
+      window.location.search.includes('utm_source=apk') ||
+      window.location.search.includes('source=apk') ||
+      localStorage.getItem('ggms_apk_mode') === 'true';
+
+    // Persist APK mode in case navigation strips URL query parameters
+    if (
+      window.location.search.includes('utm_source=apk') || 
+      window.location.search.includes('source=apk') ||
+      document.referrer.includes('android-app://')
+    ) {
+      localStorage.setItem('ggms_apk_mode', 'true');
+    }
+
+    if (!isStandalone) {
+      return false; // Skip onboarding on normal website
+    }
     return localStorage.getItem('ggms_intro_seen') !== 'true';
   });
   const [introStep, setIntroStep] = useState(0);
@@ -381,6 +410,7 @@ export default function App() {
   });
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRateAppPopup, setShowRateAppPopup] = useState(false);
+  const isExitingRef = useRef(false);
 
   const addRecentlyViewed = useCallback((productId: string) => {
     setRecentlyViewed(prev => {
@@ -602,7 +632,16 @@ export default function App() {
 
   // Handle Android back button exit confirmation
   useEffect(() => {
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone ||
+      document.referrer.includes('android-app://') ||
+      localStorage.getItem('ggms_apk_mode') === 'true';
+
+    if (!isStandalone) return; // Skip back-button intercept on normal browsers
+
     const handleBackButton = (e: PopStateEvent) => {
+      if (isExitingRef.current) return;
       if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
         e.preventDefault();
         window.history.pushState(null, '', window.location.href);
@@ -4811,8 +4850,33 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      window.close();
+                      isExitingRef.current = true;
                       setShowExitConfirm(false);
+
+                      // Try exiting on common WebView/TWA wrappers
+                      try {
+                        if ((navigator as any).app && (navigator as any).app.exitApp) {
+                          (navigator as any).app.exitApp();
+                        }
+                      } catch (err) {}
+                      try {
+                        if ((window as any).Android && (window as any).Android.closeApp) {
+                          (window as any).Android.closeApp();
+                        }
+                      } catch (err) {}
+                      try {
+                        if ((window as any).Android && (window as any).Android.exitApp) {
+                          (window as any).Android.exitApp();
+                        }
+                      } catch (err) {}
+
+                      // Go back in history to pop the intercepted state
+                      window.history.back();
+
+                      // Try fallback window.close
+                      setTimeout(() => {
+                        window.close();
+                      }, 50);
                     }}
                     className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
                   >
