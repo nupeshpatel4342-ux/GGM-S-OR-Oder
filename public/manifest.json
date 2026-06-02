@@ -17,6 +17,7 @@
   "orientation": "portrait",
   "categories": ["shopping", "food"],
   "iarc_rating_id": "e84bc34b-149b-4498-8e6f-fb2bbfbb94d5",
+  "prefer_related_applications": false,
   "related_applications": [
     {
       "platform": "play",
