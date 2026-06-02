@@ -104,5 +104,50 @@
   ],
   "launch_handler": {
     "client_mode": "focus-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+ggms",
+      "url": "/?url=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/?shared-content",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "widgets": [
+    {
+      "name": "Grocery List",
+      "short_name": "GGM&S List",
+      "description": "View and manage your grocery shopping list",
+      "tag": "grocery-list",
+      "template": "grocery-list-template",
+      "ms_ac_template": "/widgets/grocery-list.json",
+      "data": "/widgets/grocery-list-data.json",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "/screenshot-mobile.png",
+          "sizes": "1024x1024",
+          "type": "image/png",
+          "label": "GGM&S Grocery List Widget"
+        }
+      ]
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 480
   }
 }
