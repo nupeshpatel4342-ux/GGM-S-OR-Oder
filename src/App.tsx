@@ -690,6 +690,51 @@ export default function App() {
     };
   }, []);
 
+  // First Launch inside APK/Standalone mode: Reset state to make it a fresh launch
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent || '';
+    const isWebView = 
+      /; wv\)/.test(userAgent) || 
+      /WebView/i.test(userAgent) || 
+      /android-app/i.test(userAgent) ||
+      /Capacitor/i.test(userAgent) ||
+      /Cordova/i.test(userAgent);
+
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone ||
+      document.referrer.includes('android-app://') ||
+      window.location.search.includes('utm_source=apk') ||
+      window.location.search.includes('source=apk') ||
+      isWebView ||
+      localStorage.getItem('ggms_apk_mode') === 'true';
+
+    if (isStandalone) {
+      const isApkInitialized = localStorage.getItem('ggms_apk_initialized') === 'true';
+      if (!isApkInitialized) {
+        // Reset all relevant local storage to make it clean
+        localStorage.removeItem('ggms_intro_seen');
+        localStorage.removeItem('ggms_cart');
+        localStorage.removeItem('ggms_recently_viewed');
+        localStorage.removeItem('ggms_loyalty_points');
+        localStorage.removeItem('voiceSearchHistory');
+        
+        // Log out the user to ensure no carried-over browser session
+        signOut(auth)
+          .then(() => console.log('Successfully signed out on fresh APK launch.'))
+          .catch(err => console.error('Error signing out on fresh APK launch:', err));
+
+        // Mark this APK installation as initialized
+        localStorage.setItem('ggms_apk_initialized', 'true');
+        
+        // Force the app to show splash and onboarding walkthrough
+        setShowSplash(true);
+        setShowIntro(true);
+        setIntroStep(0);
+      }
+    }
+  }, []);
+
   // Delayed show and scroll tracking for APK Install Promo Button
   useEffect(() => {
     const userAgent = window.navigator.userAgent || '';
