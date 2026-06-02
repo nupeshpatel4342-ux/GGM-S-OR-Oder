@@ -2,13 +2,28 @@
   "name": "GGM&S Grocery",
   "short_name": "GGM&S",
   "description": "Premium wholesale & retail grocery ordering web application.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/",
   "id": "/",
+  "scope": "/",
+  "scope_extensions": [
+    { "origin": "https://ggm-s-or-oder.vercel.app" }
+  ],
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#0f172a",
   "orientation": "portrait",
   "categories": ["shopping", "food"],
+  "iarc_rating_id": "e84bc34b-149b-4498-8e6f-fb2bbfbb94d5",
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.ggms.grocery",
+      "url": "https://play.google.com/store/apps/details?id=com.ggms.grocery"
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
