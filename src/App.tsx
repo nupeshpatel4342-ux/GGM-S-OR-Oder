@@ -430,6 +430,8 @@ export default function App() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRateAppPopup, setShowRateAppPopup] = useState(false);
   const isExitingRef = useRef(false);
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
+  const [showAndroidInstallGuide, setShowAndroidInstallGuide] = useState(false);
 
   // Floating APK Install Prompt states
   const [showApkInstallPrompt, setShowApkInstallPrompt] = useState(false);
@@ -733,13 +735,43 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [showApkInstallPrompt]);
 
-  const handleDownloadApk = () => {
+  const handleDownloadApk = async () => {
     // Vibration feedback on supported devices
     if (window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate([120]);
     }
-    // Launch APK download
-    window.open('/app-release.apk', '_blank');
+
+    // 1. Try PWA installation if deferredPrompt is available
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`PWA Installation Outcome: ${outcome}`);
+        setDeferredPrompt(null);
+        setShowInstallPrompt(false);
+        return;
+      } catch (err) {
+        console.error("PWA prompt failed, falling back to download", err);
+      }
+    }
+
+    // Check operating system
+    const userAgent = window.navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+
+    if (isIOS) {
+      setShowIosInstallGuide(true);
+    } else {
+      // Android / Other fallback: Show instruction modal and trigger APK file download
+      setShowAndroidInstallGuide(true);
+
+      const link = document.createElement('a');
+      link.href = '/app-release.apk';
+      link.setAttribute('download', 'app-release.apk');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   // Synchronize network status
@@ -4973,6 +5005,159 @@ export default function App() {
                     પછીથી / Remind Me Later
                   </button>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* iOS Install Guide Modal */}
+        <AnimatePresence>
+          {showIosInstallGuide && (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200 dark:border-slate-800 p-6 text-center shadow-2xl relative"
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowIosInstallGuide(false)}
+                  className="absolute top-4 right-4 w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center border-none transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <div className="w-14 h-14 bg-emerald-500 rounded-3xl flex items-center justify-center text-white mx-auto mb-4 border border-emerald-400 shadow-md">
+                  <Smartphone className="w-7 h-7" />
+                </div>
+                
+                <h3 className="text-slate-900 dark:text-white font-extrabold text-base mb-1">
+                  એપ હોમ સ્ક્રીન પર ઉમેરો 📲
+                </h3>
+                <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
+                  Add to Home Screen (iOS)
+                </p>
+
+                {/* Steps */}
+                <div className="text-left space-y-4 mb-6 font-sans">
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">1</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      સફારી (Safari) બ્રાઉઝરમાં નીચે આપેલા <span className="font-bold">Share (શેર)</span> આઇકોન પર ટેપ કરો.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Tap the Share button at the bottom of Safari browser.</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">2</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      નીચે સ્ક્રોલ કરો અને <span className="font-bold">'Add to Home Screen'</span> (હોમ સ્ક્રીન પર ઉમેરો) ઓપ્શન પસંદ કરો.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Scroll down and select 'Add to Home Screen' option.</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">3</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      ઉપર જમણી બાજુએ આપેલા <span className="font-bold">'Add'</span> (ઉમેરો) બટન પર ક્લિક કરો.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Tap 'Add' in the top right corner to install.</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowIosInstallGuide(false)}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
+                >
+                  સમજાઈ ગયું / Got it
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Android Install Guide Modal */}
+        <AnimatePresence>
+          {showAndroidInstallGuide && (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200 dark:border-slate-800 p-6 text-center shadow-2xl relative"
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowAndroidInstallGuide(false)}
+                  className="absolute top-4 right-4 w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center border-none transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <div className="w-14 h-14 bg-emerald-500 rounded-3xl flex items-center justify-center text-white mx-auto mb-4 border border-emerald-400 shadow-md">
+                  <Download className="w-7 h-7 text-white" />
+                </div>
+                
+                <h3 className="text-slate-900 dark:text-white font-extrabold text-base mb-1">
+                  એપ ડાઉનલોડ થઈ રહી છે... 📲
+                </h3>
+                <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
+                  Downloading App (Android)
+                </p>
+
+                {/* Steps */}
+                <div className="text-left space-y-4 mb-6 font-sans">
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">1</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      ફાઇલ ડાઉનલોડ પૂર્ણ થવાની રાહ જુઓ.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Wait for the APK file to finish downloading.</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">2</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      નોટિફિકેશન અથવા 'Downloads' ફોલ્ડર માંથી <span className="font-bold">`app-release.apk`</span> ખોલો.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Open the downloaded file `app-release.apk` from notifications or Downloads folder.</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">3</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      જો સિક્યોરિટી પૂછે, તો <span className="font-bold">"Allow from Unknown Sources"</span> (અજ્ઞાત સ્ત્રોતો મંજૂર કરો) ચાલુ કરો.
+                      <span className="block text-[10px] text-slate-555 mt-0.5">If prompted, enable "Allow installation from unknown sources" in settings.</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold shrink-0">4</span>
+                    <p className="text-slate-750 dark:text-slate-350 text-xs leading-normal">
+                      <span className="font-bold">"Install"</span> પર ક્લિક કરી એપ ઇન્સ્ટોલ કરો અને ઓપન કરો!
+                      <span className="block text-[10px] text-slate-555 mt-0.5">Tap 'Install' and launch the app to see splash and onboarding.</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-5 text-left font-sans">
+                  <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 leading-normal flex items-start gap-1.5 m-0">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>નોંધ:</strong> આ ડાઉનલોડ બટન કામ કરે તે માટે તમારી સાચી APK ફાઇલ public ફોલ્ડરમાં હોવી જરૂરી છે. જો ડાઉનલોડ કરેલ ફાઇલ ન ખૂલે, તો કૃપા કરીને PWA મોડનો ઉપયોગ કરો.
+                    </span>
+                  </p>
+                  <p className="text-[9px] text-slate-400 mt-1 pl-5 m-0">
+                    Note: A real APK must be generated and copied to `public/app-release.apk` for direct file install to succeed.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAndroidInstallGuide(false)}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
+                >
+                  સમજાઈ ગયું / Got it
+                </button>
               </motion.div>
             </div>
           )}
