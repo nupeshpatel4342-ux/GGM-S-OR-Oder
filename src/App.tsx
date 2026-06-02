@@ -19,7 +19,7 @@ import {
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
   Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic, Sparkles, Bot, MessageSquare,
-  Bell, WifiOff
+  Bell, WifiOff, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -358,6 +358,47 @@ export default function App() {
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
 
+  // Premium Mobile App States
+  const [showSplash, setShowSplash] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => {
+    return localStorage.getItem('ggms_intro_seen') !== 'true';
+  });
+  const [introStep, setIntroStep] = useState(0);
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ggms_recently_viewed') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [loyaltyPoints, setLoyaltyPoints] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem('ggms_loyalty_points');
+      return stored ? parseInt(stored) : 120;
+    } catch {
+      return 120;
+    }
+  });
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showRateAppPopup, setShowRateAppPopup] = useState(false);
+
+  const addRecentlyViewed = useCallback((productId: string) => {
+    setRecentlyViewed(prev => {
+      const filtered = prev.filter(id => id !== productId);
+      const updated = [productId, ...filtered].slice(0, 5);
+      localStorage.setItem('ggms_recently_viewed', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const addLoyaltyPoints = useCallback((points: number) => {
+    setLoyaltyPoints(prev => {
+      const updated = prev + points;
+      localStorage.setItem('ggms_loyalty_points', String(updated));
+      return updated;
+    });
+  }, []);
+
   const [orders, setOrders] = useState<Order[]>(() => {
     const storedOrders = localStorage.getItem('orders');
     return storedOrders ? JSON.parse(storedOrders) : [];
@@ -550,6 +591,30 @@ export default function App() {
       }
     }
   };
+
+  // Hide splash screen after delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle Android back button exit confirmation
+  useEffect(() => {
+    const handleBackButton = (e: PopStateEvent) => {
+      if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+        setShowExitConfirm(true);
+      }
+    };
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handleBackButton);
+    return () => {
+      window.removeEventListener('popstate', handleBackButton);
+    };
+  }, []);
 
   // Synchronize network status
   useEffect(() => {
@@ -1726,6 +1791,10 @@ export default function App() {
     setCart([]);
     setAppliedCoupon(null);
     setCouponCodeInput('');
+    addLoyaltyPoints(50);
+    setTimeout(() => {
+      setShowRateAppPopup(true);
+    }, 1500);
     
     alert(deliveryMode === 'home_delivery' 
       ? 'Order placed successfully! Home Delivery selected. Redirecting to WhatsApp...'
@@ -3424,7 +3493,7 @@ export default function App() {
                 transition={{ duration: 0.2 }}
                 className="pb-16"
               >
-                <ProductDetailPageWrapper products={products} addToCart={addToCart} />
+                <ProductDetailPageWrapper products={products} addToCart={addToCart} onViewProduct={addRecentlyViewed} />
               </motion.div>
             } />
 
@@ -3456,6 +3525,7 @@ export default function App() {
                     voiceIntent={voiceIntent}
                     notificationPermission={notificationPermission}
                     requestNotificationPermission={requestNotificationPermission}
+                    loyaltyPoints={loyaltyPoints}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -3660,6 +3730,39 @@ export default function App() {
                       </div>
                     </div>
                   </>
+                )}
+
+                {/* Recently Viewed Products */}
+                {recentlyViewed.length > 0 && (
+                  <div className="pt-6 pb-2">
+                    <div className="flex items-center gap-2 mb-4 px-1">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">Recently Viewed / તમે જોયેલી વસ્તુઓ</h3>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-3.5 no-scrollbar snap-x scroll-smooth -mx-4 px-4">
+                      {recentlyViewed
+                        .map(id => products.find(p => p.id === id))
+                        .filter((p): p is Product => !!p)
+                        .map(p => {
+                          return (
+                            <div 
+                              key={p.id}
+                              onClick={() => navigate(`/product/${p.id}`)}
+                              className="w-[125px] bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-[20px] p-2 shrink-0 snap-start flex flex-col justify-between shadow-xs hover:border-emerald-500 hover:shadow-xs transition-all cursor-pointer"
+                            >
+                              <div className="w-full h-16 bg-slate-50 dark:bg-slate-900 rounded-xl flex items-center justify-center p-1 overflow-hidden">
+                                <img src={p.image} alt={p.name} className="max-h-full max-w-full object-contain" />
+                              </div>
+                              <div className="flex-1 text-left min-w-0 mt-2">
+                                <h5 className="text-[10px] font-black text-slate-850 dark:text-slate-100 truncate line-clamp-1 leading-tight uppercase">{p.name}</h5>
+                                <p className="text-[8px] font-bold text-slate-400 truncate mt-0.5">{p.gujaratiName || ''}</p>
+                                <span className="text-xs font-black text-primary-green block mt-1">₹{p.price.toFixed(0)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 )}
 
                 {/* Customer Basket */}
@@ -4169,6 +4272,277 @@ export default function App() {
             </AnimatePresence>
           </div>
         )}
+
+        {/* ==========================================
+            PREMIUM NATIVE APP PORTAL & OVERLAYS
+            ========================================== */}
+
+        {/* 1. Opening Splash Screen Animation Overlay */}
+        <AnimatePresence>
+          {showSplash && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+              className="fixed inset-0 z-[999] bg-[#0a0f1d] flex flex-col items-center justify-center text-white"
+            >
+              {/* Logo & Glow */}
+              <div className="relative flex flex-col items-center justify-center p-8">
+                <motion.div 
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute w-44 h-44 rounded-full bg-emerald-500/20 blur-xl"
+                />
+                
+                <motion.div
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                  className="relative w-28 h-28 bg-gradient-to-tr from-emerald-600 via-emerald-500 to-amber-455 p-6 rounded-3xl shadow-2xl flex items-center justify-center border border-white/10"
+                >
+                  <Store className="w-14 h-14 text-white" />
+                </motion.div>
+
+                <motion.h1
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.5 }}
+                  className="text-2xl font-black tracking-tight mt-6 bg-gradient-to-r from-emerald-400 via-emerald-300 to-amber-300 bg-clip-text text-transparent uppercase font-display"
+                >
+                  GGM&S Grocery
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.6 }}
+                  transition={{ delay: 0.6 }}
+                  className="text-[10px] uppercase tracking-widest font-bold mt-1 text-slate-400 font-sans"
+                >
+                  Wholesale & Retail Hub
+                </motion.p>
+              </div>
+
+              {/* Premium Loading Spinner */}
+              <div className="absolute bottom-16 flex flex-col items-center gap-3">
+                <div className="flex gap-2">
+                  {[0, 1, 2].map((i) => (
+                    <motion.span
+                      key={i}
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+                      className="w-2.5 h-2.5 rounded-full bg-emerald-455"
+                    />
+                  ))}
+                </div>
+                <span className="text-[9px] uppercase tracking-widest font-black text-slate-500 font-sans">Loading App...</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 2. Onboarding Intro Screens */}
+        <AnimatePresence>
+          {showIntro && !showSplash && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[990] bg-[#0c1020] text-white flex flex-col justify-between p-6 sm:p-8"
+            >
+              <div className="flex items-center justify-between pt-4">
+                <span className="text-xs font-black tracking-wider text-emerald-400">GGM&S GROCERY</span>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('ggms_intro_seen', 'true');
+                    setShowIntro(false);
+                  }}
+                  className="text-[10px] font-black uppercase text-slate-400 tracking-wider hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-full border border-white/5 cursor-pointer"
+                >
+                  Skip / સ્કીપ
+                </button>
+              </div>
+
+              <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full">
+                <AnimatePresence mode="wait">
+                  {introStep === 0 && (
+                    <motion.div
+                      key="step0"
+                      initial={{ x: 50, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -50, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-center space-y-6 flex flex-col items-center"
+                    >
+                      <div className="w-36 h-36 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+                        <Package className="w-16 h-16" />
+                      </div>
+                      <div className="space-y-3">
+                        <h2 className="text-xl sm:text-2xl font-black">તાજા અને શુદ્ધ અનાજ-કરિયાણું</h2>
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
+                          GGM&S લાવે છે પ્રીમિયમ ક્વોલિટી દાળ, તેલ, મસાલા અને પાંડેરીની દરેક વસ્તુઓ સીધી તમારા ઘર સુધી.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {introStep === 1 && (
+                    <motion.div
+                      key="step1"
+                      initial={{ x: 50, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -50, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-center space-y-6 flex flex-col items-center"
+                    >
+                      <div className="w-36 h-36 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
+                        <IndianRupee className="w-16 h-16" />
+                      </div>
+                      <div className="space-y-3">
+                        <h2 className="text-xl sm:text-2xl font-black">હોલસેલ ભાવે ખરીદી</h2>
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
+                          બજાર કરતા વ્યાજબી અને સ્પર્ધાત્મક હોલસેલ તથા રિટેલ ભાવે દરેક જીવનજરૂરી વસ્તુઓની આસાનીથી ઓનલાઇન બુકિંગ કરો.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {introStep === 2 && (
+                    <motion.div
+                      key="step2"
+                      initial={{ x: 50, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -50, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-center space-y-6 flex flex-col items-center"
+                    >
+                      <div className="w-36 h-36 rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shadow-inner">
+                        <Send className="w-16 h-16" />
+                      </div>
+                      <div className="space-y-3">
+                        <h2 className="text-xl sm:text-2xl font-black">એક ક્લિકમાં વોટ્સએપ ઓર્ડર</h2>
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
+                          તમારું કાર્ટ ભરો અને સીધો વોટ્સએપ પર ઓર્ડર મોકલી આપો. પેમેન્ટ દુકાને પિકઅપ સમયે અથવા ડિલિવરી સમયે.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="flex flex-col items-center gap-6 pb-6 max-w-md mx-auto w-full">
+                <div className="flex gap-2">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className={`h-2 rounded-full transition-all duration-350 ${introStep === i ? 'w-6 bg-emerald-500' : 'w-2 bg-slate-700'}`}
+                    />
+                  ))}
+                </div>
+
+                {introStep < 2 ? (
+                  <button
+                    onClick={() => setIntroStep(prev => prev + 1)}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg"
+                  >
+                    આગળ વધો / Next
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('ggms_intro_seen', 'true');
+                      setShowIntro(false);
+                    }}
+                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 active:scale-98 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg"
+                  >
+                    શરૂ કરો / Get Started
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 3. Exit Confirmation Modal */}
+        <AnimatePresence>
+          {showExitConfirm && (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200 dark:border-slate-800 p-6 text-center shadow-2xl"
+              >
+                <div className="w-12 h-12 bg-rose-50 dark:bg-rose-950/30 rounded-2xl flex items-center justify-center text-rose-500 mx-auto mb-4 border border-rose-100 dark:border-rose-900/50">
+                  <LogOut className="w-6 h-6" />
+                </div>
+                <h3 className="text-slate-900 dark:text-white font-extrabold text-base mb-1">એપ બંધ કરો? / Close App?</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed mb-6 font-semibold">
+                  શું તમે ખરેખર જીજીએમએન્ડએસ ગ્રોસરી એપમાંથી બહાર નીકળવા માંગો છો?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowExitConfirm(false)}
+                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-250 rounded-xl text-xs font-bold transition-all cursor-pointer border-none"
+                  >
+                    ના / Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.close();
+                      setShowExitConfirm(false);
+                    }}
+                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
+                  >
+                    હા / Exit App
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. App Rating Popup */}
+        <AnimatePresence>
+          {showRateAppPopup && (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200 dark:border-slate-800 p-6 text-center shadow-2xl"
+              >
+                <div className="w-14 h-14 bg-amber-400 rounded-3xl flex items-center justify-center text-white mx-auto mb-4 border border-amber-300 shadow-md">
+                  <Gift className="w-7 h-7" />
+                </div>
+                <h3 className="text-slate-900 dark:text-white font-extrabold text-base mb-1">તમને ૫૦ પોઈન્ટ મળ્યા! 🎉</h3>
+                <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-3">Earned 50 Loyalty Points!</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed mb-6 font-semibold">
+                  અમને પ્લે સ્ટોર પર રેટ કરો અને તમારો અનુભવ શેર કરો! ⭐️⭐️⭐️⭐️⭐️
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open("https://play.google.com/store", "_blank");
+                      setShowRateAppPopup(false);
+                    }}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-none shadow-md"
+                  >
+                    એપ રેટ કરો / Rate App
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRateAppPopup(false)}
+                    className="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-650 dark:hover:text-slate-300 transition-colors cursor-pointer border-none bg-transparent"
+                  >
+                    પછીથી / Remind Me Later
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>
@@ -5279,11 +5653,19 @@ const AdminCouponsPanel: React.FC<AdminCouponsPanelProps> = ({
 interface ProductDetailPageProps {
   products: Product[];
   addToCart: (product: Product, quantity: number, variant?: ProductVariant) => void;
+  onViewProduct?: (productId: string) => void;
 }
 
-function ProductDetailPageWrapper({ products, addToCart }: ProductDetailPageProps) {
+function ProductDetailPageWrapper({ products, addToCart, onViewProduct }: ProductDetailPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (id) {
+      onViewProduct?.(id);
+    }
+  }, [id, onViewProduct]);
+
   const foundProduct = products.find(p => p.id === id);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -7130,11 +7512,13 @@ export const MyAccountPage: React.FC<{
   voiceIntent?: VoiceIntent | null;
   notificationPermission?: string;
   requestNotificationPermission?: () => Promise<void>;
+  loyaltyPoints?: number;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
   cart, setCart, cartTotal, updateCartQuantity, shopSettings,
   preferredTheme, handleThemeChange, voiceIntent,
-  notificationPermission = 'default', requestNotificationPermission
+  notificationPermission = 'default', requestNotificationPermission,
+  loyaltyPoints = 120
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
@@ -7704,6 +8088,27 @@ export const MyAccountPage: React.FC<{
                   {customerProfile?.phone || customerUser.email?.split('@')[0]}
                 </p>
 
+                {/* Loyalty Point Card */}
+                <div className="mt-4 w-full bg-gradient-to-br from-amber-500 via-amber-400 to-amber-500 text-slate-950 p-4.5 rounded-2xl text-left border border-amber-350 shadow-sm relative overflow-hidden">
+                  <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-2 translate-y-2">
+                    <Award className="w-24 h-24 text-slate-950" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-900 bg-white/30 px-2 py-0.5 rounded">GGM&S Club</span>
+                    <span className="text-[9px] font-bold text-slate-950 flex items-center gap-0.5">
+                      <Award className="w-3 h-3 text-slate-900 fill-slate-900" />
+                      {loyaltyPoints >= 500 ? 'Gold' : (loyaltyPoints >= 300 ? 'Silver' : 'Bronze')} Rank
+                    </span>
+                  </div>
+                  <div className="mt-3.5">
+                    <p className="text-[10px] font-black text-slate-950/70 uppercase tracking-wide">Loyalty Points</p>
+                    <p className="text-2xl font-black font-mono leading-none mt-1 text-slate-950">{loyaltyPoints}</p>
+                  </div>
+                  <p className="text-[9.5px] font-bold text-slate-900/80 leading-relaxed mt-2.5">
+                    • Redeem points for free home delivery & exclusive wholesale offers!
+                  </p>
+                </div>
+
                 {/* Theme Selector Section inside Profile Card */}
                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 w-full flex flex-col items-center gap-2">
                   <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
@@ -7766,6 +8171,33 @@ export const MyAccountPage: React.FC<{
                         ? 'Notifications Active' 
                         : (notificationPermission === 'denied' ? 'Permission Denied' : 'Enable Notifications')}
                     </span>
+                  </button>
+                </div>
+
+                {/* Share App Option */}
+                <div className="mt-2 w-full">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if (navigator.share) {
+                          await navigator.share({
+                            title: 'GGM&S Grocery',
+                            text: 'GGM&S Grocery પરથી હોલસેલ અને રિટેલ કરિયાણું ઓર્ડર કરો!',
+                            url: window.location.origin
+                          });
+                        } else {
+                          await navigator.clipboard.writeText(window.location.origin);
+                          showToast('App link copied to clipboard! / એપ લિંક કોપી થઇ ગઇ છે!', 'success');
+                        }
+                      } catch (err) {
+                        console.error('Share error:', err);
+                      }
+                    }}
+                    className="w-full py-2 px-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-700/50 active:scale-[0.98] rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Share App / એપ શેર કરો</span>
                   </button>
                 </div>
 
