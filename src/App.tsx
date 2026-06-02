@@ -4298,9 +4298,9 @@ export default function App() {
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 100, damping: 15 }}
-                  className="relative w-28 h-28 bg-gradient-to-tr from-emerald-600 via-emerald-500 to-amber-455 p-6 rounded-3xl shadow-2xl flex items-center justify-center border border-white/10"
+                  className="relative w-28 h-28 bg-[#0f172a] rounded-3xl shadow-2xl flex items-center justify-center border border-white/10 overflow-hidden p-2"
                 >
-                  <Store className="w-14 h-14 text-white" />
+                  <img src="/logo.png" alt="GGM&S Grocery" className="w-full h-full object-contain rounded-2xl" />
                 </motion.div>
 
                 <motion.h1
@@ -4346,22 +4346,32 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[990] bg-[#0c1020] text-white flex flex-col justify-between p-6 sm:p-8"
+              className="fixed inset-0 z-[990] bg-[#0a0f1d] text-white flex flex-col justify-between p-6 sm:p-8"
             >
-              <div className="flex items-center justify-between pt-4">
-                <span className="text-xs font-black tracking-wider text-emerald-400">GGM&S GROCERY</span>
-                <button
-                  onClick={() => {
-                    localStorage.setItem('ggms_intro_seen', 'true');
-                    setShowIntro(false);
-                  }}
-                  className="text-[10px] font-black uppercase text-slate-400 tracking-wider hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-full border border-white/5 cursor-pointer"
-                >
-                  Skip / સ્કીપ
-                </button>
+              {/* Glowing Background Decorative Elements */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[50%] rounded-full bg-emerald-500/10 blur-[130px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[50%] rounded-full bg-amber-500/10 blur-[130px]" />
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full">
+              {/* Onboarding Header */}
+              <div className="flex items-center justify-between pt-4 z-10 relative">
+                <span className="text-xs font-black tracking-widest text-emerald-450 uppercase font-sans">GGM&S GROCERY</span>
+                {introStep < 3 && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('ggms_intro_seen', 'true');
+                      setShowIntro(false);
+                    }}
+                    className="text-[10px] font-black uppercase text-slate-400 tracking-wider hover:text-white transition-colors bg-white/5 px-3.5 py-1.5 rounded-full border border-white/10 cursor-pointer"
+                  >
+                    Skip / સ્કીપ
+                  </button>
+                )}
+              </div>
+
+              {/* Slide Content Frame */}
+              <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full z-10 relative">
                 <AnimatePresence mode="wait">
                   {introStep === 0 && (
                     <motion.div
@@ -4370,16 +4380,84 @@ export default function App() {
                       animate={{ x: 0, opacity: 1 }}
                       exit={{ x: -50, opacity: 0 }}
                       transition={{ duration: 0.3 }}
-                      className="text-center space-y-6 flex flex-col items-center"
+                      className="text-center space-y-6 flex flex-col items-center w-full"
                     >
-                      <div className="w-36 h-36 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
-                        <Package className="w-16 h-16" />
+                      {/* Premium Logo & Floating Orbits */}
+                      <div className="relative w-48 h-48 flex items-center justify-center">
+                        {/* Background Glow Ring */}
+                        <motion.div
+                          animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute w-36 h-36 rounded-full bg-emerald-500/15 blur-xl"
+                        />
+                        
+                        {/* Central Logo Container */}
+                        <motion.div
+                          animate={{ y: [0, -6, 0] }}
+                          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                          className="relative w-28 h-28 bg-[#0f172a] rounded-[32px] shadow-2xl flex items-center justify-center border border-white/10 p-3"
+                        >
+                          <img src="/logo.png" alt="GGM&S Grocery" className="w-full h-full object-contain rounded-2xl" />
+                        </motion.div>
+
+                        {/* Floating elements */}
+                        <motion.div
+                          animate={{ y: [0, -10, 0], x: [0, 5, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                          className="absolute top-4 right-4 w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-lg flex items-center justify-center text-amber-400 backdrop-blur-xs"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </motion.div>
+
+                        <motion.div
+                          animate={{ y: [0, 8, 0], x: [0, -6, 0] }}
+                          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                          className="absolute bottom-4 left-4 w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 shadow-lg flex items-center justify-center text-emerald-450 backdrop-blur-xs"
+                        >
+                          <Tag className="w-4 h-4" />
+                        </motion.div>
+
+                        <motion.div
+                          animate={{ scale: [0.9, 1.1, 0.9] }}
+                          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute top-12 left-2 w-7 h-7 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shadow-lg flex items-center justify-center text-indigo-400 backdrop-blur-xs"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </motion.div>
                       </div>
-                      <div className="space-y-3">
-                        <h2 className="text-xl sm:text-2xl font-black">તાજા અને શુદ્ધ અનાજ-કરિયાણું</h2>
+
+                      {/* Titles */}
+                      <div className="space-y-3.5 max-w-sm px-4">
+                        <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-350 bg-clip-text text-transparent leading-tight font-display uppercase tracking-tight">
+                          Welcome to GGM&S Grocery
+                          <span className="block text-lg font-extrabold text-emerald-450 mt-1.5 font-sans lowercase">જીજીએમએન્ડએસ ગ્રોસરી</span>
+                        </h2>
                         <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
-                          GGM&S લાવે છે પ્રીમિયમ ક્વોલિટી દાળ, તેલ, મસાલા અને પાંડેરીની દરેક વસ્તુઓ સીધી તમારા ઘર સુધી.
+                          Your trusted wholesale & retail grocery partner.
+                          <span className="block text-[11px] text-slate-500 mt-1 font-bold">તમારા વિશ્વાસપાત્ર હોલસેલ અને રિટેલ કરિયાણાના ભાગીદાર.</span>
                         </p>
+                      </div>
+
+                      {/* Feature Highlights */}
+                      <div className="flex flex-wrap gap-2 justify-center max-w-sm px-2 pt-2">
+                        {[
+                          { text: "Fast Ordering", guj: "ઝડપી ઓર્ડર", color: "emerald" },
+                          { text: "Trusted Products", guj: "વિશ્વાસપાત્ર વસ્તુઓ", color: "amber" },
+                          { text: "Best Prices", guj: "શ્રેષ્ઠ ભાવો", color: "indigo" }
+                        ].map((feat, idx) => (
+                          <motion.span
+                            key={feat.text}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + idx * 0.1 }}
+                            className="px-3.5 py-2 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-300 tracking-wide flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              feat.color === 'emerald' ? 'bg-emerald-450' : (feat.color === 'amber' ? 'bg-amber-450' : 'bg-indigo-400')
+                            }`} />
+                            {feat.text} | {feat.guj}
+                          </motion.span>
+                        ))}
                       </div>
                     </motion.div>
                   )}
@@ -4391,16 +4469,80 @@ export default function App() {
                       animate={{ x: 0, opacity: 1 }}
                       exit={{ x: -50, opacity: 0 }}
                       transition={{ duration: 0.3 }}
-                      className="text-center space-y-6 flex flex-col items-center"
+                      className="text-center space-y-6 flex flex-col items-center w-full"
                     >
-                      <div className="w-36 h-36 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
-                        <IndianRupee className="w-16 h-16" />
+                      {/* Delivery Scooter & Floating Assets */}
+                      <div className="relative w-48 h-48 flex items-center justify-center">
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute w-36 h-36 rounded-full bg-amber-500/10 blur-xl"
+                        />
+
+                        <motion.div
+                          animate={{ y: [0, -5, 0], rotate: [0, 2, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="relative w-28 h-28 bg-[#0f172a] rounded-[32px] shadow-2xl flex items-center justify-center border border-white/10 text-amber-400 p-6"
+                        >
+                          <Truck className="w-14 h-14" />
+                        </motion.div>
+
+                        {/* Floating speedometer dashes & location pins */}
+                        <motion.div
+                          animate={{ x: [-10, 10, -10] }}
+                          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute top-6 left-4 w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-lg flex items-center justify-center text-amber-500 backdrop-blur-xs"
+                        >
+                          <Clock className="w-4 h-4 animate-pulse" />
+                        </motion.div>
+
+                        <motion.div
+                          animate={{ y: [0, 8, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                          className="absolute bottom-6 right-4 w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 shadow-lg flex items-center justify-center text-emerald-450 backdrop-blur-xs"
+                        >
+                          <MapPin className="w-4 h-4" />
+                        </motion.div>
+
+                        <div className="absolute right-3 top-10 flex flex-col gap-1 opacity-50">
+                          <span className="w-4 h-1 bg-amber-450/35 rounded-full animate-pulse" />
+                          <span className="w-6 h-1 bg-amber-450/35 rounded-full animate-pulse [animation-delay:0.2s]" />
+                          <span className="w-3 h-1 bg-amber-450/35 rounded-full animate-pulse [animation-delay:0.4s]" />
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        <h2 className="text-xl sm:text-2xl font-black">હોલસેલ ભાવે ખરીદી</h2>
+
+                      {/* Titles */}
+                      <div className="space-y-3.5 max-w-sm px-4">
+                        <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-350 bg-clip-text text-transparent leading-tight font-display uppercase tracking-tight">
+                          Fast Home Delivery
+                          <span className="block text-lg font-extrabold text-amber-400 mt-1.5 font-sans lowercase">ઝડપી હોમ ડિલિવરી</span>
+                        </h2>
                         <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
-                          બજાર કરતા વ્યાજબી અને સ્પર્ધાત્મક હોલસેલ તથા રિટેલ ભાવે દરેક જીવનજરૂરી વસ્તુઓની આસાનીથી ઓનલાઇન બુકિંગ કરો.
+                          Get groceries delivered quickly to your doorstep.
+                          <span className="block text-[11px] text-slate-500 mt-1 font-bold">કરિયાણું ઝડપથી મેળવો તમારા ઘર આંગણે.</span>
                         </p>
+                      </div>
+
+                      {/* Feature Highlights */}
+                      <div className="flex flex-wrap gap-2 justify-center max-w-sm px-2 pt-2">
+                        {[
+                          { text: "Same Day Delivery", guj: "સેમ ડે ડિલિવરી", color: "amber" },
+                          { text: "Live Order Updates", guj: "લાઈવ અપડેટ્સ", color: "emerald" },
+                          { text: "Safe Packaging", guj: "સુરક્ષિત પેકિંગ", color: "blue" }
+                        ].map((feat, idx) => (
+                          <motion.span
+                            key={feat.text}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + idx * 0.1 }}
+                            className="px-3.5 py-2 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-300 tracking-wide flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              feat.color === 'amber' ? 'bg-amber-455' : (feat.color === 'emerald' ? 'bg-emerald-450' : 'bg-blue-400')
+                            }`} />
+                            {feat.text} | {feat.guj}
+                          </motion.span>
+                        ))}
                       </div>
                     </motion.div>
                   )}
@@ -4412,25 +4554,176 @@ export default function App() {
                       animate={{ x: 0, opacity: 1 }}
                       exit={{ x: -50, opacity: 0 }}
                       transition={{ duration: 0.3 }}
-                      className="text-center space-y-6 flex flex-col items-center"
+                      className="text-center space-y-6 flex flex-col items-center w-full"
                     >
-                      <div className="w-36 h-36 rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shadow-inner">
-                        <Send className="w-16 h-16" />
+                      {/* Mobile search / Voice visualizer */}
+                      <div className="relative w-48 h-48 flex items-center justify-center">
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute w-36 h-36 rounded-full bg-blue-500/10 blur-xl"
+                        />
+
+                        {/* Breathing voice rings */}
+                        <motion.div
+                          animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                          className="absolute w-24 h-24 rounded-full border border-blue-500/30"
+                        />
+                        <motion.div
+                          animate={{ scale: [1, 1.7, 1], opacity: [0.2, 0, 0.2] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.4 }}
+                          className="absolute w-24 h-24 rounded-full border border-indigo-500/20"
+                        />
+
+                        <motion.div
+                          animate={{ scale: [1, 1.05, 1] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          className="relative w-28 h-28 bg-[#0f172a] rounded-[32px] shadow-2xl flex items-center justify-center border border-white/10 text-indigo-400 p-6"
+                        >
+                          <Mic className="w-12 h-12 text-indigo-400" />
+                        </motion.div>
+
+                        {/* Floating visual items */}
+                        <motion.div
+                          animate={{ y: [0, -6, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute top-6 right-4 w-9 h-9 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-lg flex items-center justify-center text-indigo-400 backdrop-blur-xs"
+                        >
+                          <Sparkles className="w-4 h-4 text-indigo-400" />
+                        </motion.div>
+
+                        <motion.div
+                          animate={{ y: [0, 8, 0], rotate: [0, -10, 0] }}
+                          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
+                          className="absolute bottom-6 left-4 w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 shadow-lg flex items-center justify-center text-emerald-450 backdrop-blur-xs"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </motion.div>
                       </div>
-                      <div className="space-y-3">
-                        <h2 className="text-xl sm:text-2xl font-black">એક ક્લિકમાં વોટ્સએપ ઓર્ડર</h2>
+
+                      {/* Titles */}
+                      <div className="space-y-3.5 max-w-sm px-4">
+                        <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-350 bg-clip-text text-transparent leading-tight font-display uppercase tracking-tight">
+                          Smart Grocery Shopping
+                          <span className="block text-lg font-extrabold text-indigo-400 mt-1.5 font-sans lowercase">સ્માર્ટ ગ્રોસરી શોપિંગ</span>
+                        </h2>
                         <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
-                          તમારું કાર્ટ ભરો અને સીધો વોટ્સએપ પર ઓર્ડર મોકલી આપો. પેમેન્ટ દુકાને પિકઅપ સમયે અથવા ડિલિવરી સમયે.
+                          Search products easily with smart features.
+                          <span className="block text-[11px] text-slate-500 mt-1 font-bold">સ્માર્ટ સુવિધાઓ વડે સરળતાથી પ્રોડક્ટ્સ શોધો.</span>
                         </p>
+                      </div>
+
+                      {/* Feature Highlights */}
+                      <div className="flex flex-wrap gap-2 justify-center max-w-sm px-2 pt-2">
+                        {[
+                          { text: "Voice Search", guj: "વોઈસ સર્ચ", color: "indigo" },
+                          { text: "Smart Suggestions", guj: "સ્માર્ટ સૂચનો", color: "amber" },
+                          { text: "Easy Cart Management", guj: "સરળ કાર્ટ મેનેજમેન્ટ", color: "emerald" }
+                        ].map((feat, idx) => (
+                          <motion.span
+                            key={feat.text}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + idx * 0.1 }}
+                            className="px-3.5 py-2 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-300 tracking-wide flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              feat.color === 'indigo' ? 'bg-indigo-400' : (feat.color === 'amber' ? 'bg-amber-450' : 'bg-emerald-450')
+                            }`} />
+                            {feat.text} | {feat.guj}
+                          </motion.span>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {introStep === 3 && (
+                    <motion.div
+                      key="step3"
+                      initial={{ x: 50, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -50, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="text-center space-y-6 flex flex-col items-center w-full"
+                    >
+                      {/* Reward / Gold Ribbon & Floating coins */}
+                      <div className="relative w-48 h-48 flex items-center justify-center">
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute w-36 h-36 rounded-full bg-emerald-500/10 blur-xl"
+                        />
+
+                        <motion.div
+                          animate={{ scale: [0.95, 1.05, 0.95], y: [0, -4, 0] }}
+                          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                          className="relative w-28 h-28 bg-[#0f172a] rounded-[32px] shadow-2xl flex items-center justify-center border border-white/10 text-[#FFB800] p-6"
+                        >
+                          <Award className="w-14 h-14" />
+                        </motion.div>
+
+                        {/* Floating Gift Box and shopping badges */}
+                        <motion.div
+                          animate={{ y: [0, -8, 0], rotate: [0, 15, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
+                          className="absolute top-6 right-4 w-9 h-9 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-lg flex items-center justify-center text-amber-500 backdrop-blur-xs"
+                        >
+                          <Gift className="w-4 h-4" />
+                        </motion.div>
+
+                        <motion.div
+                          animate={{ y: [0, 8, 0] }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                          className="absolute bottom-6 left-4 w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 shadow-lg flex items-center justify-center text-emerald-450 backdrop-blur-xs"
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                        </motion.div>
+                      </div>
+
+                      {/* Titles */}
+                      <div className="space-y-3.5 max-w-sm px-4">
+                        <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-355 bg-clip-text text-transparent leading-tight font-display uppercase tracking-tight">
+                          Let's Start Shopping
+                          <span className="block text-lg font-extrabold text-emerald-450 mt-1.5 font-sans lowercase">ચાલો ખરીદી શરૂ કરીએ</span>
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-semibold">
+                          Fresh groceries, premium service, and smooth shopping experience.
+                          <span className="block text-[11px] text-slate-500 mt-1 font-bold">તાજું કરિયાણું, પ્રીમિયમ સેવા અને ખરીદીનો ઉત્તમ અનુભવ.</span>
+                        </p>
+                      </div>
+
+                      {/* Feature Highlights */}
+                      <div className="flex flex-wrap gap-2 justify-center max-w-sm px-2 pt-2">
+                        {[
+                          { text: "Exclusive Offers", guj: "ખાસ ઓફરો", color: "amber" },
+                          { text: "Loyalty Rewards", guj: "લોયલ્ટી રિવોર્ડ્સ", color: "emerald" },
+                          { text: "Easy Checkout", guj: "સરળ ચેકઆઉટ", color: "blue" }
+                        ].map((feat, idx) => (
+                          <motion.span
+                            key={feat.text}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + idx * 0.1 }}
+                            className="px-3.5 py-2 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-300 tracking-wide flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              feat.color === 'amber' ? 'bg-amber-450' : (feat.color === 'emerald' ? 'bg-emerald-450' : 'bg-blue-400')
+                            }`} />
+                            {feat.text} | {feat.guj}
+                          </motion.span>
+                        ))}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
-              <div className="flex flex-col items-center gap-6 pb-6 max-w-md mx-auto w-full">
+              {/* Onboarding Bottom Indicators & Buttons */}
+              <div className="flex flex-col items-center gap-6 pb-6 max-w-md mx-auto w-full z-10 relative">
+                {/* Pagination Dots */}
                 <div className="flex gap-2">
-                  {[0, 1, 2].map((i) => (
+                  {[0, 1, 2, 3].map((i) => (
                     <span
                       key={i}
                       className={`h-2 rounded-full transition-all duration-350 ${introStep === i ? 'w-6 bg-emerald-500' : 'w-2 bg-slate-700'}`}
@@ -4438,23 +4731,52 @@ export default function App() {
                   ))}
                 </div>
 
-                {introStep < 2 ? (
-                  <button
-                    onClick={() => setIntroStep(prev => prev + 1)}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg"
-                  >
-                    આગળ વધો / Next
-                  </button>
+                {/* Control Actions */}
+                {introStep < 3 ? (
+                  introStep === 0 ? (
+                    <button
+                      onClick={() => setIntroStep(prev => prev + 1)}
+                      className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg shadow-emerald-950/20"
+                    >
+                      આગળ વધો / Next
+                    </button>
+                  ) : (
+                    <div className="flex gap-3 w-full animate-fadeIn">
+                      <button
+                        onClick={() => setIntroStep(prev => prev - 1)}
+                        className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        પાછા / Back
+                      </button>
+                      <button
+                        onClick={() => setIntroStep(prev => prev + 1)}
+                        className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg shadow-emerald-950/20"
+                      >
+                        આગળ / Next
+                      </button>
+                    </div>
+                  )
                 ) : (
-                  <button
-                    onClick={() => {
-                      localStorage.setItem('ggms_intro_seen', 'true');
-                      setShowIntro(false);
-                    }}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 active:scale-98 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg"
-                  >
-                    શરૂ કરો / Get Started
-                  </button>
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('ggms_intro_seen', 'true');
+                        setShowIntro(false);
+                      }}
+                      className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 active:scale-[0.98] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg shadow-emerald-950/25"
+                    >
+                      શરૂ કરો / Get Started
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem('ggms_intro_seen', 'true');
+                        setShowIntro(false);
+                      }}
+                      className="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer border-none bg-transparent"
+                    >
+                      સ્કીપ / Skip
+                    </button>
+                  </div>
                 )}
               </div>
             </motion.div>
