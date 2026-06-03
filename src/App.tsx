@@ -404,6 +404,8 @@ export default function App() {
       isWebView
     ) {
       localStorage.setItem('ggms_apk_mode', 'true');
+    } else {
+      localStorage.removeItem('ggms_apk_mode');
     }
 
     if (!isStandalone) {
@@ -3690,6 +3692,7 @@ export default function App() {
                     notificationPermission={notificationPermission}
                     requestNotificationPermission={requestNotificationPermission}
                     loyaltyPoints={loyaltyPoints}
+                    onDownloadApk={handleDownloadApk}
                   />
                 ) : (
                   <div className="py-24 text-center bg-white border border-slate-200 rounded-[32px] p-6 max-w-md mx-auto space-y-4">
@@ -4204,6 +4207,22 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* App Download Area at the Bottom */}
+                <div className="flex flex-col items-center justify-center gap-2 mt-12 mb-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadApk}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs active:scale-[0.98] outline-hidden"
+                    id="bottom-get-android-app-btn"
+                  >
+                    <Smartphone className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <span>GET ANDROID APP</span>
+                  </button>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold tracking-wide">
+                    iOS version coming soon
+                  </span>
                 </div>
 
                 {/* Footer Section */}
@@ -5205,90 +5224,6 @@ export default function App() {
                 </button>
               </motion.div>
             </div>
-          )}
-        </AnimatePresence>
-
-        {/* Premium Floating APK Install Button */}
-        <AnimatePresence>
-          {showApkInstallPrompt && apkInstallPromptVisible && (
-            <motion.div
-              initial={{ opacity: 0, y: 80, scale: 0.9 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0, 
-                scale: 1,
-                boxShadow: [
-                  "0 12px 40px -15px rgba(16, 185, 129, 0.15)",
-                  "0 12px 40px -5px rgba(16, 185, 129, 0.35)",
-                  "0 12px 40px -15px rgba(16, 185, 129, 0.15)"
-                ]
-              }}
-              exit={{ opacity: 0, y: 80, scale: 0.9 }}
-              transition={{
-                boxShadow: {
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                },
-                default: {
-                  type: "spring",
-                  stiffness: 260,
-                  damping: 20
-                }
-              }}
-              className="fixed bottom-[84px] right-4 sm:right-6 z-[100] flex items-center bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-md border border-slate-700/50 rounded-2xl p-2.5 shadow-2xl select-none hover:border-emerald-500/40 transition-colors w-[270px] sm:w-[310px]"
-            >
-              {/* Left: App Logo Icon with NEW badge */}
-              <div className="relative shrink-0 cursor-pointer" onClick={handleDownloadApk}>
-                <div className="w-10 h-10 bg-[#0f172a] rounded-xl flex items-center justify-center p-1 border border-slate-700/50 shadow-inner">
-                  <img src="/logo.png" alt="GGM&S Grocery" className="w-full h-full object-contain rounded-lg" />
-                </div>
-                {/* NEW Badge */}
-                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-bounce">
-                  New
-                </span>
-              </div>
-
-              {/* Middle: Text Information */}
-              <div className="ml-3 mr-2 flex-1 text-left min-w-0 cursor-pointer" onClick={handleDownloadApk}>
-                <h5 className="text-[11.5px] font-black text-white leading-tight uppercase flex items-center gap-1.5 font-sans">
-                  📲 Install App
-                </h5>
-                <p className="text-[9px] font-bold text-slate-400 leading-tight mt-0.5 truncate font-sans">
-                  Fast Grocery Shopping
-                </p>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Download Button */}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleDownloadApk}
-                  className="w-8 h-8 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-950/20 border-none cursor-pointer transition-all"
-                >
-                  <motion.div
-                    animate={{ y: [0, 3, 0] }}
-                    transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <Download className="w-4 h-4 text-white" />
-                  </motion.div>
-                </motion.button>
-
-                {/* Close Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('ggms_apk_prompt_dismissed', 'true');
-                    setShowApkInstallPrompt(false);
-                  }}
-                  className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center border-none transition-colors cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </motion.div>
           )}
         </AnimatePresence>
 
@@ -8261,12 +8196,13 @@ export const MyAccountPage: React.FC<{
   notificationPermission?: string;
   requestNotificationPermission?: () => Promise<void>;
   loyaltyPoints?: number;
+  onDownloadApk?: () => void;
 }> = ({ 
   customerUser, customerProfile, setCustomerProfile, showToast, products, onAdd, onLogout,
   cart, setCart, cartTotal, updateCartQuantity, shopSettings,
   preferredTheme, handleThemeChange, voiceIntent,
   notificationPermission = 'default', requestNotificationPermission,
-  loyaltyPoints = 120
+  loyaltyPoints = 120, onDownloadApk
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
@@ -8946,6 +8882,18 @@ export const MyAccountPage: React.FC<{
                   >
                     <Smartphone className="w-3.5 h-3.5 text-slate-500" />
                     <span>Share App / એપ શેર કરો</span>
+                  </button>
+                </div>
+
+                {/* Download App Option */}
+                <div className="mt-2 w-full">
+                  <button
+                    type="button"
+                    onClick={onDownloadApk}
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white hover:scale-[1.01] active:scale-[0.98] rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer border-none shadow-sm shadow-emerald-950/20"
+                  >
+                    <Download className="w-3.5 h-3.5 text-white" />
+                    <span>Download App / એપ ડાઉનલોડ કરો</span>
                   </button>
                 </div>
 
