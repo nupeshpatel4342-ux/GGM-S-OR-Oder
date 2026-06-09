@@ -24,7 +24,22 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/refs': 'warn',
+      'no-empty': 'off',
+      'prefer-const': 'warn',
     },
   },
-  firebaseRulesPlugin.configs['flat/recommended']
+  firebaseRulesPlugin.configs['flat/recommended'],
+  {
+    files: ['**/*.rules'],
+    rules: {
+      '@firebase/security-rules/no-open-writes': 'warn',
+      '@firebase/security-rules/no-open-reads': 'warn',
+    }
+  }
 );

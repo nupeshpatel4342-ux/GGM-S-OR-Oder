@@ -5710,6 +5710,26 @@ const AdminCouponsPanel: React.FC<AdminCouponsPanelProps> = ({
   const [onePerCustomer, setOnePerCustomer] = useState(true);
   const [customerSpecific, setCustomerSpecific] = useState('');
 
+  const clearForm = () => {
+    setCode('');
+    setTitle('');
+    setDescription('');
+    setDiscountType('flat');
+    setDiscountValue(0);
+    setMinOrderAmount(0);
+    setMaxDiscount(0);
+    setCategory('');
+    // Default expiry date: 30 days from now
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    setExpiryDate(d.toISOString().split('T')[0]);
+    setUsageLimit(1000);
+    setActiveStatus(true);
+    setFirstOrderOnly(false);
+    setOnePerCustomer(true);
+    setCustomerSpecific('');
+  };
+
   // Populate form if editingCoupon is set
   useEffect(() => {
     if (editingCoupon) {
@@ -5731,26 +5751,6 @@ const AdminCouponsPanel: React.FC<AdminCouponsPanelProps> = ({
       clearForm();
     }
   }, [editingCoupon]);
-
-  const clearForm = () => {
-    setCode('');
-    setTitle('');
-    setDescription('');
-    setDiscountType('flat');
-    setDiscountValue(0);
-    setMinOrderAmount(0);
-    setMaxDiscount(0);
-    setCategory('');
-    // Default expiry date: 30 days from now
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    setExpiryDate(d.toISOString().split('T')[0]);
-    setUsageLimit(1000);
-    setActiveStatus(true);
-    setFirstOrderOnly(false);
-    setOnePerCustomer(true);
-    setCustomerSpecific('');
-  };
 
   const handlePreset = (presetName: string) => {
     const today = new Date();
