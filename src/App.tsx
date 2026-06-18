@@ -5289,97 +5289,91 @@ const WelcomeDeliveryPopup: React.FC = () => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.88, y: 40 }}
           transition={{ type: 'spring', damping: 22, stiffness: 280, delay: 0.05 }}
-          className="relative w-full max-w-[430px] rounded-[28px] overflow-hidden"
+          className="relative w-full max-w-[360px] rounded-[24px] overflow-hidden"
           style={{
             background: '#ffffff',
-            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1)',
+            boxShadow: '0 20px 50px -10px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1)',
           }}
           onClick={e => e.stopPropagation()}
         >
           {/* Top gradient accent bar */}
-          <div className="h-1.5" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
 
           {/* Decorative background shapes */}
-          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full" style={{ background: 'radial-gradient(circle, rgba(22,163,74,0.06) 0%, transparent 70%)' }}></div>
-          <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%)' }}></div>
-          <div className="absolute top-32 right-6 w-20 h-20 rounded-full" style={{ background: 'radial-gradient(circle, rgba(22,163,74,0.04) 0%, transparent 70%)' }}></div>
+          <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full" style={{ background: 'radial-gradient(circle, rgba(22,163,74,0.06) 0%, transparent 70%)' }}></div>
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%)' }}></div>
 
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full transition-all z-10"
+            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-all z-10"
             style={{ background: '#f1f5f9', color: '#64748b' }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#1e293b'; }}
             onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
 
-          <div className="relative px-6 pt-7 pb-6 sm:px-8 sm:pt-8 sm:pb-7">
+          <div className="relative px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6">
             {/* Header Icon Cluster */}
-            <div className="flex justify-center mb-5">
+            <div className="flex justify-center mb-4">
               <div className="relative">
                 <motion.div
-                  animate={{ y: [0, -5, 0] }}
+                  animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-[76px] h-[76px] rounded-[22px] flex items-center justify-center"
+                  className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center"
                   style={{
                     background: 'linear-gradient(145deg, #16a34a 0%, #15803d 100%)',
-                    boxShadow: '0 12px 32px -4px rgba(22,163,74,0.35), 0 4px 12px rgba(22,163,74,0.15)',
+                    boxShadow: '0 10px 24px -4px rgba(22,163,74,0.35), 0 3px 8px rgba(22,163,74,0.15)',
                   }}
                 >
-                  <Warehouse className="w-9 h-9 text-white" />
+                  <Warehouse className="w-7 h-7 text-white" />
                 </motion.div>
                 {/* Small floating accent icons */}
                 <motion.div
                   animate={{ y: [0, -3, 0], rotate: [0, 5, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
-                  className="absolute -top-2 -right-3 w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(145deg, #f97316, #ea580c)', boxShadow: '0 4px 12px rgba(249,115,22,0.3)' }}
+                  className="absolute -top-1.5 -right-2.5 w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: 'linear-gradient(145deg, #f97316, #ea580c)', boxShadow: '0 3px 10px rgba(249,115,22,0.3)' }}
                 >
-                  <Package className="w-4 h-4 text-white" />
+                  <Package className="w-3.5 h-3.5 text-white" />
                 </motion.div>
                 <motion.div
-                  animate={{ y: [0, -4, 0], rotate: [0, -5, 0] }}
+                  animate={{ y: [0, -3, 0], rotate: [0, -5, 0] }}
                   transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
-                  className="absolute -bottom-1 -left-3 w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ background: 'linear-gradient(145deg, #0ea5e9, #0284c7)', boxShadow: '0 4px 12px rgba(14,165,233,0.3)' }}
+                  className="absolute -bottom-1 -left-2.5 w-6 h-6 rounded-md flex items-center justify-center"
+                  style={{ background: 'linear-gradient(145deg, #0ea5e9, #0284c7)', boxShadow: '0 3px 10px rgba(14,165,233,0.3)' }}
                 >
-                  <Truck className="w-3.5 h-3.5 text-white" />
+                  <Truck className="w-3 h-3 text-white" />
                 </motion.div>
               </div>
             </div>
 
             {/* Title */}
-            <h2 className="text-center text-xl sm:text-[22px] font-black mb-1.5" style={{ color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
+            <h2 className="text-center text-lg sm:text-xl font-black mb-1" style={{ color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
               📢 હોલસેલ ઓર્ડર માહિતી
             </h2>
-            <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] mb-6" style={{ color: '#16a34a' }}>
+            <p className="text-center text-[10px] font-bold uppercase tracking-[0.18em] mb-4" style={{ color: '#16a34a' }}>
               Wholesale Order Information
             </p>
 
             {/* Info Cards */}
-            <div className="space-y-3 mb-6">
+            <div className="space-y-2.5 mb-5">
               {/* Point 1: Wholesale Prices */}
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15 }}
-                className="rounded-2xl p-4 border"
+                className="rounded-xl p-3 border"
                 style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', borderColor: '#bbf7d0' }}
               >
-                <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #dcfce7, #bbf7d0)' }}>
-                    <ShoppingCart className="w-5 h-5" style={{ color: '#16a34a' }} />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #dcfce7, #bbf7d0)' }}>
+                    <ShoppingCart className="w-4 h-4" style={{ color: '#16a34a' }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-bold leading-snug" style={{ color: '#14532d' }}>
-                      🛒 દુકાનદારો અને બલ્ક ખરીદદારો માટે <span style={{ color: '#16a34a' }} className="font-extrabold">ખાસ ભાવ</span>
-                    </p>
-                    <p className="text-[11px] mt-1" style={{ color: '#6b7280' }}>
-                      Special wholesale prices for retailers & bulk buyers
-                    </p>
-                  </div>
+                  <p className="text-[13px] font-bold leading-snug" style={{ color: '#14532d' }}>
+                    દુકાનદારો અને બલ્ક ખરીદદારો માટે <span style={{ color: '#16a34a' }} className="font-extrabold">ખાસ ભાવ</span>
+                  </p>
                 </div>
               </motion.div>
 
@@ -5388,21 +5382,16 @@ const WelcomeDeliveryPopup: React.FC = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.25 }}
-                className="rounded-2xl p-4 border"
+                className="rounded-xl p-3 border"
                 style={{ background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)', borderColor: '#fed7aa' }}
               >
-                <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #ffedd5, #fed7aa)' }}>
-                    <Truck className="w-5 h-5" style={{ color: '#ea580c' }} />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #ffedd5, #fed7aa)' }}>
+                    <Truck className="w-4 h-4" style={{ color: '#ea580c' }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-bold leading-snug" style={{ color: '#7c2d12' }}>
-                      📦 મોટા ઓર્ડર પર ઝડપી ડિલિવરી અને <span style={{ color: '#ea580c' }} className="font-extrabold">વિશ્વસનીય સપોર્ટ</span>
-                    </p>
-                    <p className="text-[11px] mt-1" style={{ color: '#6b7280' }}>
-                      Fast delivery & reliable support for bulk orders
-                    </p>
-                  </div>
+                  <p className="text-[13px] font-bold leading-snug" style={{ color: '#7c2d12' }}>
+                    મોટા ઓર્ડર પર ઝડપી ડિલિવરી અને <span style={{ color: '#ea580c' }} className="font-extrabold">વિશ્વસનીય સપોર્ટ</span>
+                  </p>
                 </div>
               </motion.div>
 
@@ -5411,55 +5400,46 @@ const WelcomeDeliveryPopup: React.FC = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.35 }}
-                className="rounded-2xl p-4 border"
+                className="rounded-xl p-3 border"
                 style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', borderColor: '#bfdbfe' }}
               >
-                <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #dbeafe, #bfdbfe)' }}>
-                    <Store className="w-5 h-5" style={{ color: '#2563eb' }} />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #dbeafe, #bfdbfe)' }}>
+                    <Store className="w-4 h-4" style={{ color: '#2563eb' }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-bold leading-snug" style={{ color: '#1e3a5f' }}>
-                      🏪 તમારા બિઝનેસ માટે સીધી <span style={{ color: '#2563eb' }} className="font-extrabold">હોલસેલ ખરીદી</span> કરો
-                    </p>
-                    <p className="text-[11px] mt-1" style={{ color: '#6b7280' }}>
-                      Buy grocery products directly at wholesale rates
-                    </p>
-                  </div>
+                  <p className="text-[13px] font-bold leading-snug" style={{ color: '#1e3a5f' }}>
+                    તમારા બિઝનેસ માટે સીધી <span style={{ color: '#2563eb' }} className="font-extrabold">હોલસેલ ખરીદી</span> કરો
+                  </p>
                 </div>
               </motion.div>
             </div>
 
             {/* CTA Button */}
             <motion.button
-              whileHover={{ scale: 1.02, boxShadow: '0 12px 28px -4px rgba(22,163,74,0.4)' }}
+              whileHover={{ scale: 1.02, boxShadow: '0 10px 24px -4px rgba(22,163,74,0.4)' }}
               whileTap={{ scale: 0.98 }}
               onClick={handleClose}
-              className="w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-[0.12em] flex items-center justify-center gap-2.5 transition-shadow"
+              className="w-full py-3.5 rounded-xl text-white font-black text-[13px] uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-shadow"
               style={{
                 background: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%)',
-                boxShadow: '0 8px 24px -4px rgba(22,163,74,0.35)',
+                boxShadow: '0 6px 20px -4px rgba(22,163,74,0.35)',
               }}
             >
-              <Truck className="w-5 h-5" />
-              <span>
-                <span className="block sm:inline">હોલસેલ ઓર્ડર શરૂ કરો</span>
-                <span className="hidden sm:inline"> / </span>
-                <span className="block sm:inline text-[11px] sm:text-sm font-bold opacity-90">START WHOLESALE ORDER</span>
-              </span>
+              <Truck className="w-4.5 h-4.5" />
+              🚚 હોલસેલ ઓર્ડર શરૂ કરો
             </motion.button>
 
             {/* Trust Badge Footer */}
-            <div className="mt-4 flex items-center justify-center gap-1.5">
-              <Award className="w-3.5 h-3.5" style={{ color: '#f97316' }} />
-              <p className="text-[10px] font-semibold tracking-wide" style={{ color: '#9ca3af' }}>
+            <div className="mt-3 flex items-center justify-center gap-1.5">
+              <Award className="w-3 h-3" style={{ color: '#f97316' }} />
+              <p className="text-[9px] font-semibold tracking-wide" style={{ color: '#9ca3af' }}>
                 GGMS Grocery Wholesale — Trusted Partner for Retailers
               </p>
             </div>
           </div>
 
           {/* Bottom gradient accent bar */}
-          <div className="h-1.5" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
