@@ -5260,7 +5260,7 @@ const ScrollingAnnouncement: React.FC<ScrollingAnnouncementProps> = ({ text }) =
   );
 };
 
-// 🏪 Wholesale Customer Welcome Modal Popup (shows on first visit)
+// 🛒 Retail Customer Welcome Modal Popup (shows on first visit)
 const WelcomeDeliveryPopup: React.FC = () => {
   const [isOpen, setIsOpen] = useState(() => {
     return sessionStorage.getItem('welcomePopupSeen') !== 'true';
@@ -5281,27 +5281,27 @@ const WelcomeDeliveryPopup: React.FC = () => {
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(10px)' }}
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(10px)' }}
         onClick={handleClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.88, y: 40 }}
+          initial={{ opacity: 0, scale: 0.88, y: 36 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.88, y: 40 }}
-          transition={{ type: 'spring', damping: 22, stiffness: 280, delay: 0.05 }}
+          exit={{ opacity: 0, scale: 0.88, y: 36 }}
+          transition={{ type: 'spring', damping: 24, stiffness: 300, delay: 0.05 }}
           className="relative w-full max-w-[360px] rounded-[24px] overflow-hidden"
           style={{
             background: '#ffffff',
-            boxShadow: '0 20px 50px -10px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.1)',
+            boxShadow: '0 20px 50px -10px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08)',
           }}
           onClick={e => e.stopPropagation()}
         >
           {/* Top gradient accent bar */}
-          <div className="h-1" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 25%, #f97316 65%, #ea580c 100%)' }}></div>
 
           {/* Decorative background shapes */}
-          <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full" style={{ background: 'radial-gradient(circle, rgba(22,163,74,0.06) 0%, transparent 70%)' }}></div>
-          <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%)' }}></div>
+          <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full" style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.05) 0%, transparent 70%)' }}></div>
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.05) 0%, transparent 70%)' }}></div>
 
           {/* Close button */}
           <button
@@ -5323,21 +5323,22 @@ const WelcomeDeliveryPopup: React.FC = () => {
                   transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                   className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center"
                   style={{
-                    background: 'linear-gradient(145deg, #16a34a 0%, #15803d 100%)',
-                    boxShadow: '0 10px 24px -4px rgba(22,163,74,0.35), 0 3px 8px rgba(22,163,74,0.15)',
+                    background: 'linear-gradient(145deg, #22c55e 0%, #16a34a 100%)',
+                    boxShadow: '0 10px 24px -4px rgba(34,197,94,0.35), 0 3px 8px rgba(34,197,94,0.15)',
                   }}
                 >
-                  <Warehouse className="w-7 h-7 text-white" />
+                  <ShoppingBag className="w-7 h-7 text-white" />
                 </motion.div>
-                {/* Small floating accent icons */}
+                {/* Floating accent: Cart */}
                 <motion.div
-                  animate={{ y: [0, -3, 0], rotate: [0, 5, 0] }}
+                  animate={{ y: [0, -3, 0], rotate: [0, 6, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
                   className="absolute -top-1.5 -right-2.5 w-7 h-7 rounded-lg flex items-center justify-center"
                   style={{ background: 'linear-gradient(145deg, #f97316, #ea580c)', boxShadow: '0 3px 10px rgba(249,115,22,0.3)' }}
                 >
-                  <Package className="w-3.5 h-3.5 text-white" />
+                  <ShoppingCart className="w-3.5 h-3.5 text-white" />
                 </motion.div>
+                {/* Floating accent: Truck */}
                 <motion.div
                   animate={{ y: [0, -3, 0], rotate: [0, -5, 0] }}
                   transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
@@ -5351,15 +5352,15 @@ const WelcomeDeliveryPopup: React.FC = () => {
 
             {/* Title */}
             <h2 className="text-center text-lg sm:text-xl font-black mb-1" style={{ color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-              📢 હોલસેલ ઓર્ડર માહિતી
+              📢 ડિલિવરી માહિતી
             </h2>
             <p className="text-center text-[10px] font-bold uppercase tracking-[0.18em] mb-4" style={{ color: '#16a34a' }}>
-              Wholesale Order Information
+              Delivery Information
             </p>
 
             {/* Info Cards */}
             <div className="space-y-2.5 mb-5">
-              {/* Point 1: Wholesale Prices */}
+              {/* Point 1: Easy Online Shopping */}
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -5372,12 +5373,12 @@ const WelcomeDeliveryPopup: React.FC = () => {
                     <ShoppingCart className="w-4 h-4" style={{ color: '#16a34a' }} />
                   </div>
                   <p className="text-[13px] font-bold leading-snug" style={{ color: '#14532d' }}>
-                    દુકાનદારો અને બલ્ક ખરીદદારો માટે <span style={{ color: '#16a34a' }} className="font-extrabold">ખાસ ભાવ</span>
+                    ઘર બેઠા <span style={{ color: '#16a34a' }} className="font-extrabold">સરળ ખરીદી</span> કરો
                   </p>
                 </div>
               </motion.div>
 
-              {/* Point 2: Fast Delivery */}
+              {/* Point 2: Free Home Delivery */}
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -5390,12 +5391,12 @@ const WelcomeDeliveryPopup: React.FC = () => {
                     <Truck className="w-4 h-4" style={{ color: '#ea580c' }} />
                   </div>
                   <p className="text-[13px] font-bold leading-snug" style={{ color: '#7c2d12' }}>
-                    મોટા ઓર્ડર પર ઝડપી ડિલિવરી અને <span style={{ color: '#ea580c' }} className="font-extrabold">વિશ્વસનીય સપોર્ટ</span>
+                    ₹2000 થી વધુની ખરીદી પર <span style={{ color: '#ea580c' }} className="font-extrabold">ફ્રી હોમ ડિલિવરી</span> મળશે
                   </p>
                 </div>
               </motion.div>
 
-              {/* Point 3: Direct Wholesale */}
+              {/* Point 3: Quality Products Fast Delivery */}
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -5405,10 +5406,10 @@ const WelcomeDeliveryPopup: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(145deg, #dbeafe, #bfdbfe)' }}>
-                    <Store className="w-4 h-4" style={{ color: '#2563eb' }} />
+                    <Package className="w-4 h-4" style={{ color: '#2563eb' }} />
                   </div>
                   <p className="text-[13px] font-bold leading-snug" style={{ color: '#1e3a5f' }}>
-                    તમારા બિઝનેસ માટે સીધી <span style={{ color: '#2563eb' }} className="font-extrabold">હોલસેલ ખરીદી</span> કરો
+                    ગુણવત્તાયુક્ત પ્રોડક્ટ્સ <span style={{ color: '#2563eb' }} className="font-extrabold">ઝડપી ડિલિવરી</span> સાથે મેળવો
                   </p>
                 </div>
               </motion.div>
@@ -5416,30 +5417,30 @@ const WelcomeDeliveryPopup: React.FC = () => {
 
             {/* CTA Button */}
             <motion.button
-              whileHover={{ scale: 1.02, boxShadow: '0 10px 24px -4px rgba(22,163,74,0.4)' }}
+              whileHover={{ scale: 1.02, boxShadow: '0 10px 24px -4px rgba(34,197,94,0.4)' }}
               whileTap={{ scale: 0.98 }}
               onClick={handleClose}
               className="w-full py-3.5 rounded-xl text-white font-black text-[13px] uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-shadow"
               style={{
-                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #166534 100%)',
-                boxShadow: '0 6px 20px -4px rgba(22,163,74,0.35)',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)',
+                boxShadow: '0 6px 20px -4px rgba(34,197,94,0.35)',
               }}
             >
-              <Truck className="w-4.5 h-4.5" />
-              🚚 હોલસેલ ઓર્ડર શરૂ કરો
+              <ShoppingBag className="w-4 h-4" />
+              🛍️ ખરીદી શરૂ કરો
             </motion.button>
 
             {/* Trust Badge Footer */}
             <div className="mt-3 flex items-center justify-center gap-1.5">
               <Award className="w-3 h-3" style={{ color: '#f97316' }} />
               <p className="text-[9px] font-semibold tracking-wide" style={{ color: '#9ca3af' }}>
-                GGMS Grocery Wholesale — Trusted Partner for Retailers
+                GGMS Grocery — Your Trusted Grocery Partner
               </p>
             </div>
           </div>
 
           {/* Bottom gradient accent bar */}
-          <div className="h-1" style={{ background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #f97316 60%, #ea580c 100%)' }}></div>
+          <div className="h-1" style={{ background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 25%, #f97316 65%, #ea580c 100%)' }}></div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
