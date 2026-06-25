@@ -389,6 +389,8 @@ export default function App() {
   });
 
   const isCartLoadedRef = useRef(false);
+  const cartUnsubscribeRef = useRef<(() => void) | null>(null);
+  const lastSavedCartRef = useRef<string>('');
 
   // PWA & Network States
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -1244,67 +1246,96 @@ export default function App() {
             await setDoc(doc(db, 'customers', user.uid), profile);
             setCustomerProfile(profile);
           }
-          const cartSnap = await getDoc(doc(db, 'customerCarts', user.uid));
-          if (cartSnap.exists() && cartSnap.data().items?.length > 0) {
-            const list = cartSnap.data().items.map((item: any) => {
-              const cleanItem = cleanseProduct(item);
-              return {
-                ...cleanItem,
-                quantity: Number(item.quantity) || 1,
-                selectedVariant: item.selectedVariant ? {
-                  ...item.selectedVariant,
-                  price: Number(item.selectedVariant.price) || 0,
-                  mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
-                } : undefined
-              } as CartItem;
-            });
-            setCart(list);
-            isCartLoadedRef.current = true;
-          } else {
-            try {
-              const storedCart = localStorage.getItem('ggms_cart');
-              let listToSet: CartItem[] = [];
-              if (storedCart) {
-                const parsed = JSON.parse(storedCart);
-                if (parsed.length > 0) {
-                  listToSet = parsed.map((item: any) => {
-                    const cleanItem = cleanseProduct(item);
-                    return {
-                      ...cleanItem,
-                      quantity: Number(item.quantity) || 1,
-                      selectedVariant: item.selectedVariant ? {
-                        ...item.selectedVariant,
-                        price: Number(item.selectedVariant.price) || 0,
-                        mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
-                      } : undefined
-                    } as CartItem;
-                  });
-                  await setDoc(doc(db, 'customerCarts', user.uid), {
-                    items: JSON.parse(JSON.stringify(listToSet)),
-                    updatedAt: new Date().toISOString()
-                  });
-                }
-              }
-              setCart(listToSet);
-              isCartLoadedRef.current = true;
-            } catch (err) {
-              console.error('Error syncing local cart with Firestore:', err);
-              setCart([]);
-              isCartLoadedRef.current = true;
-            }
+          // Unsubscribe from previous listener if any
+          if (cartUnsubscribeRef.current) {
+            cartUnsubscribeRef.current();
+            cartUnsubscribeRef.current = null;
           }
+
+          // Subscribe to cart in Firestore in real-time
+          cartUnsubscribeRef.current = onSnapshot(doc(db, 'customerCarts', user.uid), async (cartDoc) => {
+            if (cartDoc.exists() && cartDoc.data().items?.length > 0) {
+              const list = cartDoc.data().items.map((item: any) => {
+                const cleanItem = cleanseProduct(item);
+                return {
+                  ...cleanItem,
+                  quantity: Number(item.quantity) || 1,
+                  selectedVariant: item.selectedVariant ? {
+                    ...item.selectedVariant,
+                    price: Number(item.selectedVariant.price) || 0,
+                    mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                  } : undefined
+                } as CartItem;
+              });
+
+              const listStr = JSON.stringify(list);
+              lastSavedCartRef.current = listStr;
+              setCart(prev => {
+                const isSame = JSON.stringify(prev) === listStr;
+                return isSame ? prev : list;
+              });
+              isCartLoadedRef.current = true;
+            } else {
+              try {
+                const storedCart = localStorage.getItem('ggms_cart');
+                let listToSet: CartItem[] = [];
+                if (storedCart) {
+                  const parsed = JSON.parse(storedCart);
+                  if (parsed.length > 0) {
+                    listToSet = parsed.map((item: any) => {
+                      const cleanItem = cleanseProduct(item);
+                      return {
+                        ...cleanItem,
+                        quantity: Number(item.quantity) || 1,
+                        selectedVariant: item.selectedVariant ? {
+                          ...item.selectedVariant,
+                          price: Number(item.selectedVariant.price) || 0,
+                          mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                        } : undefined
+                      } as CartItem;
+                    });
+                    await setDoc(doc(db, 'customerCarts', user.uid), {
+                      items: JSON.parse(JSON.stringify(listToSet)),
+                      updatedAt: new Date().toISOString()
+                    });
+                    return; // setDoc will trigger snapshot callback again
+                  }
+                }
+                lastSavedCartRef.current = '[]';
+                setCart(prev => prev.length === 0 ? prev : []);
+                isCartLoadedRef.current = true;
+              } catch (err) {
+                console.error('Error syncing local cart with Firestore:', err);
+                lastSavedCartRef.current = '[]';
+                setCart(prev => prev.length === 0 ? prev : []);
+                isCartLoadedRef.current = true;
+              }
+            }
+          }, (error) => {
+            console.error("Firestore customerCarts snapshot read error:", error);
+          });
         } catch (error) {
           console.error('Error loading customer data:', error);
         }
       } else {
+        if (cartUnsubscribeRef.current) {
+          cartUnsubscribeRef.current();
+          cartUnsubscribeRef.current = null;
+        }
         setCustomerProfile(null);
         setCart([]);
         localStorage.removeItem('ggms_cart');
         isCartLoadedRef.current = false;
+        lastSavedCartRef.current = '';
       }
       setCustomerAuthLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (cartUnsubscribeRef.current) {
+        cartUnsubscribeRef.current();
+      }
+    };
   }, []);
 
   // Persist cart to Firestore (debounced)
@@ -1312,9 +1343,14 @@ export default function App() {
   useEffect(() => {
     if (!customerUser) return;
     if (!isCartLoadedRef.current) return; // Wait until cart is loaded from server
+
+    const cartStr = JSON.stringify(cart);
+    if (cartStr === lastSavedCartRef.current) return;
+
     if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current);
     cartSaveTimerRef.current = setTimeout(() => {
       try {
+        lastSavedCartRef.current = cartStr;
         const cleanCart = JSON.parse(JSON.stringify(cart));
         setDoc(doc(db, 'customerCarts', customerUser.uid), {
           items: cleanCart,
