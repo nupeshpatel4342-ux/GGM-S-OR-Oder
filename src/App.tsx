@@ -388,6 +388,8 @@ export default function App() {
     }
   });
 
+  const isCartLoadedRef = useRef(false);
+
   // PWA & Network States
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -1252,18 +1254,20 @@ export default function App() {
                 selectedVariant: item.selectedVariant ? {
                   ...item.selectedVariant,
                   price: Number(item.selectedVariant.price) || 0,
-                  mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && item.selectedVariant.mrp !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                  mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
                 } : undefined
               } as CartItem;
             });
             setCart(list);
+            isCartLoadedRef.current = true;
           } else {
             try {
               const storedCart = localStorage.getItem('ggms_cart');
+              let listToSet: CartItem[] = [];
               if (storedCart) {
                 const parsed = JSON.parse(storedCart);
                 if (parsed.length > 0) {
-                  const list = parsed.map((item: any) => {
+                  listToSet = parsed.map((item: any) => {
                     const cleanItem = cleanseProduct(item);
                     return {
                       ...cleanItem,
@@ -1271,19 +1275,22 @@ export default function App() {
                       selectedVariant: item.selectedVariant ? {
                         ...item.selectedVariant,
                         price: Number(item.selectedVariant.price) || 0,
-                        mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && item.selectedVariant.mrp !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                        mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && String(item.selectedVariant.mrp) !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
                       } : undefined
                     } as CartItem;
                   });
                   await setDoc(doc(db, 'customerCarts', user.uid), {
-                    items: list,
+                    items: listToSet,
                     updatedAt: new Date().toISOString()
                   });
-                  setCart(list);
                 }
               }
+              setCart(listToSet);
+              isCartLoadedRef.current = true;
             } catch (err) {
               console.error('Error syncing local cart with Firestore:', err);
+              setCart([]);
+              isCartLoadedRef.current = true;
             }
           }
         } catch (error) {
@@ -1293,6 +1300,7 @@ export default function App() {
         setCustomerProfile(null);
         setCart([]);
         localStorage.removeItem('ggms_cart');
+        isCartLoadedRef.current = false;
       }
       setCustomerAuthLoading(false);
     });
@@ -1303,6 +1311,7 @@ export default function App() {
   const cartSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!customerUser) return;
+    if (!isCartLoadedRef.current) return; // Wait until cart is loaded from server
     if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current);
     cartSaveTimerRef.current = setTimeout(() => {
       setDoc(doc(db, 'customerCarts', customerUser.uid), {
