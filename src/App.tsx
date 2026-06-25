@@ -47,6 +47,23 @@ function handleLocalDataError(error: unknown, operationType: OperationType, path
   console.error('Local Data Error: ', JSON.stringify(errInfo));
 }
 
+const cleanseProduct = (p: any): Product => {
+  if (!p) return p;
+  return {
+    ...p,
+    price: Number(p.price) || 0,
+    mrp: (p.mrp !== undefined && p.mrp !== null && String(p.mrp) !== '') ? (Number(p.mrp) || undefined) : undefined,
+    variants: Array.isArray(p.variants)
+      ? p.variants.map((v: any) => ({
+          ...v,
+          price: Number(v.price) || 0,
+          mrp: (v.mrp !== undefined && v.mrp !== null && String(v.mrp) !== '') ? (Number(v.mrp) || undefined) : undefined,
+        }))
+      : undefined
+  };
+};
+
+
 const compressImage = (
   file: File,
   maxWidth: number,
@@ -297,10 +314,16 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(() => {
     const storedProducts = localStorage.getItem('products');
     if (storedProducts) {
-      return JSON.parse(storedProducts);
+      try {
+        const parsed = JSON.parse(storedProducts);
+        return parsed.map((p: any) => cleanseProduct(p));
+      } catch {
+        return SEED_PRODUCTS.map((p, idx) => ({ ...cleanseProduct(p), id: `seed-${idx}` }));
+      }
     } else {
-      localStorage.setItem('products', JSON.stringify(SEED_PRODUCTS));
-      return SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}` }));
+      const initial = SEED_PRODUCTS.map((p, idx) => ({ ...cleanseProduct(p), id: `seed-${idx}` }));
+      localStorage.setItem('products', JSON.stringify(initial));
+      return initial;
     }
   });
 
@@ -344,7 +367,22 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const storedCart = localStorage.getItem('ggms_cart');
-      return storedCart ? JSON.parse(storedCart) : [];
+      if (storedCart) {
+        const parsed = JSON.parse(storedCart);
+        return parsed.map((item: any) => {
+          const cleanItem = cleanseProduct(item);
+          return {
+            ...cleanItem,
+            quantity: Number(item.quantity) || 1,
+            selectedVariant: item.selectedVariant ? {
+              ...item.selectedVariant,
+              price: Number(item.selectedVariant.price) || 0,
+              mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && item.selectedVariant.mrp !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+            } : undefined
+          } as CartItem;
+        });
+      }
+      return [];
     } catch {
       return [];
     }
@@ -948,7 +986,7 @@ export default function App() {
         // Firestore has data – always use it
         const list: Product[] = [];
         snapshot.forEach((d) => {
-          list.push({ ...d.data(), id: d.id } as Product);
+          list.push(cleanseProduct({ ...d.data(), id: d.id }));
         });
         list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setProducts(list);
@@ -958,7 +996,7 @@ export default function App() {
         // Collection is genuinely empty on server – seed once
         hasSeededProducts = true;
         const saved = localStorage.getItem('products');
-        const initial: Product[] = saved ? JSON.parse(saved) : SEED_PRODUCTS.map((p, idx) => ({ ...p, id: `seed-${idx}`, order: idx }));
+        const initial: Product[] = saved ? JSON.parse(saved).map((p: any) => cleanseProduct(p)) : SEED_PRODUCTS.map((p, idx) => ({ ...cleanseProduct(p), id: `seed-${idx}`, order: idx }));
         initial.forEach((p) => {
           setDoc(doc(db, 'products', p.id), p).catch(err => console.error("Error seeding product:", err));
         });
@@ -1148,7 +1186,14 @@ export default function App() {
     const unsub = onSnapshot(collection(db, 'coupons'), (snapshot) => {
       const list: Coupon[] = [];
       snapshot.forEach((doc) => {
-        list.push({ ...doc.data(), id: doc.id } as Coupon);
+        const data = doc.data();
+        list.push({
+          ...data,
+          id: doc.id,
+          minOrderAmount: data.minOrderAmount !== undefined ? (Number(data.minOrderAmount) || 0) : 0,
+          discountValue: data.discountValue !== undefined ? (Number(data.discountValue) || 0) : 0,
+          maxDiscount: data.maxDiscount !== undefined ? (Number(data.maxDiscount) || undefined) : undefined,
+        } as Coupon);
       });
       setCoupons(list);
     }, (error) => {
@@ -1199,18 +1244,42 @@ export default function App() {
           }
           const cartSnap = await getDoc(doc(db, 'customerCarts', user.uid));
           if (cartSnap.exists() && cartSnap.data().items?.length > 0) {
-            setCart(cartSnap.data().items);
+            const list = cartSnap.data().items.map((item: any) => {
+              const cleanItem = cleanseProduct(item);
+              return {
+                ...cleanItem,
+                quantity: Number(item.quantity) || 1,
+                selectedVariant: item.selectedVariant ? {
+                  ...item.selectedVariant,
+                  price: Number(item.selectedVariant.price) || 0,
+                  mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && item.selectedVariant.mrp !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                } : undefined
+              } as CartItem;
+            });
+            setCart(list);
           } else {
             try {
               const storedCart = localStorage.getItem('ggms_cart');
               if (storedCart) {
                 const parsed = JSON.parse(storedCart);
                 if (parsed.length > 0) {
+                  const list = parsed.map((item: any) => {
+                    const cleanItem = cleanseProduct(item);
+                    return {
+                      ...cleanItem,
+                      quantity: Number(item.quantity) || 1,
+                      selectedVariant: item.selectedVariant ? {
+                        ...item.selectedVariant,
+                        price: Number(item.selectedVariant.price) || 0,
+                        mrp: (item.selectedVariant.mrp !== undefined && item.selectedVariant.mrp !== null && item.selectedVariant.mrp !== '') ? (Number(item.selectedVariant.mrp) || undefined) : undefined,
+                      } : undefined
+                    } as CartItem;
+                  });
                   await setDoc(doc(db, 'customerCarts', user.uid), {
-                    items: parsed,
+                    items: list,
                     updatedAt: new Date().toISOString()
                   });
-                  setCart(parsed);
+                  setCart(list);
                 }
               }
             } catch (err) {
@@ -1793,30 +1862,37 @@ export default function App() {
   };
 
   const addToCartInternal = (product: Product, quantity: number, selectedVariant?: ProductVariant) => {
+    const cleanProduct = cleanseProduct(product);
+    const cleanVariant = selectedVariant ? {
+      ...selectedVariant,
+      price: Number(selectedVariant.price) || 0,
+      mrp: (selectedVariant.mrp !== undefined && selectedVariant.mrp !== null && String(selectedVariant.mrp) !== '') ? (Number(selectedVariant.mrp) || undefined) : undefined,
+    } : undefined;
+
     setCart(prev => {
       const existing = prev.find(item => 
-        item.id === product.id && 
-        ((!item.selectedVariant && !selectedVariant) || (item.selectedVariant?.id === selectedVariant?.id))
+        item.id === cleanProduct.id && 
+        ((!item.selectedVariant && !cleanVariant) || (item.selectedVariant?.id === cleanVariant?.id))
       );
       if (existing) {
         return prev.map(item =>
-          item.id === product.id && 
-          ((!item.selectedVariant && !selectedVariant) || (item.selectedVariant?.id === selectedVariant?.id))
+          item.id === cleanProduct.id && 
+          ((!item.selectedVariant && !cleanVariant) || (item.selectedVariant?.id === cleanVariant?.id))
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
       
-      const finalPrice = selectedVariant ? selectedVariant.price : product.price;
-      const finalMrp = selectedVariant ? selectedVariant.mrp : product.mrp;
-      const finalUnit = selectedVariant ? selectedVariant.name : product.unit;
+      const finalPrice = cleanVariant ? cleanVariant.price : cleanProduct.price;
+      const finalMrp = cleanVariant ? cleanVariant.mrp : cleanProduct.mrp;
+      const finalUnit = cleanVariant ? cleanVariant.name : cleanProduct.unit;
 
       return [...prev, { 
-        ...product, 
+        ...cleanProduct, 
         price: finalPrice, 
         mrp: finalMrp, 
         unit: finalUnit, 
-        selectedVariant, 
+        selectedVariant: cleanVariant, 
         quantity 
       }];
     });
