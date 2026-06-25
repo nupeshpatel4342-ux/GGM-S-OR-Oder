@@ -1280,7 +1280,7 @@ export default function App() {
                     } as CartItem;
                   });
                   await setDoc(doc(db, 'customerCarts', user.uid), {
-                    items: listToSet,
+                    items: JSON.parse(JSON.stringify(listToSet)),
                     updatedAt: new Date().toISOString()
                   });
                 }
@@ -1314,10 +1314,15 @@ export default function App() {
     if (!isCartLoadedRef.current) return; // Wait until cart is loaded from server
     if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current);
     cartSaveTimerRef.current = setTimeout(() => {
-      setDoc(doc(db, 'customerCarts', customerUser.uid), {
-        items: cart,
-        updatedAt: new Date().toISOString()
-      }).catch(console.error);
+      try {
+        const cleanCart = JSON.parse(JSON.stringify(cart));
+        setDoc(doc(db, 'customerCarts', customerUser.uid), {
+          items: cleanCart,
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.error("Firestore cart write error:", err));
+      } catch (err) {
+        console.error("Error sanitizing cart for Firestore:", err);
+      }
     }, 1500);
     return () => { if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current); };
   }, [cart, customerUser]);
@@ -2011,7 +2016,7 @@ export default function App() {
     };
 
     try {
-      await setDoc(doc(db, 'orders', newOrder.id), newOrder);
+      await setDoc(doc(db, 'orders', newOrder.id), JSON.parse(JSON.stringify(newOrder)));
       
       // Update coupon usage if applicable
       if (appliedCoupon && customerUser) {
