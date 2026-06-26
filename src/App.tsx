@@ -967,10 +967,15 @@ export default function App() {
     }
   };
 
-  // Auto-register FCM token when user logs in (if permission already granted)
+  // Auto-request or auto-register FCM token when user logs in
   useEffect(() => {
-    if (customerUser && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      registerFcmToken();
+    if (customerUser && typeof Notification !== 'undefined') {
+      if (Notification.permission === 'default') {
+        // Auto-request permission on first load/login
+        requestNotificationPermission();
+      } else if (Notification.permission === 'granted') {
+        registerFcmToken();
+      }
     }
   }, [customerUser]);
 
@@ -9309,18 +9314,13 @@ export const MyAccountPage: React.FC<{
                   <button
                     type="button"
                     onClick={requestNotificationPermission}
-                    disabled={notificationPermission === 'granted'}
-                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border cursor-pointer ${
-                      notificationPermission === 'granted'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50 cursor-default'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-700/50 active:scale-[0.98]'
-                    }`}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 border cursor-pointer bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-700/50 active:scale-[0.98]`}
                   >
                     <Bell className="w-3.5 h-3.5" />
                     <span>
                       {notificationPermission === 'granted' 
-                        ? 'Notifications Active' 
-                        : (notificationPermission === 'denied' ? 'Permission Denied' : 'Enable Notifications')}
+                        ? 'Notifications Active (Click to Refresh)' 
+                        : (notificationPermission === 'denied' ? 'Permission Denied (Click to Try)' : 'Enable Notifications')}
                     </span>
                   </button>
                 </div>
