@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ggms-grocery-cache-v1';
+const CACHE_NAME = 'ggms-grocery-cache-v2';
 const OFFLINE_URL = '/offline.html';
 
 const ASSETS_TO_CACHE = [
@@ -38,6 +38,11 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: intercept network requests
 self.addEventListener('fetch', (event) => {
+  // Skip caching entirely on localhost for development to prevent stale assets
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Only handle GET requests and skip browser extensions or non-HTTP protocols
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
