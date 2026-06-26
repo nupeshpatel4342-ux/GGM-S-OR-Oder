@@ -1,47 +1,33 @@
 import { initializeApp as initAdminApp, cert, getApps } from "firebase-admin/app";
 import { getMessaging as getAdminMessaging } from "firebase-admin/messaging";
-import fs from "fs";
-import path from "path";
+
+// Embed the service account key directly to ensure 100% compatibility in Vercel Serverless environment
+const serviceAccount = {
+  type: "service_account",
+  project_id: "ggms-grocery",
+  private_key_id: "87e763c01232b9b2d3b9693867147a5a13b972b5",
+  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDfyz+C6VutGUEA\nprkcFwIrlkFP6TajpBBg/AAFH6yarXWWT+5bpMjI0pLRUXrmZ+BC1P97ZTZQueL/\nXDkhcka55IODZSELGz69opp0YGte3EEvh4prXQhoQhTQZeTeU0NrI0nkS5+XR62j\nMtGFmDZsAxwUNCQu988pCK6BSnTsHOesoRcVOnRDwxs4PhNc5rv6oAiOdDtbyN+x\nLomZgpbizChMEo66uKmx5ahrVDF9ZmDLtfMlROtLsSDwe0XupNpnOdqcMz89r0bj\n7SCtg7O2vrMiVbVPpxEVvImRItBxDRm1Fz5KCU7Ok+bNUFlg0EqSg792l4gk6Zqm\nFeBGo8GLAgMBAAECggEAJ2EQT+zYIOFsurybngG+dAUAgRs8bhcUerxdFIm6SY10\nP3rZKm8YlZ3YD9USlzB4Gcp5GjF5GUNcWirUMrp1D4jSS3CkG9wzchMGsqu0uQBw\nx/hFtxarwAzAtNr5JtXn6xZOjklwT6JhP3JVw/hAu0jgy/1Q0KLyZPoOGtoLMPCg\n4A/xFzbz7Zpkqxun3bNJtv5mbRVi99GBYKSrkzGcDmsM9duDRZbCHNOV5ZqLHp4j\nEt/z7wVcVAEq9vQ3Won5QfIc22iQ8jQOpjXWwFi0wzl7hZGKC9KqE4DnuDa396+F\nuwwxXLqiQEbT9y5hH81NKn20v24CMOQe5jVkgUS5gQKBgQD1jVU7rrBAwsNju2xA\nV08ZgkKUb1IsL/pxcyA5Xr7yBUhFC7n8uatTc2z8jYCR8i1lSRWPs81vHYonTVBr\nXYzZKfE7PIbWscHIHIxzSn22r8wJJwwMB6f6RoJIPgDlJL8CMr6FoCGfDykVhiPn\nWKp9kgrPsPMTuaEtRyPejs2+GwKBgQDpUOpVP3ftm9pIdXE8khZFcx+eqqLm1K/E\n8uOCOZVl0bmfkX7RBmxxx7aAgemg8FVy1IS13nrfsNPLuhhVOOO1Ufy6bEA/GyJP\nZmaxsHdEmTwJoulqHeQkQicXp4YT0xv6rpz/JcatSR3TXVIWnKZx/Xp2ii0qTGtU\nMJZPAC2BUQKBgQDPl/MNB/y+Y2oosNUt+CJJYJTFRO/lp5JFw5zko7MujUSyCt3s\nSVQMszLauQ6PVH0IeiceXFY7sG+SFoz8mBRxrEHjYKJmc9VuRqR+++UYQ7ttqXNH\n4Fkk/+M5DCJZlx1c0GW+Nsj13i1Pox5LgexxSLyXJfP7Ix6eVtx+VaCfLQKBgCTU\nMfk86IhoRp+Tckl2Ye+aiY45LzeysQAsuv7uagfFgECQ7ey+z9VyCfvlBeTyqvpS\nU5SFxu2ScwxAluC09zTC+VrQBaAwf0z7RBCeY2U/rvtybNfkWgPjMVqJhh+Q/mSm\ntX+NDfyCgyO/IlsRZTCvK2qUyyZXI8YJWWClDYnRAoGAXVa2uyfI1ezQ4RUvmZtr\nCTpK32g9ucvUb181UnjdR0C4XlNIZgR6aeKZk6vCGu+0Ws6v7mt8bDorr3b1cAeg\ncSvHeLmK4t5Vokdf9B5URJiOXdmUHVbjOAR8zyc19ygQHdOywGFy8gvzrPqK/w+h\n8i+bkY+PhNHu/b2RVdp60zg=\n-----END PRIVATE KEY-----\n",
+  client_email: "firebase-adminsdk-fbsvc@ggms-grocery.iam.gserviceaccount.com",
+  client_id: "106504131814843024715",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ggms-grocery.iam.gserviceaccount.com",
+  universe_domain: "googleapis.com"
+};
 
 let adminMessaging: any = null;
 let adminInitError: string = "";
-
-function findFile(dir: string, fileName: string): string | null {
-  try {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const fullPath = path.join(dir, file);
-      if (file === fileName) {
-        return fullPath;
-      }
-      // Avoid traversing node_modules and hidden folders
-      if (!file.includes('node_modules') && !file.startsWith('.')) {
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          const found = findFile(fullPath, fileName);
-          if (found) return found;
-        }
-      }
-    }
-  } catch (e) {}
-  return null;
-}
-
 try {
   let appInstance;
   // Use a named app to avoid conflicts with default-initialized apps in serverless environments
   const existingApp = getApps().find(app => app.name === 'admin-messaging-app');
   if (!existingApp) {
-    const saPath = findFile(process.cwd(), "service-account-key.json");
-    if (!saPath) {
-      throw new Error(`Service account key not found anywhere under ${process.cwd()}. Directory contents: ${fs.readdirSync(process.cwd()).join(', ')}`);
-    }
-    const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
     appInstance = initAdminApp({
-      credential: cert(serviceAccount),
+      credential: cert(serviceAccount as any),
       projectId: "ggms-grocery"
     }, 'admin-messaging-app');
-    console.log(`✅ Vercel Serverless: Named Admin SDK initialized via file found at ${saPath}`);
+    console.log("✅ Vercel Serverless: Named Admin SDK initialized via embedded key constant");
   } else {
     appInstance = existingApp;
   }
