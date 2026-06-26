@@ -936,7 +936,8 @@ export default function App() {
         showToast('FCM messaging is not supported in this browser.', 'error');
         return;
       }
-      const vapidKey = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY;
+      // @ts-ignore
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
       if (!vapidKey || vapidKey === 'YOUR_VAPID_KEY_HERE') {
         showToast('FCM VAPID key is missing or not configured in .env', 'error');
         console.warn('⚠️ VAPID key not configured — FCM token will not be generated');
