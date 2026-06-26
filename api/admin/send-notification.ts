@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 
 let adminMessaging: any = null;
+let adminInitError: string = "";
 try {
   let appInstance;
   // Use a named app to avoid conflicts with default-initialized apps in serverless environments
@@ -11,19 +12,30 @@ try {
   if (!existingApp) {
     const saPath = path.join(process.cwd(), "service-account-key.json");
     if (!fs.existsSync(saPath)) {
-      throw new Error(`Service account key not found at ${saPath}`);
+      // Let's also check relative to __dirname
+      const saPathDir = path.resolve(__dirname, "../../service-account-key.json");
+      if (!fs.existsSync(saPathDir)) {
+        throw new Error(`Service account key not found at ${saPath} or ${saPathDir}. Directory contents of process.cwd(): ${fs.readdirSync(process.cwd()).join(', ')}`);
+      }
+      const serviceAccount = JSON.parse(fs.readFileSync(saPathDir, "utf8"));
+      appInstance = initAdminApp({
+        credential: cert(serviceAccount),
+        projectId: "ggms-grocery"
+      }, 'admin-messaging-app');
+    } else {
+      const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
+      appInstance = initAdminApp({
+        credential: cert(serviceAccount),
+        projectId: "ggms-grocery"
+      }, 'admin-messaging-app');
     }
-    const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
-    appInstance = initAdminApp({
-      credential: cert(serviceAccount),
-      projectId: "ggms-grocery"
-    }, 'admin-messaging-app');
     console.log("✅ Vercel Serverless: Named Admin SDK initialized via read file");
   } else {
     appInstance = existingApp;
   }
   adminMessaging = getAdminMessaging(appInstance);
-} catch (err) {
+} catch (err: any) {
+  adminInitError = err?.message || String(err);
   console.error("❌ Vercel Serverless: Admin SDK init failed:", err);
 }
 
@@ -52,7 +64,7 @@ export default async function handler(req: any, res: any) {
   }
 
   if (!adminMessaging) {
-    return res.status(500).json({ error: "Firebase Admin Messaging not initialized" });
+    return res.status(500).json({ error: "Firebase Admin Messaging not initialized. Init Error: " + adminInitError });
   }
 
   const { fcmToken, title, body, data } = req.body || {};
