@@ -104,24 +104,33 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push notification event listener (Push Notifications Ready Structure)
 self.addEventListener('push', (event) => {
-  let data = { title: 'GGM&S Grocery', body: 'New offers and updates waiting for you!' };
+  let title = 'GGM&S Grocery';
+  let body = 'New offers and updates waiting for you!';
+  let url = '/';
+
   if (event.data) {
     try {
-      data = event.data.json();
+      const payload = event.data.json();
+      // FCM wraps notification payload in payload.notification or payload.data
+      const notification = payload.notification || (payload.data && payload.data.notification ? JSON.parse(payload.data.notification) : payload);
+      title = notification.title || payload.title || title;
+      body = notification.body || payload.body || body;
+      
+      const customData = payload.data || payload;
+      url = customData.url || url;
     } catch (e) {
-      data = { title: 'GGM&S Grocery', body: event.data.text() };
+      body = event.data.text() || body;
     }
   }
 
   const options = {
-    body: data.body,
+    body: body,
     icon: '/icon-192.png',
     badge: '/icon-192.png', // Small monochrome image for android notification bar
     vibrate: [100, 50, 100],
     data: {
-      url: data.url || '/'
+      url: url
     },
     actions: [
       { action: 'open_url', title: 'Open App' },
@@ -130,7 +139,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, options)
   );
 });
 

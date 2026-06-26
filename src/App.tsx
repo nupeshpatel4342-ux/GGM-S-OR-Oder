@@ -932,22 +932,37 @@ export default function App() {
     if (!customerUser) return;
     try {
       const messaging = await getFirebaseMessaging();
-      if (!messaging) return;
+      if (!messaging) {
+        showToast('FCM messaging is not supported in this browser.', 'error');
+        return;
+      }
       const vapidKey = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY;
       if (!vapidKey || vapidKey === 'YOUR_VAPID_KEY_HERE') {
+        showToast('FCM VAPID key is missing or not configured in .env', 'error');
         console.warn('⚠️ VAPID key not configured — FCM token will not be generated');
         return;
       }
+      
+      showToast('Configuring notifications...', 'info');
       const swReg = await navigator.serviceWorker.ready;
+      if (!swReg) {
+        showToast('Service Worker is not ready yet.', 'error');
+        return;
+      }
+      
       const token = await getToken(messaging, {
         vapidKey,
         serviceWorkerRegistration: swReg
       });
       if (token) {
         await setDoc(doc(db, 'customers', customerUser.uid), { fcmToken: token }, { merge: true });
-        console.log('✅ FCM token saved to Firestore');
+        showToast('Notifications registered successfully!', 'success');
+        console.log('✅ FCM token saved to Firestore:', token);
+      } else {
+        showToast('Failed to retrieve notification token.', 'error');
       }
-    } catch (err) {
+    } catch (err: any) {
+      showToast(`Notification registration failed: ${err?.message || err}`, 'error');
       console.error('❌ Failed to get FCM token:', err);
     }
   };
