@@ -1,6 +1,7 @@
 import { initializeApp as initAdminApp, cert, getApps } from "firebase-admin/app";
 import { getMessaging as getAdminMessaging } from "firebase-admin/messaging";
-import serviceAccount from "../../service-account-key.json";
+import fs from "fs";
+import path from "path";
 
 let adminMessaging: any = null;
 try {
@@ -8,11 +9,16 @@ try {
   // Use a named app to avoid conflicts with default-initialized apps in serverless environments
   const existingApp = getApps().find(app => app.name === 'admin-messaging-app');
   if (!existingApp) {
+    const saPath = path.join(process.cwd(), "service-account-key.json");
+    if (!fs.existsSync(saPath)) {
+      throw new Error(`Service account key not found at ${saPath}`);
+    }
+    const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
     appInstance = initAdminApp({
-      credential: cert(serviceAccount as any),
+      credential: cert(serviceAccount),
       projectId: "ggms-grocery"
     }, 'admin-messaging-app');
-    console.log("✅ Vercel Serverless: Named Admin SDK initialized via imported key");
+    console.log("✅ Vercel Serverless: Named Admin SDK initialized via read file");
   } else {
     appInstance = existingApp;
   }
