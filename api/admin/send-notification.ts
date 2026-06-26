@@ -12,23 +12,13 @@ try {
   if (!existingApp) {
     const saPath = path.join(process.cwd(), "service-account-key.json");
     if (!fs.existsSync(saPath)) {
-      // Let's also check relative to __dirname
-      const saPathDir = path.resolve(__dirname, "../../service-account-key.json");
-      if (!fs.existsSync(saPathDir)) {
-        throw new Error(`Service account key not found at ${saPath} or ${saPathDir}. Directory contents of process.cwd(): ${fs.readdirSync(process.cwd()).join(', ')}`);
-      }
-      const serviceAccount = JSON.parse(fs.readFileSync(saPathDir, "utf8"));
-      appInstance = initAdminApp({
-        credential: cert(serviceAccount),
-        projectId: "ggms-grocery"
-      }, 'admin-messaging-app');
-    } else {
-      const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
-      appInstance = initAdminApp({
-        credential: cert(serviceAccount),
-        projectId: "ggms-grocery"
-      }, 'admin-messaging-app');
+      throw new Error(`Service account key not found at ${saPath}. Directory contents of process.cwd(): ${fs.readdirSync(process.cwd()).join(', ')}`);
     }
+    const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
+    appInstance = initAdminApp({
+      credential: cert(serviceAccount),
+      projectId: "ggms-grocery"
+    }, 'admin-messaging-app');
     console.log("✅ Vercel Serverless: Named Admin SDK initialized via read file");
   } else {
     appInstance = existingApp;
