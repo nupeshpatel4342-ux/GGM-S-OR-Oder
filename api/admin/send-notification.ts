@@ -1,24 +1,24 @@
 import { initializeApp as initAdminApp, cert, getApps } from "firebase-admin/app";
 import { getMessaging as getAdminMessaging } from "firebase-admin/messaging";
-import fs from "fs";
-import path from "path";
 
-// Initialize Firebase Admin SDK if not already done
+// Statically require the service account key so esbuild bundles it directly in the Vercel function
+const serviceAccount = require("../../service-account-key.json");
+
 let adminMessaging: any = null;
 try {
-  if (getApps().length === 0) {
-    const saPath = path.resolve(process.cwd(), "service-account-key.json");
-    if (fs.existsSync(saPath)) {
-      initAdminApp({
-        credential: cert(saPath),
-        projectId: "ggms-grocery"
-      });
-      console.log("✅ Vercel Serverless: Admin SDK initialized via service-account-key.json");
-    } else {
-      console.warn("⚠️ Vercel Serverless: Service account key not found at", saPath);
-    }
+  let appInstance;
+  // Use a named app to avoid conflicts with default-initialized apps in serverless environments
+  const existingApp = getApps().find(app => app.name === 'admin-messaging-app');
+  if (!existingApp) {
+    appInstance = initAdminApp({
+      credential: cert(serviceAccount),
+      projectId: "ggms-grocery"
+    }, 'admin-messaging-app');
+    console.log("✅ Vercel Serverless: Named Admin SDK initialized via bundled key");
+  } else {
+    appInstance = existingApp;
   }
-  adminMessaging = getAdminMessaging();
+  adminMessaging = getAdminMessaging(appInstance);
 } catch (err) {
   console.error("❌ Vercel Serverless: Admin SDK init failed:", err);
 }
