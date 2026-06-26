@@ -12,7 +12,7 @@ let hasSeededBanners = false;
 let hasSeededSettings = false;
 import { 
   ShoppingCart, Search, Package, Smartphone, Plus, Trash2, ChevronLeft, 
-  ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, 
+  ChevronRight, MapPin, Phone, User, Send, LayoutDashboard, Camera, X, Mail,
   Image as ImageIcon, LogOut, ArrowLeft, 
   CheckCircle, Settings, ClipboardList, 
   TrendingUp, IndianRupee, AlertCircle, Edit, Store,
@@ -27,7 +27,7 @@ import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router
 import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord } from './types.ts';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from './firebase.ts';
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, type User as FirebaseAuthUser } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, type User as FirebaseAuthUser } from 'firebase/auth';
 
 enum OperationType {
   CREATE = 'create',
@@ -8046,31 +8046,35 @@ export const AuthModal: React.FC<{
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onAuthSuccess: () => void;
 }> = ({ isOpen, onClose, showToast, onAuthSuccess }) => {
-  const [tab, setTab] = useState<'login' | 'signup'>('login');
+  const [tab, setTab] = useState<'login' | 'signup' | 'forgot'>('login');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Forgot Password state
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLinkSent, setForgotLinkSent] = useState(false);
+
   if (!isOpen) return null;
+
+  const resetForgotState = () => {
+    setForgotEmail('');
+    setForgotLinkSent(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !password) {
+    if (!email || !password) {
       showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
-      return;
-    }
-    const cleanPhone = normalizePhone(phone);
-    if (cleanPhone.length < 10) {
-      showToast('સાચો ફોન નંબર દાખલ કરો / Enter a valid phone number.', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const email = `${cleanPhone}@ggms.app`;
       await signInWithEmailAndPassword(auth, email, password);
       showToast('સફળતાપૂર્વક લૉગિન થયા! / Login Successful! 🎉', 'success');
       onAuthSuccess();
@@ -8079,7 +8083,7 @@ export const AuthModal: React.FC<{
       console.error(error);
       let errMsg = 'લૉગિન નિષ્ફળ ગયું / Login Failed';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errMsg = 'મોબાઈલ નંબર અથવા પાસવર્ડ ખોટો છે / Incorrect mobile or password';
+        errMsg = 'ઈમેલ અથવા પાસવર્ડ ખોટો છે / Incorrect email or password';
       }
       showToast(errMsg, 'error');
     } finally {
@@ -8089,7 +8093,7 @@ export const AuthModal: React.FC<{
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !password || !confirmPassword) {
+    if (!name || !email || !phone || !password || !confirmPassword) {
       showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
       return;
     }
@@ -8109,7 +8113,6 @@ export const AuthModal: React.FC<{
 
     setLoading(true);
     try {
-      const email = `${cleanPhone}@ggms.app`;
       // Create user
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       const user = credential.user;
@@ -8122,6 +8125,7 @@ export const AuthModal: React.FC<{
         uid: user.uid,
         name,
         phone: cleanPhone,
+        email,
         createdAt: new Date().toISOString(),
         savedAddresses: [],
         wishlist: []
@@ -8135,9 +8139,66 @@ export const AuthModal: React.FC<{
       console.error(error);
       let errMsg = 'સાઇનઅપ નિષ્ફળ ગયું / Signup Failed';
       if (error.code === 'auth/email-already-in-use') {
-        errMsg = 'આ નંબર પર એકાઉન્ટ પહેલેથી બનેલું છે / This number is already registered.';
+        errMsg = 'આ ઈમેલ પર એકાઉન્ટ પહેલેથી બનેલું છે / This email is already registered.';
       }
       showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendResetLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      showToast('કૃપા કરીને ઈમેલ લખો / Please enter email.', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail);
+      setForgotLinkSent(true);
+      showToast('પાસવર્ડ રીસેટ લિંક મોકલી દેવામાં આવી છે! / Reset link sent! 📧', 'success');
+    } catch (error: any) {
+      console.error(error);
+      let errMsg = 'લિંક મોકલવામાં નિષ્ફળતા / Failed to send link';
+      if (error.code === 'auth/user-not-found') {
+        errMsg = 'આ ઈમેલ રજીસ્ટર થયેલો નથી / This email is not registered.';
+      }
+      showToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Save user to Firestore if not exists
+      const docRef = doc(db, 'customers', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        const newProfile: CustomerProfile = {
+          uid: user.uid,
+          name: user.displayName || 'Google User',
+          phone: user.phoneNumber || '',
+          email: user.email || '',
+          createdAt: new Date().toISOString(),
+          savedAddresses: [],
+          wishlist: []
+        };
+        await setDoc(docRef, newProfile);
+      }
+
+      showToast('Google વડે સફળતાપૂર્વક લોગીન થયા! / Google Login Successful! 🚀', 'success');
+      onAuthSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      showToast('Google લોગીન નિષ્ફળ ગયું / Google Login Failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -8174,7 +8235,7 @@ export const AuthModal: React.FC<{
         <div className="flex border-b border-slate-100 bg-slate-50">
           <button
             type="button"
-            onClick={() => { setTab('login'); }}
+            onClick={() => { setTab('login'); resetForgotState(); }}
             className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
               tab === 'login' 
                 ? 'border-emerald-600 text-emerald-600 bg-white' 
@@ -8185,7 +8246,7 @@ export const AuthModal: React.FC<{
           </button>
           <button
             type="button"
-            onClick={() => { setTab('signup'); }}
+            onClick={() => { setTab('signup'); resetForgotState(); }}
             className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
               tab === 'signup' 
                 ? 'border-emerald-600 text-emerald-600 bg-white' 
@@ -8201,15 +8262,15 @@ export const AuthModal: React.FC<{
           {tab === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number / વૉટ્સએપ નંબર</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     required
-                    type="tel"
-                    placeholder="દા.ત. 9876543210"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
+                    type="email"
+                    placeholder="example@gmail.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
                   />
                 </div>
@@ -8254,16 +8315,38 @@ export const AuthModal: React.FC<{
                 </button>
               </div>
 
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-100"></div>
+                <span className="flex-shrink mx-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">or / અથવા</span>
+                <div className="flex-grow border-t border-slate-100"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full py-3.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center gap-3 bg-white cursor-pointer"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
+                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
+                </svg>
+                Sign in with Google / ગૂગલ લોગીન
+              </button>
+
               <div className="text-center pt-2">
-                <p className="text-[10px] text-slate-400 font-bold">
-                  Forgot Password? / પાસવર્ડ ભૂલી ગયા?
-                </p>
-                <p className="text-[11px] font-black text-emerald-600 mt-1">
-                  દુકાન પર રૂબરૂ અથવા WhatsApp પર સંપર્ક કરો.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => { setTab('forgot'); resetForgotState(); }}
+                  className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors cursor-pointer underline underline-offset-2"
+                >
+                  Forgot Password? / પાસવર્ડ ભૂલી ગયા? 🔑
+                </button>
               </div>
             </form>
-          ) : (
+          ) : tab === 'signup' ? (
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Name / તમારું પૂરું નામ</label>
@@ -8275,6 +8358,21 @@ export const AuthModal: React.FC<{
                     placeholder="નામ અને અટક"
                     value={name}
                     onChange={e => setName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    required
+                    type="email"
+                    placeholder="example@gmail.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
                   />
                 </div>
@@ -8349,6 +8447,27 @@ export const AuthModal: React.FC<{
                 </button>
               </div>
 
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-100"></div>
+                <span className="flex-shrink mx-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">or / અથવા</span>
+                <div className="flex-grow border-t border-slate-100"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full py-3.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center gap-3 bg-white cursor-pointer"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
+                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
+                </svg>
+                Sign up with Google / ગૂગલ સાઇનઅપ
+              </button>
+
               <div className="text-center pt-2">
                 <button
                   type="button"
@@ -8359,7 +8478,82 @@ export const AuthModal: React.FC<{
                 </button>
               </div>
             </form>
-          )}
+          ) : tab === 'forgot' ? (
+            /* ─── Forgot Password Flow ─── */
+            <div className="space-y-4">
+              {!forgotLinkSent ? (
+                <form onSubmit={handleSendResetLink} className="space-y-4">
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-[10.5px] text-emerald-800 font-bold text-center leading-relaxed">
+                    તમારા રજીસ્ટર ઈમેલ પર પાસવર્ડ રીસેટ કરવાની લિંક મોકલવામાં આવશે. 
+                    <span className="block mt-1 text-[9px] text-slate-400">We will send a password reset link to your registered email.</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        required
+                        type="email"
+                        placeholder="example@gmail.com"
+                        value={forgotEmail}
+                        onChange={e => setForgotEmail(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        રીસેટ લિંક મોકલો / Send Reset Link
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4 py-2 text-center animate-in fade-in zoom-in-95 duration-200">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <CheckCircle className="w-8 h-8" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-black text-slate-800">લિંક મોકલી દેવાઈ છે! / Reset Link Sent!</h4>
+                    <p className="text-[11px] text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
+                      અમે <span className="text-emerald-700 font-black">{forgotEmail}</span> પર પાસવર્ડ બદલવાની લિંક મોકલી દીધી છે. કૃપા કરીને તમારું ઇમેલ ઇનબોક્સ અને સ્પામ ફોલ્ડર ચેક કરો.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setTab('login'); resetForgotState(); }}
+                    className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-700 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                  >
+                    Login પેજ પર પાછા જાઓ / Back to Login
+                  </button>
+                </div>
+              )}
+
+              {!forgotLinkSent && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setTab('login'); resetForgotState(); }}
+                    className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors cursor-pointer"
+                  >
+                    ← Login પર પાછા જાઓ / Back to Login
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -8438,23 +8632,7 @@ export const MyAccountPage: React.FC<{
 
     setProfileUpdating(true);
     try {
-      // 1. Update Firebase Auth Email if phone changed
-      if (cleanPhone !== customerProfile?.phone) {
-        const newEmail = `${cleanPhone}@ggms.app`;
-        try {
-          const { updateEmail } = await import('firebase/auth');
-          await updateEmail(customerUser, newEmail);
-        } catch (authError: any) {
-          console.error('Firebase Auth email update failed:', authError);
-          if (authError.code === 'auth/requires-recent-login') {
-            showToast('સેક્યુરિટીના કારણે નંબર બદલવા માટે ફરીથી લોગિન કરવું પડશે / For security, please log out and log in again to change phone number', 'error');
-            setProfileUpdating(false);
-            return;
-          }
-        }
-      }
-
-      // 2. Update Firebase Auth Profile name
+      // 1. Update Firebase Auth Profile name
       await updateProfile(customerUser, { displayName: profileName });
 
       // 3. Update Firestore Profile Doc

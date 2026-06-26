@@ -1,13 +1,40 @@
 import crypto from "crypto";
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp as initializeFirebaseApp } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocs, collection, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocs, collection, setDoc, deleteDoc } from "firebase/firestore";
+import { initializeApp as initAdminApp, cert } from "firebase-admin/app";
+import { getAuth as getAdminAuth, type Auth as AdminAuth } from "firebase-admin/auth";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// ─── Firebase Admin SDK Initialization ────────────────────────────────
+// Password reset mate Firebase Admin SDK jaruri chhe.
+// Service account JSON file nu path GOOGLE_APPLICATION_CREDENTIALS env var ma set karo
+// ATHVA service-account-key.json file project root ma muko.
+let adminAuth: AdminAuth | null = null;
+try {
+  const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account-key.json";
+  if (fs.existsSync(saPath)) {
+    initAdminApp({
+      credential: cert(saPath),
+      projectId: "ggms-grocery"
+    });
+    adminAuth = getAdminAuth();
+    console.log("✅ Firebase Admin SDK initialized — password reset enabled.");
+  } else {
+    console.warn("⚠️  Service account key not found at:", saPath);
+    console.warn("   Password reset will NOT work. Place service-account-key.json in project root");
+    console.warn("   or set GOOGLE_APPLICATION_CREDENTIALS env var.");
+  }
+} catch (err) {
+  console.warn("⚠️  Firebase Admin SDK init failed:", err);
+  console.warn("   Password reset will NOT work.");
+}
 
 const firebaseConfig = {
   projectId: "ggms-grocery",
@@ -29,6 +56,8 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
 const sessions = new Map<string, { expiresAt: number }>();
 const pendingChallenges = new Map<string, { expiresAt: number }>();
+
+
 
 function isStrongPassword(password: string): boolean {
   return password.length >= 12 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
@@ -124,6 +153,9 @@ async function startServer() {
   app.get("/api/admin/orders", requireAdminAuth, (_req, res) => res.json({ ok: true }));
   app.get("/api/admin/settings", requireAdminAuth, (_req, res) => res.json({ ok: true }));
   app.get("/api/admin/reports", requireAdminAuth, (_req, res) => res.json({ ok: true }));
+
+
+
 
   app.post("/api/ai/chat", async (req, res) => {
     const { message, history } = req.body || {};

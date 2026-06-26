@@ -76,6 +76,7 @@ export interface CustomerProfile {
   uid: string;
   name: string;
   phone: string;
+  email?: string;
   createdAt: string;
   savedAddresses: SavedAddress[];
   wishlist: string[];
