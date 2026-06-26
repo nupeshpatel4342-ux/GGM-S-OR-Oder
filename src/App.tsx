@@ -3747,7 +3747,7 @@ export default function App() {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowAuthModal(true)}
+                    onClick={() => navigate('/login', { state: { from: location.pathname } })}
                     className="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all bg-emerald-600 text-white shadow-md hover:bg-[#00884F]"
                   >
                     <UserPlus className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
@@ -3780,6 +3780,27 @@ export default function App() {
         {/* View Routing */}
         <AnimatePresence mode="wait">
           <Routes>
+            {/* Customer Login Route */}
+            <Route path="/login" element={
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <LoginPage 
+                  customerUser={customerUser} 
+                  showToast={showToast} 
+                  onAuthSuccess={() => {
+                    if (authRedirectAction) {
+                      authRedirectAction();
+                      setAuthRedirectAction(null);
+                    }
+                  }} 
+                />
+              </motion.div>
+            } />
+
             {/* Admin View Routes */}
             <Route path="/admin/*" element={
               <motion.div
@@ -3844,8 +3865,7 @@ export default function App() {
                     <p className="text-slate-400 text-xs">તમારું એકાઉન્ટ અને ઓર્ડર ઇતિહાસ જોવા માટે લૉગિન કરવું જરૂરી છે.</p>
                     <button
                       onClick={() => {
-                        setAuthRedirectAction(() => () => navigate('/account'));
-                        setShowAuthModal(true);
+                        navigate('/login', { state: { from: '/account' } });
                       }}
                       className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
                     >
@@ -8066,6 +8086,171 @@ export const ToastContainer: React.FC<{ toasts: ToastMessage[] }> = ({ toasts })
   );
 };
 
+export const LoginPage: React.FC<{
+  customerUser: FirebaseAuthUser | null;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onAuthSuccess: () => void;
+}> = ({ customerUser, showToast, onAuthSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (customerUser) {
+      const from = (location.state as any)?.from || '/account';
+      navigate(from, { replace: true });
+    }
+  }, [customerUser, navigate, location]);
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Save user to Firestore if not exists
+      const docRef = doc(db, 'customers', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        const newProfile: CustomerProfile = {
+          uid: user.uid,
+          name: user.displayName || 'Google User',
+          phone: user.phoneNumber || '',
+          email: user.email || '',
+          createdAt: new Date().toISOString(),
+          savedAddresses: [],
+          wishlist: []
+        };
+        await setDoc(docRef, newProfile);
+      }
+
+      showToast('Google વડે સફળતાપૂર્વક લોગીન થયા! / Google Login Successful! 🚀', 'success');
+      onAuthSuccess();
+    } catch (error: any) {
+      console.error(error);
+      const detailedError = error.message || error.code || String(error);
+      showToast('Google Login Failed: ' + detailedError, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 font-sans">
+      <motion.div 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(0,136,79,0.08)] border border-slate-100 dark:border-slate-800 flex flex-col p-8 space-y-6"
+      >
+        {/* Close button that goes back to home page */}
+        <button 
+          onClick={() => navigate('/')} 
+          className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-205 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-2 rounded-full transition-all cursor-pointer border-none z-20 flex items-center justify-center"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Top Section */}
+        <div className="flex flex-col items-center pt-4 text-center select-none">
+          {/* Logo Placeholder */}
+          <div className="flex items-center gap-1.5 mb-5 bg-[#00884F]/5 dark:bg-[#00884F]/10 px-4 py-1.5 rounded-full border border-[#00884F]/10">
+            <span className="w-2 h-2 rounded-full bg-[#f97316] animate-ping" />
+            <span className="text-[11px] font-black tracking-widest text-[#00884F] dark:text-emerald-450 uppercase">GGMS GROCERY</span>
+          </div>
+
+          {/* Grocery shopping illustration */}
+          <div className="relative w-32 h-32 mb-6 flex items-center justify-center bg-gradient-to-tr from-[#00884F]/5 to-[#f97316]/5 dark:from-[#00884F]/10 dark:to-[#f97316]/10 rounded-full">
+            <svg className="w-20 h-20 text-emerald-600 dark:text-emerald-455" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M25 40H75V80C75 85.5228 70.5228 90 65 90H35C29.4772 90 25 85.5228 25 80V40Z" fill="url(#loginPageBagGrad)" />
+              <path d="M38 18C38 18 48 30 46 45H32C30 30 38 18 38 18Z" fill="#F97316" />
+              <path d="M38 18C39 12 36 8 36 8" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M41 18C43 14 42 9 42 9" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M60 12C63 8 70 8 72 14C74 20 68 28 64 35C62 38 56 42 56 42C56 42 54 30 56 22C58 14 60 12 60 12Z" fill="#22C55E" opacity="0.9" />
+              <path d="M52 20C54 16 59 15 61 19C63 23 59 29 56 34" stroke="#15803D" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="53" cy="38" r="10" fill="#EF4444" />
+              <path d="M53 28C54 26 55 26 55 26" stroke="#15803D" strokeWidth="2" strokeLinecap="round" />
+              <path d="M40 40C40 28.9543 44.4772 20 50 20C55.5228 20 60 28.9543 60 40" stroke="#00884F" strokeWidth="4.5" strokeLinecap="round" />
+              <path d="M43 40C43 31.5 46.134 25 50 25C53.866 25 57 31.5 57 40" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
+              <defs>
+                <linearGradient id="loginPageBagGrad" x1="25" y1="40" x2="75" y2="90" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#10B981" stopOpacity="0.15" />
+                  <stop stopColor="#00884F" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <Sparkles className="w-5 h-5 text-[#f97316] absolute top-4 right-4 animate-bounce" />
+            <ShoppingBag className="w-5 h-5 text-[#00884F] absolute bottom-3 left-4 rotate-12" />
+          </div>
+
+          {/* Welcome Messages */}
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight mb-2">
+            🛒 GGMS Grocery માં આપનું સ્વાગત છે
+          </h3>
+          <p className="text-xs font-black text-[#00884F] dark:text-emerald-450 mb-4 px-2">
+            ઘરે બેઠા ગ્રોસરી ખરીદવા માટે લોગિન કરો
+          </p>
+          
+          <div className="w-12 h-0.5 bg-gradient-to-r from-[#00884F]/30 via-[#f97316]/30 to-[#00884F]/30 rounded-full mb-4" />
+          
+          <h4 className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
+            Welcome to GGMS Grocery
+          </h4>
+          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+            Login to continue shopping
+          </p>
+        </div>
+
+        {/* Action Button & Footer details */}
+        <div className="space-y-6">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full py-4 border-2 border-[#00884F]/20 hover:border-[#00884F] dark:border-slate-700 dark:hover:border-emerald-500 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 active:scale-[0.98] rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-3 shadow-md hover:shadow-lg shadow-emerald-100/30 dark:shadow-none cursor-pointer"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2.5 border-[#00884F] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
+                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
+                </svg>
+                Continue with Google
+              </>
+            )}
+          </button>
+
+          <div className="flex flex-col items-center space-y-4">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-black tracking-wide">
+              <Lock className="w-3.5 h-3.5 text-[#00884F]" />
+              Secure login with your Google account
+            </div>
+
+            <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
+
+            {/* Footer Details */}
+            <div className="text-center pb-2">
+              <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 tracking-widest uppercase mb-1">GGMS Grocery</p>
+              <p className="text-[9px] text-[#f97316] font-extrabold tracking-wide flex items-center justify-center gap-2">
+                <span>Fresh Grocery</span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span>Easy Shopping</span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span>Fast Delivery</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export const AuthModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -8120,98 +8305,108 @@ export const AuthModal: React.FC<{
       />
 
       {/* Modal Card */}
-      <div className="relative bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-205">
-        
-        {/* Header decoration */}
-        <div className="bg-gradient-to-b from-emerald-600 to-emerald-700 p-8 text-white text-center relative overflow-hidden">
-          {/* Close Button */}
-          <button 
-            onClick={onClose} 
-            className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all cursor-pointer border-none"
-          >
-            <X className="w-4 h-4" />
-          </button>
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(0,136,79,0.08)] border border-slate-100 dark:border-slate-800 flex flex-col z-10 p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+        {/* Close Button */}
+        <button 
+          onClick={onClose} 
+          className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-2 rounded-full transition-all cursor-pointer border-none z-20 flex items-center justify-center"
+        >
+          <X className="w-4 h-4" />
+        </button>
 
-          {/* Grocery Icons Background Pattern */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none flex items-center justify-around flex-wrap gap-4 p-8">
-            <ShoppingBag className="w-8 h-8" />
-            <Sparkles className="w-8 h-8" />
-            <Percent className="w-8 h-8" />
-            <Store className="w-8 h-8" />
+        {/* Top Section */}
+        <div className="flex flex-col items-center pt-4 text-center select-none">
+          {/* Logo Placeholder */}
+          <div className="flex items-center gap-1.5 mb-5 bg-[#00884F]/5 dark:bg-[#00884F]/10 px-4 py-1.5 rounded-full border border-[#00884F]/10">
+            <span className="w-2 h-2 rounded-full bg-[#f97316] animate-ping" />
+            <span className="text-[11px] font-black tracking-widest text-[#00884F] dark:text-emerald-450 uppercase">GGMS GROCERY</span>
           </div>
+
+          {/* Grocery shopping illustration */}
+          <div className="relative w-32 h-32 mb-6 flex items-center justify-center bg-gradient-to-tr from-[#00884F]/5 to-[#f97316]/5 dark:from-[#00884F]/10 dark:to-[#f97316]/10 rounded-full">
+            <svg className="w-20 h-20 text-emerald-600 dark:text-emerald-455" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M25 40H75V80C75 85.5228 70.5228 90 65 90H35C29.4772 90 25 85.5228 25 80V40Z" fill="url(#modalPageBagGrad)" />
+              <path d="M38 18C38 18 48 30 46 45H32C30 30 38 18 38 18Z" fill="#F97316" />
+              <path d="M38 18C39 12 36 8 36 8" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M41 18C43 14 42 9 42 9" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M60 12C63 8 70 8 72 14C74 20 68 28 64 35C62 38 56 42 56 42C56 42 54 30 56 22C58 14 60 12 60 12Z" fill="#22C55E" opacity="0.9" />
+              <path d="M52 20C54 16 59 15 61 19C63 23 59 29 56 34" stroke="#15803D" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="53" cy="38" r="10" fill="#EF4444" />
+              <path d="M53 28C54 26 55 26 55 26" stroke="#15803D" strokeWidth="2" strokeLinecap="round" />
+              <path d="M40 40C40 28.9543 44.4772 20 50 20C55.5228 20 60 28.9543 60 40" stroke="#00884F" strokeWidth="4.5" strokeLinecap="round" />
+              <path d="M43 40C43 31.5 46.134 25 50 25C53.866 25 57 31.5 57 40" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
+              <defs>
+                <linearGradient id="modalPageBagGrad" x1="25" y1="40" x2="75" y2="90" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#10B981" stopOpacity="0.15" />
+                  <stop stopColor="#00884F" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <Sparkles className="w-5 h-5 text-[#f97316] absolute top-4 right-4 animate-bounce" />
+            <ShoppingBag className="w-5 h-5 text-[#00884F] absolute bottom-3 left-4 rotate-12" />
+          </div>
+
+          {/* Welcome Messages */}
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight mb-2">
+            🛒 GGMS Grocery માં આપનું સ્વાગત છે
+          </h3>
+          <p className="text-xs font-black text-[#00884F] dark:text-emerald-450 mb-4 px-2">
+            ઘરે બેઠા ગ્રોસરી ખરીદવા માટે લોગિન કરો
+          </p>
           
-          <div className="w-16 h-16 bg-white/15 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md shadow-lg">
-            <Store className="w-8 h-8 text-white animate-pulse" />
-          </div>
-          <h3 className="text-xl font-black tracking-wide">GGM&S Grocery</h3>
-          <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-1">Fresh & Daily Grocery Delivery / ગ્રોસરી પોર્ટલ</p>
-        </div>
-
-        {/* Benefits list */}
-        <div className="p-6 pb-2 space-y-4">
-          <h4 className="text-center text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
-            શા માટે અમારી સાથે ઓર્ડર કરવો? / Why Buy With Us?
+          <div className="w-12 h-0.5 bg-gradient-to-r from-[#00884F]/30 via-[#f97316]/30 to-[#00884F]/30 rounded-full mb-4" />
+          
+          <h4 className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
+            Welcome to GGMS Grocery
           </h4>
-          
-          <div className="grid grid-cols-1 gap-3.5">
-            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
-              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
-                <Truck className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-800 dark:text-slate-200">ઝડપી હોમ ડિલિવરી / Fast Home Delivery</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">તમારા ઘરે સમયસર ઓર્ડર મળશે</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
-              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-800 dark:text-slate-200">તાજી અને ઉત્તમ ગુણવત્તા / Fresh & Premium Quality</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">રોજે-રોજ શાકભાજી અને ગ્રોસરી આઈટમ્સ</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
-              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
-                <Percent className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-800 dark:text-slate-200">શ્રેષ્ઠ ભાવો અને ઓફર્સ / Best Prices & Offers</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">દરેક સામાન પર આકર્ષક બચત</p>
-              </div>
-            </div>
-          </div>
+          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+            Login to continue shopping
+          </p>
         </div>
 
-        {/* Action Button */}
-        <div className="p-6 pt-4 space-y-4">
+        {/* Action Button & Footer details */}
+        <div className="space-y-6">
           <button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center gap-3 bg-white dark:bg-slate-800 shadow-md hover:shadow-lg shadow-slate-100 dark:shadow-none cursor-pointer"
+            className="w-full py-4 border-2 border-[#00884F]/20 hover:border-[#00884F] dark:border-slate-700 dark:hover:border-emerald-500 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 active:scale-[0.98] rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-3 shadow-md hover:shadow-lg shadow-emerald-100/30 dark:shadow-none cursor-pointer"
           >
             {loading ? (
-              <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2.5 border-[#00884F] border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
                   <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
                   <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
                   <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
                 </svg>
-                Continue with Google / Google વડે આગળ વધો
+                Continue with Google
               </>
             )}
           </button>
 
-          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold text-center leading-relaxed max-w-xs mx-auto">
-            ગૂગલ લોગિન વડે આગળ વધીને, તમે અમારી સેવાની શરતો અને ગોપનીયતા નીતિ સાથે સંમત થાઓ છો.
-          </p>
+          <div className="flex flex-col items-center space-y-4">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-black tracking-wide">
+              <Lock className="w-3.5 h-3.5 text-[#00884F]" />
+              Secure login with your Google account
+            </div>
+
+            <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
+
+            {/* Footer Details */}
+            <div className="text-center pb-2">
+              <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 tracking-widest uppercase mb-1">GGMS Grocery</p>
+              <p className="text-[9px] text-[#f97316] font-extrabold tracking-wide flex items-center justify-center gap-2">
+                <span>Fresh Grocery</span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span>Easy Shopping</span>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <span>Fast Delivery</span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
