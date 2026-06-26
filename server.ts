@@ -200,6 +200,220 @@ async function startServer() {
     }
   });
 
+  // ─── Bulk Push Notification Endpoint ──────────────────────────────────────
+  app.post("/api/admin/send-notification-bulk", requireAdminAuth, async (req, res) => {
+    if (!adminMessaging) {
+      return res.status(500).json({ error: "Firebase Admin Messaging not initialized" });
+    }
+
+    const { 
+      type, 
+      title, 
+      message, 
+      image, 
+      buttonText, 
+      buttonLink, 
+      target_type, 
+      selected_customer_ids,
+      segment_type 
+    } = req.body || {};
+
+    if (!type || !title || !message || !target_type) {
+      return res.status(400).json({ error: "type, title, message, and target_type are required" });
+    }
+
+    try {
+      let targetTokens = [];
+      let targetValueDescription = "";
+
+      if (target_type === "all") {
+        targetValueDescription = "All Customers";
+        const customersSnap = await getDocs(collection(db, "customers"));
+        customersSnap.forEach((doc) => {
+          const data = doc.data();
+          if (data.fcmToken) {
+            targetTokens.push({ token: data.fcmToken, customerId: doc.id });
+          }
+        });
+      } else if (target_type === "selected") {
+        if (!Array.isArray(selected_customer_ids) || selected_customer_ids.length === 0) {
+          return res.status(400).json({ error: "selected_customer_ids must be a non-empty array for target_type 'selected'" });
+        }
+        targetValueDescription = `${selected_customer_ids.length} Selected Customer(s)`;
+        
+        for (const customerId of selected_customer_ids) {
+          const docRef = doc(db, "customers", customerId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.fcmToken) {
+              targetTokens.push({ token: data.fcmToken, customerId });
+            }
+          }
+        }
+      } else if (target_type === "segment") {
+        if (!segment_type) {
+          return res.status(400).json({ error: "segment_type is required for target_type 'segment'" });
+        }
+
+        const customersSnap = await getDocs(collection(db, "customers"));
+        const ordersSnap = await getDocs(collection(db, "orders"));
+        
+        const allCustomers = [];
+        customersSnap.forEach((doc) => {
+          allCustomers.push({ id: doc.id, ...doc.data() });
+        });
+
+        const allOrders = [];
+        ordersSnap.forEach((doc) => {
+          allOrders.push({ id: doc.id, ...doc.data() });
+        });
+
+        let filteredCustomers = [];
+        const now = Date.now();
+
+        if (segment_type === "new") {
+          targetValueDescription = "New Customers (Registered <= 7 days)";
+          filteredCustomers = allCustomers.filter((c) => {
+            if (!c.createdAt) return false;
+            const diffDays = (now - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+            return diffDays <= 7;
+          });
+        } else if (segment_type === "regular") {
+          targetValueDescription = "Regular Customers (> 3 orders)";
+          filteredCustomers = allCustomers.filter((c) => {
+            const count = allOrders.filter((o) => o.customerId === c.id).length;
+            return count > 3;
+          });
+        } else if (segment_type === "inactive") {
+          targetValueDescription = "Inactive Customers (No order or > 15 days ago)";
+          filteredCustomers = allCustomers.filter((c) => {
+            const userOrders = allOrders.filter((o) => o.customerId === c.id);
+            if (userOrders.length === 0) {
+              if (!c.createdAt) return true;
+              const diffDays = (now - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+              return diffDays > 15;
+            }
+            userOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const latestOrder = userOrders[0];
+            const diffDays = (now - new Date(latestOrder.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+            return diffDays > 15;
+          });
+        } else if (segment_type === "high_value") {
+          targetValueDescription = "High Value Customers (Spent > ₹1500)";
+          filteredCustomers = allCustomers.filter((c) => {
+            const totalSpent = allOrders
+              .filter((o) => o.customerId === c.id)
+              .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+            return totalSpent > 1500;
+          });
+        } else {
+          return res.status(400).json({ error: `Unknown segment_type: ${segment_type}` });
+        }
+
+        filteredCustomers.forEach((c) => {
+          if (c.fcmToken) {
+            targetTokens.push({ token: c.fcmToken, customerId: c.id });
+          }
+        });
+      } else {
+        return res.status(400).json({ error: `Unknown target_type: ${target_type}` });
+      }
+
+      const uniqueTokens = Array.from(new Set(targetTokens.map(t => t.token)));
+      let succeededCount = 0;
+      let failedCount = 0;
+
+      if (uniqueTokens.length > 0) {
+        const messages = uniqueTokens.map((token) => {
+          const payload: any = {
+            token,
+            notification: { 
+              title, 
+              body: message 
+            },
+            webpush: {
+              notification: {
+                title,
+                body: message,
+                icon: "/icon-192.png",
+                badge: "/icon-192.png",
+                vibrate: [100, 50, 100],
+              },
+              fcmOptions: {
+                link: buttonLink || "/"
+              }
+            },
+            data: {
+              url: buttonLink || "/"
+            }
+          };
+
+          if (image) {
+            payload.notification.imageUrl = image;
+            payload.webpush.notification.image = image;
+            payload.data.image = image;
+          }
+          if (buttonText && buttonLink) {
+            payload.data.buttonText = buttonText;
+            payload.data.buttonLink = buttonLink;
+          }
+
+          return payload;
+        });
+
+        const chunkSize = 500;
+        for (let i = 0; i < messages.length; i += chunkSize) {
+          const chunk = messages.slice(i, i + chunkSize);
+          const response = await adminMessaging.sendEach(chunk);
+          succeededCount += response.successCount;
+          failedCount += response.failureCount;
+          
+          if (response.failureCount > 0) {
+            response.responses.forEach((resp, idx) => {
+              if (!resp.success) {
+                console.warn(`⚠️ Bulk send failure for token ${chunk[idx].token}:`, resp.error?.message);
+              }
+            });
+          }
+        }
+      }
+
+      const notificationId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newNotification = {
+        id: notificationId,
+        type,
+        title,
+        message,
+        image: image || "",
+        target_type,
+        target_value: targetValueDescription,
+        selected_customer_ids: selected_customer_ids || [],
+        sent_count: succeededCount,
+        created_at: new Date().toISOString(),
+        buttonText: buttonText || "",
+        buttonLink: buttonLink || "",
+        status: "sent"
+      };
+
+      await setDoc(doc(db, "notifications", notificationId), newNotification);
+
+      return res.json({ 
+        success: true, 
+        notification: newNotification,
+        stats: {
+          totalAttempted: uniqueTokens.length,
+          succeeded: succeededCount,
+          failed: failedCount
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Send bulk notifications failed:", error);
+      return res.status(500).json({ error: "Failed to send bulk notifications: " + (error?.message || String(error)) });
+    }
+  });
+
 
   app.post("/api/ai/chat", async (req, res) => {
     const { message, history } = req.body || {};

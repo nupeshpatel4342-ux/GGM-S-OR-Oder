@@ -110,9 +110,12 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let title = 'GGM&S Grocery';
+  let title = 'GGMS Grocery';
   let body = 'New offers and updates waiting for you!';
   let url = '/';
+  let image = null;
+  let buttonText = null;
+  let buttonLink = null;
 
   if (event.data) {
     try {
@@ -123,24 +126,34 @@ self.addEventListener('push', (event) => {
       body = notification.body || payload.body || body;
       
       const customData = payload.data || payload;
-      url = customData.url || url;
+      url = customData.url || notification.click_action || url;
+      image = notification.image || notification.imageUrl || customData.image || customData.imageUrl || null;
+      buttonText = customData.buttonText || null;
+      buttonLink = customData.buttonLink || null;
     } catch (e) {
       body = event.data.text() || body;
     }
   }
+
+  const actions = [];
+  if (buttonText && buttonLink) {
+    actions.push({ action: 'custom_action', title: buttonText });
+  } else {
+    actions.push({ action: 'open_url', title: 'Open App' });
+  }
+  actions.push({ action: 'close', title: 'Close' });
 
   const options = {
     body: body,
     icon: '/icon-192.png',
     badge: '/icon-192.png', // Small monochrome image for android notification bar
     vibrate: [100, 50, 100],
+    image: image,
     data: {
-      url: url
+      url: url,
+      buttonLink: buttonLink
     },
-    actions: [
-      { action: 'open_url', title: 'Open App' },
-      { action: 'close', title: 'Close' }
-    ]
+    actions: actions
   };
 
   event.waitUntil(
@@ -156,15 +169,29 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  const targetUrl = event.notification.data ? event.notification.data.url : '/';
+  let targetUrl = '/';
+  if (event.action === 'custom_action') {
+    targetUrl = event.notification.data && event.notification.data.buttonLink ? event.notification.data.buttonLink : '/';
+  } else {
+    targetUrl = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
+  }
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       // If a window is already open, focus it
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        if (client.url === targetUrl && 'focus' in client) {
-          return client.focus();
+        try {
+          const clientUrl = new URL(client.url);
+          const targetUrlObj = new URL(targetUrl, self.location.origin);
+          if (clientUrl.pathname === targetUrlObj.pathname && 'focus' in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        } catch (urlErr) {
+          if (client.url === targetUrl && 'focus' in client) {
+            return client.focus();
+          }
         }
       }
       // Otherwise, open a new window

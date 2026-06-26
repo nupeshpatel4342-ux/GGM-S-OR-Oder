@@ -19,12 +19,12 @@ import {
   Download, Upload, Database, GripVertical, Truck, Home,
   Heart, Eye, EyeOff, Lock, UserPlus, Clock, Bookmark, RotateCcw, Tag,
   Gift, Percent, Sun, Moon, Monitor, ShoppingBag, Mic, Sparkles, Bot, MessageSquare,
-  Bell, WifiOff, Award, Warehouse
+  Bell, WifiOff, Award, Warehouse, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord } from './types.ts';
+import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord, NotificationRecord } from './types.ts';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth, getFirebaseMessaging, getToken, onMessage } from './firebase.ts';
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, type User as FirebaseAuthUser } from 'firebase/auth';
@@ -569,7 +569,22 @@ export default function App() {
   });
 
   // Admin tab navigation state
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons' | 'voice' | 'ai_assistant'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'orders' | 'settings' | 'qr' | 'banners' | 'coupons' | 'voice' | 'ai_assistant' | 'notifications'>('dashboard');
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [customers, setCustomers] = useState<CustomerProfile[]>([]);
+
+  // Notification Form States
+  const [notifType, setNotifType] = useState<'offer' | 'info' | 'notice' | 'custom'>('offer');
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifImage, setNotifImage] = useState('');
+  const [notifButtonText, setNotifButtonText] = useState('');
+  const [notifButtonLink, setNotifButtonLink] = useState('');
+  const [notifTargetType, setNotifTargetType] = useState<'all' | 'selected' | 'segment'>('all');
+  const [notifSelectedCustomerIds, setNotifSelectedCustomerIds] = useState<string[]>([]);
+  const [notifSegmentType, setNotifSegmentType] = useState<'new' | 'regular' | 'inactive' | 'high_value'>('new');
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifSearchQuery, setNotifSearchQuery] = useState('');
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -604,6 +619,14 @@ export default function App() {
   const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false);
   const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Toast notification helper
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now().toString() + Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
   const [customerAuthLoading, setCustomerAuthLoading] = useState(true);
 
   // Theme state
@@ -1018,6 +1041,35 @@ export default function App() {
       setAiChatLogs(list);
     }, (error) => {
       console.error("Firestore aiChatAnalytics read error:", error);
+    });
+    return () => unsub();
+  }, [isAdminUnlocked]);
+
+  useEffect(() => {
+    if (!isAdminUnlocked) return;
+    const unsub = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+      const list: NotificationRecord[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as NotificationRecord);
+      });
+      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setNotifications(list);
+    }, (error) => {
+      console.error("Firestore notifications read error:", error);
+    });
+    return () => unsub();
+  }, [isAdminUnlocked]);
+
+  useEffect(() => {
+    if (!isAdminUnlocked) return;
+    const unsub = onSnapshot(collection(db, 'customers'), (snapshot) => {
+      const list: CustomerProfile[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), uid: doc.id } as CustomerProfile);
+      });
+      setCustomers(list);
+    }, (error) => {
+      console.error("Firestore customers read error:", error);
     });
     return () => unsub();
   }, [isAdminUnlocked]);
@@ -1440,13 +1492,6 @@ export default function App() {
     }, 1500);
     return () => { if (cartSaveTimerRef.current) clearTimeout(cartSaveTimerRef.current); };
   }, [cart, customerUser]);
-
-  // Toast notification helper
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = Date.now().toString() + Math.random().toString(36).slice(2);
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-  }, []);
 
   // Wishlist toggle
   const toggleWishlist = async (productId: string) => {
@@ -2083,6 +2128,142 @@ export default function App() {
   };
 
   // Order state functions
+  // Notification Center Handlers
+  const handleNotifTypeChange = (type) => {
+    setNotifType(type);
+    if (type === 'offer') {
+      setNotifTitle('🎉 Special Offer Available');
+      setNotifMessage('GGMS Grocery પર આજે ખાસ ઓફર ચાલુ છે.\nહમણાં ખરીદી કરો અને વધુ બચત મેળવો.');
+      setNotifButtonText('Shop Now');
+      setNotifButtonLink('/offers');
+    } else if (type === 'info') {
+      setNotifTitle('📢 Important Update');
+      setNotifMessage('અમારી નવી ડિલિવરી સર્વિસ અને નવા અપડેટ વિશે માહિતી મેળવો.');
+      setNotifButtonText('View Updates');
+      setNotifButtonLink('/');
+    } else if (type === 'notice') {
+      setNotifTitle('⚠️ Important Notice');
+      setNotifMessage('આવતીકાલે ટેક્નિકલ કામના કારણે ડિલિવરી સમય બદલાઈ શકે છે.');
+      setNotifButtonText('OK');
+      setNotifButtonLink('/');
+    } else {
+      setNotifTitle('');
+      setNotifMessage('');
+      setNotifButtonText('');
+      setNotifButtonLink('');
+    }
+  };
+
+  const segmentCountInfo = useMemo(() => {
+    const now = Date.now();
+    const counts = {
+      new: 0,
+      regular: 0,
+      inactive: 0,
+      high_value: 0
+    };
+    
+    // New (Registered in last 7 days)
+    counts.new = customers.filter(c => {
+      if (!c.createdAt) return false;
+      const diffDays = (now - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      return diffDays <= 7;
+    }).length;
+    
+    // Regular (> 3 orders)
+    counts.regular = customers.filter(c => {
+      const userOrders = orders.filter(o => o.customerId === c.uid);
+      return userOrders.length > 3;
+    }).length;
+    
+    // Inactive (Never ordered and registered > 15 days ago, or last order > 15 days ago)
+    counts.inactive = customers.filter(c => {
+      const userOrders = orders.filter(o => o.customerId === c.uid);
+      if (userOrders.length === 0) {
+        if (!c.createdAt) return true;
+        const diffDays = (now - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        return diffDays > 15;
+      }
+      userOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const diffDays = (now - new Date(userOrders[0].createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      return diffDays > 15;
+    }).length;
+    
+    // High Value (Spent > ₹1500)
+    counts.high_value = customers.filter(c => {
+      const totalSpent = orders.filter(o => o.customerId === c.uid).reduce((sum, o) => sum + o.total, 0);
+      return totalSpent > 1500;
+    }).length;
+
+    return counts;
+  }, [customers, orders]);
+
+  const handleSendNotification = async (e) => {
+    e.preventDefault();
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      showToast('Title and Message are required.', 'error');
+      return;
+    }
+    
+    if (notifTargetType === 'selected' && notifSelectedCustomerIds.length === 0) {
+      showToast('Please select at least one customer.', 'error');
+      return;
+    }
+    
+    setNotifSending(true);
+    try {
+      const token = localStorage.getItem('adminSession');
+      const res = await fetch('/api/admin/send-notification-bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: notifType,
+          title: notifTitle,
+          message: notifMessage,
+          image: notifImage,
+          buttonText: notifButtonText,
+          buttonLink: notifButtonLink,
+          target_type: notifTargetType,
+          selected_customer_ids: notifSelectedCustomerIds,
+          segment_type: notifSegmentType
+        })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Notification sent successfully to ${data.stats.succeeded} devices!`, 'success');
+        // Reset form
+        setNotifTitle('');
+        setNotifMessage('');
+        setNotifImage('');
+        setNotifButtonText('');
+        setNotifButtonLink('');
+        setNotifSelectedCustomerIds([]);
+      } else {
+        showToast(data.error || 'Failed to send notification', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to send notification.', 'error');
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
+  const handleDeleteNotification = async (id) => {
+    if (window.confirm('Are you sure you want to delete this notification record?')) {
+      try {
+        await deleteDoc(doc(db, 'notifications', id));
+        showToast('Notification history deleted.', 'success');
+      } catch (err) {
+        showToast('Failed to delete notification.', 'error');
+      }
+    }
+  };
+
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       await setDoc(doc(db, 'orders', orderId), { status: newStatus }, { merge: true });
@@ -2520,6 +2701,9 @@ export default function App() {
             </button>
             <button onClick={() => setAdminTab('ai_assistant')} className={`admin-sidebar-btn ${adminTab === 'ai_assistant' ? 'active' : ''}`}>
               <Sparkles className="w-4 h-4 text-purple-500" /> AI ASSISTANT
+            </button>
+            <button onClick={() => setAdminTab('notifications')} className={`admin-sidebar-btn ${adminTab === 'notifications' ? 'active' : ''}`}>
+              <Bell className="w-4 h-4 text-emerald-600" /> NOTIFICATION CENTER
             </button>
             <button onClick={() => setAdminTab('settings')} className={`admin-sidebar-btn ${adminTab === 'settings' ? 'active' : ''}`}>
               <Settings className="w-4 h-4" /> SHOP SETTINGS
@@ -3535,6 +3719,406 @@ export default function App() {
               </div>
             )}
 
+            {/* Notification Center Tab */}
+            {adminTab === 'notifications' && (
+              <div className="space-y-6">
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="admin-stat-card bg-gradient-to-br from-emerald-50 to-emerald-100/30 border border-emerald-150">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Total Broadcasts</span>
+                    <span className="text-2xl font-black text-slate-900">{notifications.length}</span>
+                  </div>
+                  <div className="admin-stat-card bg-gradient-to-br from-amber-50 to-amber-100/30 border border-amber-150">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Total Deliveries</span>
+                    <span className="text-2xl font-black text-slate-900">
+                      {notifications.reduce((sum, n) => sum + (n.sent_count || 0), 0)}
+                    </span>
+                  </div>
+                  <div className="admin-stat-card bg-gradient-to-br from-blue-50 to-blue-100/30 border border-blue-150">
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Registered Devices</span>
+                    <span className="text-2xl font-black text-blue-600">
+                      {customers.filter(c => !!c.fcmToken).length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Two Column Layout */}
+                <div className="grid lg:grid-cols-12 gap-6">
+                  {/* Left Column: Form Compose */}
+                  <div className="lg:col-span-7 bg-white border border-slate-200 rounded-[28px] p-6 shadow-sm space-y-6">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase">Compose New Notification</h3>
+                      <p className="text-[10px] text-slate-400 font-bold">ગ્રાહકોને પુશ નોટિફિકેશન મોકલો / Send push notifications to customers</p>
+                    </div>
+
+                    <form onSubmit={handleSendNotification} className="space-y-5">
+                      {/* Notification Type Selector */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Notification Type / પ્રકાર</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {['offer', 'info', 'notice', 'custom'].map(type => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => handleNotifTypeChange(type)}
+                              className={`py-2 px-3 text-xs font-black rounded-xl uppercase tracking-wider border-2 transition-all cursor-pointer ${
+                                notifType === type
+                                  ? 'border-emerald-600 bg-emerald-50/30 text-emerald-800'
+                                  : 'border-slate-100 bg-slate-50/50 hover:bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {type === 'offer' && '🎉 Offer'}
+                              {type === 'info' && '📢 Info'}
+                              {type === 'notice' && '⚠️ Notice'}
+                              {type === 'custom' && '⚙️ Custom'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Title & Message */}
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Notification Title / શીર્ષક</label>
+                          <input
+                            type="text"
+                            value={notifTitle}
+                            onChange={(e) => setNotifTitle(e.target.value)}
+                            placeholder="e.g. 🎉 Special Offer Available"
+                            className="w-full text-xs font-bold p-3 bg-slate-50/70 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none animate-none"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Image Banner URL (Optional)</label>
+                          <input
+                            type="text"
+                            value={notifImage}
+                            onChange={(e) => setNotifImage(e.target.value)}
+                            placeholder="https://example.com/banner.jpg"
+                            className="w-full text-xs font-bold p-3 bg-slate-50/70 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Message / સંદેશ</label>
+                        <textarea
+                          value={notifMessage}
+                          onChange={(e) => setNotifMessage(e.target.value)}
+                          placeholder="Write your push message in Gujarati or English..."
+                          rows={3}
+                          className="w-full text-xs font-bold p-3 bg-slate-50/70 border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none resize-none"
+                          required
+                        />
+                      </div>
+
+                      {/* Action Button Details */}
+                      <div className="bg-slate-50/40 border border-slate-150 rounded-[20px] p-4 space-y-4">
+                        <div className="flex items-center gap-2 border-b border-slate-150 pb-2">
+                          <Tag className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Call to Action Button (Optional)</span>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Button Text / બટન લખાણ</label>
+                            <input
+                              type="text"
+                              value={notifButtonText}
+                              onChange={(e) => setNotifButtonText(e.target.value)}
+                              placeholder="e.g. Shop Now / હમણાં ખરીદો"
+                              className="w-full text-xs font-bold p-2.5 bg-white border border-slate-250 rounded-xl focus:border-emerald-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Button Link / બટન લિંક</label>
+                            <select
+                              value={notifButtonLink}
+                              onChange={(e) => setNotifButtonLink(e.target.value)}
+                              className="w-full text-xs font-bold p-2.5 bg-white border border-slate-250 rounded-xl focus:border-emerald-500 focus:outline-none"
+                            >
+                              <option value="">No action (Open App Home)</option>
+                              <option value="/">Home Page (/)</option>
+                              <option value="/offers">Offers & Coupons (/offers)</option>
+                              <option value="/account?tab=orders">Order History (/account?tab=orders)</option>
+                              {products.map(p => (
+                                <option key={p.id} value={`/product/${p.id}`}>Product: {p.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Target Audience Selector */}
+                      <div className="space-y-3.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Target Audience / ટાર્ગેટ ઓડિયન્સ</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['all', 'segment', 'selected'].map(target => (
+                            <button
+                              key={target}
+                              type="button"
+                              onClick={() => setNotifTargetType(target)}
+                              className={`py-2.5 px-2 text-[10px] font-black rounded-xl uppercase tracking-wider border transition-all cursor-pointer ${
+                                notifTargetType === target
+                                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                                  : 'bg-white border-slate-200 hover:border-slate-350 text-slate-700'
+                              }`}
+                            >
+                              {target === 'all' && 'All Customers'}
+                              {target === 'segment' && 'Segment'}
+                              {target === 'selected' && 'Selected'}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Audience Option Forms */}
+                        {notifTargetType === 'all' && (
+                          <div className="p-3 bg-emerald-50/30 border border-emerald-100 rounded-xl text-xs font-bold text-emerald-800">
+                            📢 Targets all {customers.length} registered customers ({customers.filter(c => !!c.fcmToken).length} with active devices).
+                          </div>
+                        )}
+
+                        {notifTargetType === 'segment' && (
+                          <div className="space-y-2 p-4 bg-slate-50/50 border border-slate-200 rounded-[20px]">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-1.5 flex-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Select Segment / સેગમેન્ટ</label>
+                                <select
+                                  value={notifSegmentType}
+                                  onChange={(e) => setNotifSegmentType(e.target.value)}
+                                  className="w-full text-xs font-bold p-2.5 bg-white border border-slate-250 rounded-xl focus:border-emerald-500 focus:outline-none"
+                                >
+                                  <option value="new">New Customers (Registered &lt;= 7 days)</option>
+                                  <option value="regular">Regular Customers (&gt; 3 orders)</option>
+                                  <option value="inactive">Inactive Customers (&gt; 15 days no order)</option>
+                                  <option value="high_value">High Value Customers (Spent &gt; ₹1500)</option>
+                                </select>
+                              </div>
+                              <div className="bg-white border border-slate-200 rounded-2xl py-3 px-5 text-center shrink-0">
+                                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Matching</span>
+                                <span className="text-xl font-black text-emerald-600">{segmentCountInfo[notifSegmentType]} Users</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {notifTargetType === 'selected' && (
+                          <div className="space-y-3 p-4 bg-slate-50/50 border border-slate-200 rounded-[20px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-slate-600 uppercase font-bold font-black">Select Customers ({notifSelectedCustomerIds.length} Selected)</span>
+                              <input
+                                type="text"
+                                placeholder="Search by name, phone..."
+                                value={notifSearchQuery}
+                                onChange={(e) => setNotifSearchQuery(e.target.value)}
+                                className="text-[10px] font-bold p-2 bg-white border border-slate-250 rounded-xl focus:outline-none w-48 text-slate-800"
+                              />
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto border border-slate-150 rounded-xl divide-y divide-slate-150 bg-white no-scrollbar">
+                              {customers.filter(c => {
+                                if (!notifSearchQuery.trim()) return true;
+                                const q = notifSearchQuery.toLowerCase();
+                                return (
+                                  (c.name || '').toLowerCase().includes(q) ||
+                                  (c.phone || '').includes(q) ||
+                                  (c.email || '').toLowerCase().includes(q)
+                                );
+                              }).map(c => {
+                                const isChecked = notifSelectedCustomerIds.includes(c.uid);
+                                return (
+                                  <label key={c.uid} className="flex items-center gap-3 p-2.5 hover:bg-slate-50 cursor-pointer select-none text-xs text-slate-850">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setNotifSelectedCustomerIds(prev => prev.filter(id => id !== c.uid));
+                                        } else {
+                                          setNotifSelectedCustomerIds(prev => [...prev, c.uid]);
+                                        }
+                                      }}
+                                      className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                    />
+                                    <div className="flex-1">
+                                      <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                                        {c.name}
+                                        {!c.fcmToken && <span className="text-[8px] bg-slate-100 text-slate-400 px-1 rounded">No device token</span>}
+                                      </div>
+                                      <div className="text-[9px] text-slate-400 font-bold flex gap-3">
+                                        <span>📞 {c.phone}</span>
+                                        {c.email && <span>✉️ {c.email}</span>}
+                                      </div>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Button */}
+                      <button
+                        type="submit"
+                        disabled={notifSending}
+                        className="w-full mt-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {notifSending ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Sending Notifications...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4" /> Send Push Notification
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Right Column: Phone Live Preview */}
+                  <div className="lg:col-span-5 flex flex-col items-center">
+                    <div className="w-full bg-slate-900 border border-slate-850 p-6 rounded-[28px] shadow-sm mb-4">
+                      <h4 className="font-black text-slate-200 text-xs uppercase tracking-widest text-center mb-4">Live Push Preview</h4>
+                      
+                      {/* Smartphone shell mockup */}
+                      <div className="w-64 mx-auto border-8 border-slate-700 bg-slate-800 rounded-[36px] overflow-hidden aspect-[9/18] shadow-2xl relative">
+                        {/* Speaker notch */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-slate-900 rounded-full z-20 flex items-center justify-center">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+                        </div>
+
+                        {/* Screen */}
+                        <div className="w-full h-full bg-gradient-to-b from-slate-750 to-slate-900 p-3 pt-8 flex flex-col justify-start relative text-white">
+                          <div className="absolute top-8 left-0 right-0 px-4 flex justify-between text-[8px] font-bold text-slate-300 select-none">
+                            <span>GGMS Mobile</span>
+                            <span>10:42 AM</span>
+                          </div>
+
+                          {/* Dynamic push banner */}
+                          <div className="w-full bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3 mt-4 shadow-xl space-y-2 text-slate-100 select-none transform hover:scale-102 transition-all">
+                            <div className="flex items-center justify-between border-b border-slate-750 pb-1.5">
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 bg-emerald-600 rounded-full flex items-center justify-center font-extrabold text-[8px] text-white">G</div>
+                                <span className="text-[9px] font-black tracking-wide text-slate-200">GGMS Grocery</span>
+                              </div>
+                              <span className="text-[8px] text-slate-400 font-bold">now</span>
+                            </div>
+                            
+                            <div className="space-y-1">
+                              <h5 className="text-[10px] font-black leading-tight text-white">{notifTitle || '🎁 Weekend Grocery Offer'}</h5>
+                              <p className="text-[9px] font-semibold text-slate-300 leading-normal line-clamp-3 whitespace-pre-wrap">
+                                {notifMessage || '₹500 થી વધુ ખરીદી પર ખાસ ડિસ્કાઉન્ટ મેળવો.'}
+                              </p>
+                            </div>
+
+                            {notifImage && (
+                              <div className="w-full h-24 rounded-lg overflow-hidden bg-slate-800">
+                                <img src={notifImage} alt="preview" className="w-full h-full object-cover" />
+                              </div>
+                            )}
+
+                            {notifButtonText && (
+                              <div className="pt-1.5 flex justify-end">
+                                <div className="bg-slate-750 hover:bg-slate-700 text-white rounded-lg px-3 py-1 text-[8px] font-extrabold uppercase tracking-wider text-center max-w-[120px] truncate shadow-xs">
+                                  {notifButtonText}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* History Log Section */}
+                <div className="bg-white border border-slate-200 rounded-[28px] overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-black text-slate-900 text-base">Broadcast History & Analytics</h3>
+                      <p className="text-[10px] text-slate-400 font-bold">મોકલેલા પુશ નોટિફિકેશનનો લોગ / Push notification dispatch logs</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{notifications.length} total sent</span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left admin-table border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                          <th className="p-4">Date & Time</th>
+                          <th className="p-4">Type</th>
+                          <th className="p-4">Title & Message</th>
+                          <th className="p-4">Target Audience</th>
+                          <th className="p-4 text-center">Delivered</th>
+                          <th className="p-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
+                        {notifications.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center italic text-slate-400">No push notification records found.</td>
+                          </tr>
+                        ) : (
+                          notifications.map(n => (
+                            <tr key={n.id} className="hover:bg-slate-50">
+                              <td className="p-4 text-slate-500 font-semibold leading-tight min-w-[110px]">
+                                {new Date(n.created_at).toLocaleString('gu-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                                  n.type === 'offer' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
+                                  n.type === 'info' ? 'bg-blue-50 text-blue-800 border border-blue-100' :
+                                  n.type === 'notice' ? 'bg-amber-50 text-amber-800 border border-amber-100' :
+                                  'bg-slate-50 text-slate-800 border border-slate-200'
+                                }`}>
+                                  {n.type}
+                                </span>
+                              </td>
+                              <td className="p-4 max-w-[280px]">
+                                <div className="space-y-1">
+                                  <div className="font-extrabold text-slate-800 truncate">{n.title}</div>
+                                  <div className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed whitespace-pre-line">{n.message}</div>
+                                  {n.buttonText && (
+                                    <div className="text-[8px] bg-slate-100 text-slate-500 font-extrabold inline-block px-1.5 py-0.5 rounded border border-slate-200">
+                                      🔘 {n.buttonText} → {n.buttonLink}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4 text-slate-600 font-semibold leading-tight">
+                                <span className="bg-slate-50 border border-slate-200 rounded px-2 py-0.5 font-mono text-[10px]">
+                                  {n.target_value || n.target_type}
+                                </span>
+                              </td>
+                              <td className="p-4 text-center">
+                                <span className="font-black text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-150 px-2.5 py-0.5 rounded-full text-[10px]">
+                                  {n.sent_count} sent
+                                </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <button
+                                  onClick={() => handleDeleteNotification(n.id)}
+                                  className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg active:scale-90 transition-all cursor-pointer inline-block"
+                                  title="Delete Log"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </>
       )}
@@ -3935,6 +4519,25 @@ export default function App() {
                       setAuthRedirectAction(null);
                     }
                   }} 
+                />
+              </motion.div>
+            } />
+
+            {/* Customer Offers Center Route */}
+            <Route path="/offers" element={
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="pb-16"
+              >
+                <OffersPage 
+                  coupons={coupons}
+                  notifications={notifications}
+                  customerUser={customerUser}
+                  customerProfile={customerProfile}
+                  showToast={showToast}
                 />
               </motion.div>
             } />
@@ -8704,8 +9307,20 @@ export const MyAccountPage: React.FC<{
   notificationPermission = 'default', requestNotificationPermission,
   loyaltyPoints = 120, onDownloadApk
 }) => {
+  /* eslint-disable react-hooks/set-state-in-effect */
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'wishlist' | 'cart' | 'profile' | 'theme' | null>(null);
+
+  // Sync tab based on search param
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['orders', 'addresses', 'wishlist', 'cart', 'profile', 'theme'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [location.search]);
+
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   
@@ -10015,4 +10630,174 @@ export const MyAccountPage: React.FC<{
     </div>
   );
 };
+
+export const OffersPage: React.FC<{
+  coupons: Coupon[];
+  notifications: NotificationRecord[];
+  customerUser: FirebaseAuthUser | null;
+  customerProfile: CustomerProfile | null;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}> = ({ coupons, notifications, customerUser, customerProfile, showToast }) => {
+  const navigate = useNavigate();
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const handleCopy = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    showToast(`Savings Code ${code} copied! / કોડ કોપી કર્યો!`, 'success');
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const activeCoupons = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return coupons.filter(c => {
+      const isLive = c.activeStatus && c.expiryDate >= todayStr;
+      if (!isLive) return false;
+      if (customerUser && c.customerSpecific) {
+        const cleanSpecific = c.customerSpecific.replace(/\D/g, '');
+        const cleanPhone = (customerProfile?.phone || '').replace(/\D/g, '');
+        if (cleanSpecific !== cleanPhone) return false;
+      }
+      return true;
+    });
+  }, [coupons, customerUser, customerProfile]);
+
+  const offerBroadcasts = useMemo(() => {
+    return notifications.filter(n => n.type === 'offer');
+  }, [notifications]);
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 bg-slate-50 dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-sm mt-4">
+      <div className="flex items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+        <button 
+          onClick={() => navigate('/')}
+          className="p-2.5 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 active:scale-95 transition-all text-slate-700 dark:text-white"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">ખાસ ઓફર્સ અને કૂપન / Savings & Offers Center</h2>
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider">GGMS Grocery Savings Hub</p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-12 gap-8">
+        <div className="md:col-span-7 space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-white text-xs flex items-center gap-2.5 px-1 uppercase tracking-wider">
+            <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" /> Discount Coupons / ડિસ્કાઉન્ટ કૂપન્સ
+          </h3>
+
+          {activeCoupons.length === 0 ? (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[28px] p-8 text-center text-slate-400 dark:text-slate-500 space-y-2">
+              <Tag className="w-8 h-8 mx-auto text-slate-350 dark:text-slate-650" />
+              <p className="text-xs font-bold">હાલમાં કોઈ કૂપન ઉપલબ્ધ નથી / No coupons available right now.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activeCoupons.map(c => (
+                <div 
+                  key={c.id} 
+                  className="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-[28px] p-5 shadow-xs flex flex-col justify-between gap-4 border-l-4 border-l-emerald-500 dark:border-l-emerald-450 hover:shadow-md transition-all relative overflow-hidden"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/60 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                        {c.code}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                        માન્યતા: {new Date(c.expiryDate).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <h4 className="text-base font-black text-slate-850 dark:text-white">{c.title}</h4>
+                    <p className="text-xs text-slate-550 dark:text-slate-400 font-medium leading-relaxed">{c.description}</p>
+                    
+                    <div className="pt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      <span>Min Order: ₹{c.minOrderAmount}</span>
+                      {c.maxDiscount && <span>Max Discount: ₹{c.maxDiscount}</span>}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-150 dark:border-slate-700 pt-4 flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      {c.discountType === 'flat' ? `₹${c.discountValue} FLAT OFF` : c.discountType === 'percentage' ? `${c.discountValue}% OFF` : 'FREE DELIVERY'}
+                    </span>
+                    <button
+                      onClick={() => handleCopy(c.code)}
+                      className={`flex items-center gap-1.5 px-4.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                        copiedCode === c.code 
+                          ? 'bg-emerald-600 dark:bg-emerald-500 text-white' 
+                          : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {copiedCode === c.code ? (
+                        <>
+                          <CheckCircle className="w-3.5 h-3.5 animate-bounce" /> COPIED
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" /> COPY CODE
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="md:col-span-5 space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-white text-xs flex items-center gap-2.5 px-1 uppercase tracking-wider">
+            <Bell className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Recent Updates / નવીનતમ સમાચાર
+          </h3>
+
+          {offerBroadcasts.length === 0 ? (
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[28px] p-8 text-center text-slate-400 dark:text-slate-500 space-y-2">
+              <Bell className="w-8 h-8 mx-auto text-slate-350 dark:text-slate-650" />
+              <p className="text-xs font-bold">કોઈ તાજેતરના અપડેટ નથી / No recent updates.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {offerBroadcasts.slice(0, 10).map(n => (
+                <div 
+                  key={n.id} 
+                  className="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-[28px] p-5 shadow-xs flex flex-col gap-3.5 hover:shadow-md transition-all relative overflow-hidden"
+                >
+                  {n.image && (
+                    <div className="w-full h-36 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-700">
+                      <img src={n.image} alt={n.title} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                        {n.type}
+                      </span>
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold">
+                        {new Date(n.created_at).toLocaleDateString('gu-IN', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-black text-slate-850 dark:text-white leading-tight">{n.title}</h4>
+                    <p className="text-xs text-slate-550 dark:text-slate-450 font-medium leading-relaxed whitespace-pre-line">{n.message}</p>
+                  </div>
+
+                  {n.buttonText && n.buttonLink && (
+                    <button
+                      onClick={() => navigate(n.buttonLink)}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <ShoppingBag className="w-4 h-4" /> {n.buttonText}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 

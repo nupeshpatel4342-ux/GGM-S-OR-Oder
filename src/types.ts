@@ -132,5 +132,21 @@ export interface VoiceSearchRecord {
   language: 'en' | 'hi' | 'gu';
 }
 
+export interface NotificationRecord {
+  id: string;
+  type: 'offer' | 'info' | 'notice' | 'custom';
+  title: string;
+  message: string;
+  image?: string;
+  target_type: 'all' | 'selected' | 'segment';
+  target_value?: string; // Descriptive value like "New Customers" or "3 Customers"
+  selected_customer_ids?: string[];
+  sent_count: number;
+  created_at: string;
+  buttonText?: string;
+  buttonLink?: string;
+  status: 'sent' | 'pending';
+}
+
 
 
