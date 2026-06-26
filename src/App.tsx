@@ -8186,18 +8186,9 @@ export const LoginPage: React.FC<{
 
           {/* Welcome Messages */}
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight mb-2">
-            🛒 GGMS Grocery માં આપનું સ્વાગત છે
+            🛒 Welcome to GGMS Grocery
           </h3>
-          <p className="text-xs font-black text-[#00884F] dark:text-emerald-450 mb-4 px-2">
-            ઘરે બેઠા ગ્રોસરી ખરીદવા માટે લોગિન કરો
-          </p>
-          
-          <div className="w-12 h-0.5 bg-gradient-to-r from-[#00884F]/30 via-[#f97316]/30 to-[#00884F]/30 rounded-full mb-4" />
-          
-          <h4 className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
-            Welcome to GGMS Grocery
-          </h4>
-          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+          <p className="text-sm font-extrabold text-[#00884F] dark:text-emerald-450 mb-2 px-2">
             Login to continue shopping
           </p>
         </div>
@@ -8348,18 +8339,9 @@ export const AuthModal: React.FC<{
 
           {/* Welcome Messages */}
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight mb-2">
-            🛒 GGMS Grocery માં આપનું સ્વાગત છે
+            🛒 Welcome to GGMS Grocery
           </h3>
-          <p className="text-xs font-black text-[#00884F] dark:text-emerald-450 mb-4 px-2">
-            ઘરે બેઠા ગ્રોસરી ખરીદવા માટે લોગિન કરો
-          </p>
-          
-          <div className="w-12 h-0.5 bg-gradient-to-r from-[#00884F]/30 via-[#f97316]/30 to-[#00884F]/30 rounded-full mb-4" />
-          
-          <h4 className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
-            Welcome to GGMS Grocery
-          </h4>
-          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+          <p className="text-sm font-extrabold text-[#00884F] dark:text-emerald-450 mb-2 px-2">
             Login to continue shopping
           </p>
         </div>
