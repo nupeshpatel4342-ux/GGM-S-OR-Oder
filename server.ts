@@ -8,6 +8,7 @@ import { initializeApp as initializeFirebaseApp } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocs, collection, setDoc, deleteDoc } from "firebase/firestore";
 import { initializeApp as initAdminApp, cert } from "firebase-admin/app";
 import { getAuth as getAdminAuth, type Auth as AdminAuth } from "firebase-admin/auth";
+import { getMessaging as getAdminMessaging } from "firebase-admin/messaging";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -17,6 +18,7 @@ dotenv.config();
 // Service account JSON file nu path GOOGLE_APPLICATION_CREDENTIALS env var ma set karo
 // ATHVA service-account-key.json file project root ma muko.
 let adminAuth: AdminAuth | null = null;
+let adminMessaging: ReturnType<typeof getAdminMessaging> | null = null;
 try {
   const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account-key.json";
   if (fs.existsSync(saPath)) {
@@ -25,15 +27,15 @@ try {
       projectId: "ggms-grocery"
     });
     adminAuth = getAdminAuth();
-    console.log("✅ Firebase Admin SDK initialized — password reset enabled.");
+    adminMessaging = getAdminMessaging();
+    console.log("✅ Firebase Admin SDK initialized — push notifications & password reset enabled.");
   } else {
     console.warn("⚠️  Service account key not found at:", saPath);
-    console.warn("   Password reset will NOT work. Place service-account-key.json in project root");
-    console.warn("   or set GOOGLE_APPLICATION_CREDENTIALS env var.");
+    console.warn("   Password reset & push notifications will NOT work.");
   }
 } catch (err) {
   console.warn("⚠️  Firebase Admin SDK init failed:", err);
-  console.warn("   Password reset will NOT work.");
+  console.warn("   Password reset & push notifications will NOT work.");
 }
 
 const firebaseConfig = {
@@ -154,7 +156,49 @@ async function startServer() {
   app.get("/api/admin/settings", requireAdminAuth, (_req, res) => res.json({ ok: true }));
   app.get("/api/admin/reports", requireAdminAuth, (_req, res) => res.json({ ok: true }));
 
+  // ─── Push Notification Endpoint ──────────────────────────────────────
+  app.post("/api/admin/send-notification", requireAdminAuth, async (req, res) => {
+    if (!adminMessaging) {
+      return res.status(500).json({ error: "Firebase Admin Messaging not initialized" });
+    }
 
+    const { fcmToken, title, body, data } = req.body || {};
+    if (!fcmToken || !title || !body) {
+      return res.status(400).json({ error: "fcmToken, title, and body are required" });
+    }
+
+    try {
+      const messagePayload: any = {
+        token: fcmToken,
+        notification: { title, body },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            vibrate: [100, 50, 100],
+          },
+          fcmOptions: {
+            link: data?.url || "/"
+          }
+        },
+        data: data || {}
+      };
+
+      const result = await adminMessaging.send(messagePayload);
+      console.log("✅ Push notification sent:", result);
+      return res.json({ success: true, messageId: result });
+    } catch (error: any) {
+      console.error("❌ Push notification failed:", error?.message || error);
+      // Token is invalid/expired — return specific error so client can clean up
+      if (error?.code === "messaging/registration-token-not-registered" ||
+          error?.code === "messaging/invalid-registration-token") {
+        return res.status(410).json({ error: "Token expired or invalid", code: error.code });
+      }
+      return res.status(500).json({ error: "Failed to send notification: " + (error?.message || String(error)) });
+    }
+  });
 
 
   app.post("/api/ai/chat", async (req, res) => {

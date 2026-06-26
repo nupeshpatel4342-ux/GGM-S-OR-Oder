@@ -26,7 +26,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord } from './types.ts';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
-import { db, auth } from './firebase.ts';
+import { db, auth, getFirebaseMessaging, getToken, onMessage } from './firebase.ts';
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, type User as FirebaseAuthUser } from 'firebase/auth';
 
 enum OperationType {
@@ -909,25 +909,71 @@ export default function App() {
     setShowInstallPrompt(false);
   };
 
-  // Push Notifications permissions setup
+  // Push Notifications permissions setup + FCM token retrieval
   const requestNotificationPermission = async () => {
     if (typeof Notification === 'undefined') return;
     try {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       if (permission === 'granted') {
-        showToast('Notifications enabled successfully! / સૂચનાઓ સક્રિય થઈ ગઈ છે!', 'success');
-        if ('serviceWorker' in navigator) {
-          const reg = await navigator.serviceWorker.ready;
-          console.log('Ready for push manager subscription:', reg);
-        }
+        showToast('Notifications enabled successfully!', 'success');
+        // Get FCM token and store in Firestore
+        await registerFcmToken();
       } else {
-        showToast('Notification permission denied. / સૂચનાઓની પરવાનગી નકારી કાઢવામાં આવી.', 'error');
+        showToast('Notification permission denied.', 'error');
       }
     } catch (err) {
       console.error('Failed to request notification permission:', err);
     }
   };
+
+  // Register FCM token with Firestore
+  const registerFcmToken = async () => {
+    if (!customerUser) return;
+    try {
+      const messaging = await getFirebaseMessaging();
+      if (!messaging) return;
+      const vapidKey = (import.meta as any).env.VITE_FIREBASE_VAPID_KEY;
+      if (!vapidKey || vapidKey === 'YOUR_VAPID_KEY_HERE') {
+        console.warn('⚠️ VAPID key not configured — FCM token will not be generated');
+        return;
+      }
+      const swReg = await navigator.serviceWorker.ready;
+      const token = await getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: swReg
+      });
+      if (token) {
+        await setDoc(doc(db, 'customers', customerUser.uid), { fcmToken: token }, { merge: true });
+        console.log('✅ FCM token saved to Firestore');
+      }
+    } catch (err) {
+      console.error('❌ Failed to get FCM token:', err);
+    }
+  };
+
+  // Auto-register FCM token when user logs in (if permission already granted)
+  useEffect(() => {
+    if (customerUser && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      registerFcmToken();
+    }
+  }, [customerUser]);
+
+  // Foreground FCM message handler — show toast for incoming notifications
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    (async () => {
+      const messaging = await getFirebaseMessaging();
+      if (!messaging) return;
+      unsubscribe = onMessage(messaging, (payload) => {
+        console.log('📬 Foreground FCM message:', payload);
+        const title = payload.notification?.title || 'GGMS Grocery';
+        const body = payload.notification?.body || '';
+        showToast(`${title}: ${body}`, 'info');
+      });
+    })();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
 
 
 
@@ -2027,6 +2073,42 @@ export default function App() {
       await setDoc(doc(db, 'orders', orderId), { status: newStatus }, { merge: true });
       if (viewingOrder && viewingOrder.id === orderId) {
         setViewingOrder({ ...viewingOrder, status: newStatus });
+      }
+
+      // Send push notification to customer on accept/cancel
+      const order = orders.find(o => o.id === orderId) || viewingOrder;
+      if (order?.customerId && (newStatus === 'processing' || newStatus === 'cancelled')) {
+        try {
+          const customerDoc = await getDoc(doc(db, 'customers', order.customerId));
+          const fcmToken = customerDoc.data()?.fcmToken;
+          if (fcmToken) {
+            const adminSession = localStorage.getItem('adminSession');
+            let title = '';
+            let body = '';
+            if (newStatus === 'processing') {
+              title = '🛒 GGMS Grocery Order Accepted';
+              body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
+            } else if (newStatus === 'cancelled') {
+              title = '❌ GGMS Grocery Order Cancelled';
+              body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
+            }
+            const resp = await fetch('/api/admin/send-notification', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${adminSession}`
+              },
+              body: JSON.stringify({ fcmToken, title, body, data: { url: '/account', orderId } })
+            });
+            if (resp.ok) {
+              showToast('Push notification sent to customer! 🔔', 'success');
+            } else {
+              console.warn('Push notification failed:', await resp.text());
+            }
+          }
+        } catch (notifErr) {
+          console.error('Failed to send push notification:', notifErr);
+        }
       }
     } catch (error) {
       handleLocalDataError(error, OperationType.UPDATE, `orders/${orderId}`);
