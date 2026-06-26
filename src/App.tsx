@@ -601,6 +601,7 @@ export default function App() {
   const [customerUser, setCustomerUser] = useState<FirebaseAuthUser | null>(null);
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false);
   const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [customerAuthLoading, setCustomerAuthLoading] = useState(true);
@@ -1337,6 +1338,22 @@ export default function App() {
       }
     };
   }, []);
+
+  // Trigger Forced Profile Completion Modal if logged in but phone/address missing
+  useEffect(() => {
+    if (customerUser && customerProfile) {
+      const hasPhone = Boolean(customerProfile.phone);
+      const hasAddress = Boolean(customerProfile.savedAddresses && customerProfile.savedAddresses.length > 0);
+      
+      if (!hasPhone || !hasAddress) {
+        setShowCompleteProfileModal(true);
+      } else {
+        setShowCompleteProfileModal(false);
+      }
+    } else {
+      setShowCompleteProfileModal(false);
+    }
+  }, [customerUser, customerProfile]);
 
   // Persist cart to Firestore (debounced)
   const cartSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4404,6 +4421,15 @@ export default function App() {
               setAuthRedirectAction(null);
             }
           }}
+        />
+
+        <CompleteProfileModal
+          isOpen={showCompleteProfileModal}
+          customerUser={customerUser!}
+          customerProfile={customerProfile}
+          setCustomerProfile={setCustomerProfile}
+          showToast={showToast}
+          onLogout={handleCustomerLogout}
         />
 
         <ToastContainer toasts={toasts} />
@@ -8561,6 +8587,150 @@ export const AuthModal: React.FC<{
   );
 };
 
+interface CompleteProfileModalProps {
+  isOpen: boolean;
+  customerUser: FirebaseAuthUser;
+  customerProfile: CustomerProfile | null;
+  setCustomerProfile: React.Dispatch<React.SetStateAction<CustomerProfile | null>>;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onLogout: () => void;
+}
+
+export const CompleteProfileModal: React.FC<CompleteProfileModalProps> = ({
+  isOpen, customerUser, customerProfile, setCustomerProfile, showToast, onLogout
+}) => {
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone || !address) {
+      showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
+      return;
+    }
+    const cleanPhone = normalizePhone(phone);
+    if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ''))) {
+      showToast('કૃપા કરીને સાચો ૧૦ આંકડાનો WhatsApp નંબર લખો / Enter a valid 10-digit number.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updatedProfile: CustomerProfile = {
+        ...customerProfile,
+        uid: customerUser.uid,
+        name: customerProfile?.name || customerUser.displayName || 'Customer',
+        createdAt: customerProfile?.createdAt || new Date().toISOString(),
+        wishlist: customerProfile?.wishlist || [],
+        phone: cleanPhone,
+        savedAddresses: [
+          {
+            label: 'Home / ઘર',
+            address,
+            isDefault: true
+          }
+        ]
+      };
+      await setDoc(doc(db, 'customers', customerUser.uid), updatedProfile, { merge: true });
+      setCustomerProfile(updatedProfile);
+      showToast('પ્રોફાઇલ સફળતાપૂર્વક અપડેટ થઈ ગઈ! / Profile completed successfully! 🎉', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast('પ્રોફાઇલ સાચવવામાં ભૂલ આવી / Failed to save profile', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-300" />
+
+      {/* Modal Card */}
+      <div className="relative bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-205">
+        
+        {/* Header decoration */}
+        <div className="bg-emerald-600 p-6 text-white text-center relative">
+          <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <User className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="text-lg font-black tracking-wide">તમારી પ્રોફાઇલ પૂર્ણ કરો</h3>
+          <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-0.5">Complete Your Profile</p>
+        </div>
+
+        {/* Info Box */}
+        <div className="p-6 pb-2">
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl p-4 text-[11px] text-amber-800 dark:text-amber-300 font-bold text-center leading-relaxed">
+            ઓર્ડર ડિલિવરી માટે વૉટ્સએપ નંબર અને સરનામું જરૂરી છે.
+            <span className="block mt-0.5 text-[9.5px] text-slate-400 dark:text-slate-500">WhatsApp number and address are required for order delivery.</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 pt-2 space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">WhatsApp Number / વૉટ્સએપ નંબર</label>
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+              <input
+                required
+                type="tel"
+                placeholder="દા.ત. 9876543210"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-600 outline-hidden transition-all text-slate-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block">Delivery Address / ડિલિવરી સરનામું</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-4 w-4 h-4 text-slate-400 dark:text-slate-500" />
+              <textarea
+                required
+                rows={3}
+                placeholder="તમારું પૂરું સરનામું (ઘર નંબર, સોસાયટી, રોડ, એરિયા)"
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-600 outline-hidden transition-all resize-none text-slate-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  સેવ કરો અને આગળ વધો / Save & Continue
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full py-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer bg-transparent border-none"
+            >
+              Logout / બહાર નીકળો
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const MyAccountPage: React.FC<{
   customerUser: FirebaseAuthUser;
   customerProfile: CustomerProfile | null;
@@ -9804,7 +9974,7 @@ export const MyAccountPage: React.FC<{
                       />
                     </div>
                     <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold mt-0.5 pl-1">
-                      ⚠️ નોંધ: વૉટ્સએપ નંબર બદલવાથી તમારું લૉગિન આઈડી (ID) પણ બદલાઈ જશે.
+                      વૉટ્સએપ નંબરનો ઉપયોગ ફક્ત ઓર્ડર ડિલિવરી સમયે સંપર્ક કરવા માટે થશે.
                     </p>
                   </div>
 
