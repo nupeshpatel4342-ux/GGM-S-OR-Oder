@@ -2092,37 +2092,54 @@ export default function App() {
 
       // Send push notification to customer on accept/cancel
       const order = orders.find(o => o.id === orderId) || viewingOrder;
-      if (order?.customerId && (newStatus === 'processing' || newStatus === 'cancelled')) {
-        try {
-          const customerDoc = await getDoc(doc(db, 'customers', order.customerId));
-          const fcmToken = customerDoc.data()?.fcmToken;
-          if (fcmToken) {
-            const adminSession = localStorage.getItem('adminSession');
-            let title = '';
-            let body = '';
-            if (newStatus === 'processing') {
-              title = '🛒 GGMS Grocery Order Accepted';
-              body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
-            } else if (newStatus === 'cancelled') {
-              title = '❌ GGMS Grocery Order Cancelled';
-              body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
-            }
-            const resp = await fetch('/api/admin/send-notification', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${adminSession}`
-              },
-              body: JSON.stringify({ fcmToken, title, body, data: { url: '/account', orderId } })
-            });
-            if (resp.ok) {
-              showToast('Push notification sent to customer! 🔔', 'success');
+      if (newStatus === 'processing' || newStatus === 'cancelled') {
+        if (!order) {
+          showToast('Debug: Order not found in local state!', 'error');
+        } else if (!order.customerId) {
+          showToast('Debug: Order is missing customerId!', 'error');
+        } else {
+          try {
+            showToast('Debug: Fetching customer FCM token...', 'info');
+            const customerDoc = await getDoc(doc(db, 'customers', order.customerId));
+            if (!customerDoc.exists()) {
+              showToast('Debug: Customer document does not exist in Firestore!', 'error');
             } else {
-              console.warn('Push notification failed:', await resp.text());
+              const fcmToken = customerDoc.data()?.fcmToken;
+              if (!fcmToken) {
+                showToast('Debug: Customer has NO fcmToken registered in database!', 'error');
+              } else {
+                showToast('Debug: Sending push notification request...', 'info');
+                const adminSession = localStorage.getItem('adminSession');
+                let title = '';
+                let body = '';
+                if (newStatus === 'processing') {
+                  title = '🛒 GGMS Grocery Order Accepted';
+                  body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
+                } else if (newStatus === 'cancelled') {
+                  title = '❌ GGMS Grocery Order Cancelled';
+                  body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
+                }
+                const resp = await fetch('/api/admin/send-notification', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminSession}`
+                  },
+                  body: JSON.stringify({ fcmToken, title, body, data: { url: '/account', orderId } })
+                });
+                if (resp.ok) {
+                  showToast('Push notification sent successfully! 🔔', 'success');
+                } else {
+                  const errorText = await resp.text();
+                  showToast(`Debug: API failed: ${errorText}`, 'error');
+                  console.warn('Push notification failed:', errorText);
+                }
+              }
             }
+          } catch (notifErr: any) {
+            showToast(`Debug: Notification check failed: ${notifErr?.message || notifErr}`, 'error');
+            console.error('Failed to send push notification:', notifErr);
           }
-        } catch (notifErr) {
-          console.error('Failed to send push notification:', notifErr);
         }
       }
     } catch (error) {
