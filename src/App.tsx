@@ -8072,129 +8072,9 @@ export const AuthModal: React.FC<{
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onAuthSuccess: () => void;
 }> = ({ isOpen, onClose, showToast, onAuthSuccess }) => {
-  const [tab, setTab] = useState<'login' | 'signup' | 'forgot'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Forgot Password state
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotLinkSent, setForgotLinkSent] = useState(false);
-
   if (!isOpen) return null;
-
-  const resetForgotState = () => {
-    setForgotEmail('');
-    setForgotLinkSent(false);
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      showToast('સફળતાપૂર્વક લૉગિન થયા! / Login Successful! 🎉', 'success');
-      onAuthSuccess();
-      onClose();
-    } catch (error: any) {
-      console.error(error);
-      let errMsg = 'લૉગિન નિષ્ફળ ગયું / Login Failed';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errMsg = 'ઈમેલ અથવા પાસવર્ડ ખોટો છે / Incorrect email or password';
-      }
-      showToast(errMsg, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !phone || !password || !confirmPassword) {
-      showToast('કૃપા કરીને બધી વિગતો ભરો / Please fill all details.', 'error');
-      return;
-    }
-    const cleanPhone = normalizePhone(phone);
-    if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ''))) {
-      showToast('કૃપા કરીને સાચો ૧૦ આંકડાનો WhatsApp નંબર લખો / Enter a valid 10-digit number.', 'error');
-      return;
-    }
-    if (password.length < 6) {
-      showToast('પાસવર્ડ ઓછામાં ઓછો ૬ અક્ષરનો હોવો જોઈએ / Password must be at least 6 characters.', 'error');
-      return;
-    }
-    if (password !== confirmPassword) {
-      showToast('બંને પાસવર્ડ અલગ અલગ છે / Passwords do not match.', 'error');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Create user
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = credential.user;
-
-      // Update Firebase Profile
-      await updateProfile(user, { displayName: name });
-
-      // Save to Firestore
-      const newProfile: CustomerProfile = {
-        uid: user.uid,
-        name,
-        phone: cleanPhone,
-        email,
-        createdAt: new Date().toISOString(),
-        savedAddresses: [],
-        wishlist: []
-      };
-      await setDoc(doc(db, 'customers', user.uid), newProfile);
-
-      showToast('નવું એકાઉન્ટ સફળતાપૂર્વક બની ગયું! / Signup Successful! 🛒', 'success');
-      onAuthSuccess();
-      onClose();
-    } catch (error: any) {
-      console.error(error);
-      let errMsg = 'સાઇનઅપ નિષ્ફળ ગયું / Signup Failed';
-      if (error.code === 'auth/email-already-in-use') {
-        errMsg = 'આ ઈમેલ પર એકાઉન્ટ પહેલેથી બનેલું છે / This email is already registered.';
-      }
-      showToast(errMsg, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendResetLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotEmail) {
-      showToast('કૃપા કરીને ઈમેલ લખો / Please enter email.', 'error');
-      return;
-    }
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, forgotEmail);
-      setForgotLinkSent(true);
-      showToast('પાસવર્ડ રીસેટ લિંક મોકલી દેવામાં આવી છે! / Reset link sent! 📧', 'success');
-    } catch (error: any) {
-      console.error(error);
-      let errMsg = 'લિંક મોકલવામાં નિષ્ફળતા / Failed to send link';
-      if (error.code === 'auth/user-not-found') {
-        errMsg = 'આ ઈમેલ રજીસ્ટર થયેલો નથી / This email is not registered.';
-      }
-      showToast(errMsg, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -8240,347 +8120,98 @@ export const AuthModal: React.FC<{
       />
 
       {/* Modal Card */}
-      <div className="relative bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-205">
+      <div className="relative bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-205">
         
         {/* Header decoration */}
-        <div className="bg-emerald-600 p-6 text-white text-center relative">
+        <div className="bg-gradient-to-b from-emerald-600 to-emerald-700 p-8 text-white text-center relative overflow-hidden">
+          {/* Close Button */}
           <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
+            className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all cursor-pointer border-none"
           >
             <X className="w-4 h-4" />
           </button>
-          
-          <div className="w-12 h-12 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Store className="w-6 h-6 text-white" />
+
+          {/* Grocery Icons Background Pattern */}
+          <div className="absolute inset-0 opacity-10 pointer-events-none flex items-center justify-around flex-wrap gap-4 p-8">
+            <ShoppingBag className="w-8 h-8" />
+            <Sparkles className="w-8 h-8" />
+            <Percent className="w-8 h-8" />
+            <Store className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-black tracking-wide">GGM&S Grocery Shop</h3>
-          <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-0.5">Customer Portal / ગ્રાહક લૉગિન</p>
+          
+          <div className="w-16 h-16 bg-white/15 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md shadow-lg">
+            <Store className="w-8 h-8 text-white animate-pulse" />
+          </div>
+          <h3 className="text-xl font-black tracking-wide">GGM&S Grocery</h3>
+          <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-1">Fresh & Daily Grocery Delivery / ગ્રોસરી પોર્ટલ</p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex border-b border-slate-100 bg-slate-50">
-          <button
-            type="button"
-            onClick={() => { setTab('login'); resetForgotState(); }}
-            className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
-              tab === 'login' 
-                ? 'border-emerald-600 text-emerald-600 bg-white' 
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            Login / લૉગિન
-          </button>
-          <button
-            type="button"
-            onClick={() => { setTab('signup'); resetForgotState(); }}
-            className={`flex-1 py-4 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
-              tab === 'signup' 
-                ? 'border-emerald-600 text-emerald-600 bg-white' 
-                : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            Sign Up / નોંધણી
-          </button>
-        </div>
-
-        {/* Form Container */}
-        <div className="p-6 overflow-y-auto">
-          {tab === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type="email"
-                    placeholder="example@gmail.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                </div>
+        {/* Benefits list */}
+        <div className="p-6 pb-2 space-y-4">
+          <h4 className="text-center text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
+            શા માટે અમારી સાથે ઓર્ડર કરવો? / Why Buy With Us?
+          </h4>
+          
+          <div className="grid grid-cols-1 gap-3.5">
+            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
+              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+                <Truck className="w-4 h-4" />
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password / પાસવર્ડ</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="છ કે તેથી વધુ અક્ષર"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+              <div>
+                <p className="text-xs font-black text-slate-800 dark:text-slate-200">ઝડપી હોમ ડિલિવરી / Fast Home Delivery</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">તમારા ઘરે સમયસર ઓર્ડર મળશે</p>
               </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <User className="w-4 h-4" />
-                      Login / લૉગિન
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-100"></div>
-                <span className="flex-shrink mx-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">or / અથવા</span>
-                <div className="flex-grow border-t border-slate-100"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="w-full py-3.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center gap-3 bg-white cursor-pointer"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
-                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
-                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
-                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
-                </svg>
-                Sign in with Google / ગૂગલ લોગીન
-              </button>
-
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setTab('forgot'); resetForgotState(); }}
-                  className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors cursor-pointer underline underline-offset-2"
-                >
-                  Forgot Password? / પાસવર્ડ ભૂલી ગયા? 🔑
-                </button>
-              </div>
-            </form>
-          ) : tab === 'signup' ? (
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Name / તમારું પૂરું નામ</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type="text"
-                    placeholder="નામ અને અટક"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type="email"
-                    placeholder="example@gmail.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Number / વૉટ્સએપ નંબર</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type="tel"
-                    placeholder="૧૦ આંકડાનો WhatsApp નંબર"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password / પાસવર્ડ</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="ઓછામાં ઓછા ૬ અક્ષર"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm Password / કન્ફર્મ પાસવર્ડ</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="પાસવર્ડ ફરીથી લખો"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4" />
-                      Sign Up / એકાઉન્ટ બનાવો
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-100"></div>
-                <span className="flex-shrink mx-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">or / અથવા</span>
-                <div className="flex-grow border-t border-slate-100"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="w-full py-3.5 border border-slate-200 hover:bg-slate-50 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 transition-all flex items-center justify-center gap-3 bg-white cursor-pointer"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
-                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
-                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
-                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
-                </svg>
-                Sign up with Google / ગૂગલ સાઇનઅપ
-              </button>
-
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setTab('login')}
-                  className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors"
-                >
-                  Already have an account? Login / લૉગિન કરો
-                </button>
-              </div>
-            </form>
-          ) : tab === 'forgot' ? (
-            /* ─── Forgot Password Flow ─── */
-            <div className="space-y-4">
-              {!forgotLinkSent ? (
-                <form onSubmit={handleSendResetLink} className="space-y-4">
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-[10.5px] text-emerald-800 font-bold text-center leading-relaxed">
-                    તમારા રજીસ્ટર ઈમેલ પર પાસવર્ડ રીસેટ કરવાની લિંક મોકલવામાં આવશે. 
-                    <span className="block mt-1 text-[9px] text-slate-400">We will send a password reset link to your registered email.</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address / ઈમેલ આઈડી</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        required
-                        type="email"
-                        placeholder="example@gmail.com"
-                        value={forgotEmail}
-                        onChange={e => setForgotEmail(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold focus:border-emerald-500 focus:bg-white outline-hidden transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:shadow-xl transition-all flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        રીસેટ લિંક મોકલો / Send Reset Link
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : (
-                <div className="space-y-4 py-2 text-center animate-in fade-in zoom-in-95 duration-200">
-                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                    <CheckCircle className="w-8 h-8" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-black text-slate-800">લિંક મોકલી દેવાઈ છે! / Reset Link Sent!</h4>
-                    <p className="text-[11px] text-slate-500 font-bold leading-relaxed max-w-xs mx-auto">
-                      અમે <span className="text-emerald-700 font-black">{forgotEmail}</span> પર પાસવર્ડ બદલવાની લિંક મોકલી દીધી છે. કૃપા કરીને તમારું ઇમેલ ઇનબોક્સ અને સ્પામ ફોલ્ડર ચેક કરો.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => { setTab('login'); resetForgotState(); }}
-                    className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-700 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
-                  >
-                    Login પેજ પર પાછા જાઓ / Back to Login
-                  </button>
-                </div>
-              )}
-
-              {!forgotLinkSent && (
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => { setTab('login'); resetForgotState(); }}
-                    className="text-[10px] text-slate-400 font-bold hover:text-emerald-600 transition-colors cursor-pointer"
-                  >
-                    ← Login પર પાછા જાઓ / Back to Login
-                  </button>
-                </div>
-              )}
             </div>
-          ) : null}
+
+            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
+              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-800 dark:text-slate-200">તાજી અને ઉત્તમ ગુણવત્તા / Fresh & Premium Quality</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">રોજે-રોજ શાકભાજી અને ગ્રોસરી આઈટમ્સ</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3.5 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/30">
+              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+                <Percent className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-800 dark:text-slate-200">શ્રેષ્ઠ ભાવો અને ઓફર્સ / Best Prices & Offers</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">દરેક સામાન પર આકર્ષક બચત</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <div className="p-6 pt-4 space-y-4">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full py-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-[0.99] rounded-2xl font-black text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center gap-3 bg-white dark:bg-slate-800 shadow-md hover:shadow-lg shadow-slate-100 dark:shadow-none cursor-pointer"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.96-2.87 3.66-4.51 6.76-4.51z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.73 2.89c2.18-2.01 3.7-4.99 3.7-8.62z"/>
+                  <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.83 0 9s.5 4.23 1.39 6.04l3.85-2.99c-.24-.71-.38-1.49-.38-2.3z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.73-2.89c-1.1.74-2.52 1.18-4.23 1.18-3.1 0-5.8-2.14-6.76-5.01L1.39 16.3C3.37 20.19 7.35 23 12 23z"/>
+                </svg>
+                Continue with Google / Google વડે આગળ વધો
+              </>
+            )}
+          </button>
+
+          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold text-center leading-relaxed max-w-xs mx-auto">
+            ગૂગલ લોગિન વડે આગળ વધીને, તમે અમારી સેવાની શરતો અને ગોપનીયતા નીતિ સાથે સંમત થાઓ છો.
+          </p>
         </div>
       </div>
     </div>
