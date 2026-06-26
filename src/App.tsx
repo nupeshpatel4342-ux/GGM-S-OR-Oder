@@ -2119,7 +2119,7 @@ export default function App() {
                   title = '❌ GGMS Grocery Order Cancelled';
                   body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
                 }
-                const resp = await fetch('/api/admin/send-notification', {
+                const resp = await fetch(`/api/admin/send-notification?t=${Date.now()}`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
