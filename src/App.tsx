@@ -8198,7 +8198,8 @@ export const AuthModal: React.FC<{
       onClose();
     } catch (error: any) {
       console.error(error);
-      showToast('Google લોગીન નિષ્ફળ ગયું / Google Login Failed', 'error');
+      const detailedError = error.message || error.code || String(error);
+      showToast('Google Login Failed: ' + detailedError, 'error');
     } finally {
       setLoading(false);
     }
