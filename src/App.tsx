@@ -27,7 +27,7 @@ import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router
 import { CategoryItem, Product, CartItem, CustomerDetails, Order, OrderStatus, Banner, CustomerProfile, SavedAddress, ToastMessage, Coupon, CouponUsage, ProductVariant, VoiceSearchRecord, NotificationRecord } from './types.ts';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth, getFirebaseMessaging, getToken, onMessage } from './firebase.ts';
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, type User as FirebaseAuthUser } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, type User as FirebaseAuthUser } from 'firebase/auth';
 
 enum OperationType {
   CREATE = 'create',
@@ -9035,31 +9035,67 @@ export const LoginPage: React.FC<{
     }
   }, [customerUser, navigate, location]);
 
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const user = result.user;
+          const docRef = doc(db, 'customers', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            const newProfile: CustomerProfile = {
+              uid: user.uid,
+              name: user.displayName || 'Google User',
+              phone: user.phoneNumber || '',
+              email: user.email || '',
+              createdAt: new Date().toISOString(),
+              savedAddresses: [],
+              wishlist: []
+            };
+            await setDoc(docRef, newProfile);
+          }
+          showToast('Google વડે સફળતાપૂર્વક લોગીન થયા! / Google Login Successful! 🚀', 'success');
+          onAuthSuccess();
+        }
+      } catch (err: any) {
+        console.error('Redirect result processing error:', err);
+        showToast('Redirect login failed: ' + (err.message || String(err)), 'error');
+      }
+    };
+    checkRedirect();
+  }, [onAuthSuccess, showToast]);
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
 
-      // Save user to Firestore if not exists
-      const docRef = doc(db, 'customers', user.uid);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        const newProfile: CustomerProfile = {
-          uid: user.uid,
-          name: user.displayName || 'Google User',
-          phone: user.phoneNumber || '',
-          email: user.email || '',
-          createdAt: new Date().toISOString(),
-          savedAddresses: [],
-          wishlist: []
-        };
-        await setDoc(docRef, newProfile);
+        // Save user to Firestore if not exists
+        const docRef = doc(db, 'customers', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          const newProfile: CustomerProfile = {
+            uid: user.uid,
+            name: user.displayName || 'Google User',
+            phone: user.phoneNumber || '',
+            email: user.email || '',
+            createdAt: new Date().toISOString(),
+            savedAddresses: [],
+            wishlist: []
+          };
+          await setDoc(docRef, newProfile);
+        }
+
+        showToast('Google વડે સફળતાપૂર્વક લોગીન થયા! / Google Login Successful! 🚀', 'success');
+        onAuthSuccess();
       }
-
-      showToast('Google વડે સફળતાપૂર્વક લોગીન થયા! / Google Login Successful! 🚀', 'success');
-      onAuthSuccess();
     } catch (error: any) {
       console.error(error);
       const detailedError = error.message || error.code || String(error);
