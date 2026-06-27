@@ -1307,7 +1307,8 @@ function MainApp() {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
       const isAdmin = Boolean(localStorage.getItem('adminSession'));
-      if (isAdmin && !isInitial) {
+      const isCurrentlyInAdminView = window.location.pathname.startsWith('/admin');
+      if (isAdmin && isCurrentlyInAdminView && !isInitial) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added') {
             const o = change.doc.data() as Order;
