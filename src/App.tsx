@@ -264,6 +264,28 @@ const SEED_PRODUCTS = [
 
 import ErrorBoundary from './ErrorBoundary.jsx';
 
+const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      console.warn('⚠️ LocalStorage quota exceeded. Clearing non-essential large caches...');
+      // Clear non-critical large caches to free up space
+      localStorage.removeItem('orders');
+      localStorage.removeItem('products');
+      localStorage.removeItem('ggms_recently_viewed');
+      try {
+        localStorage.setItem(key, value);
+      } catch (retryErr) {
+        console.error('❌ Failed to set item even after clearing caches:', retryErr);
+      }
+    } else {
+      console.error('❌ Failed to save to localStorage:', e);
+    }
+  }
+};
+
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -298,26 +320,26 @@ function MainApp() {
     if (settings.whatsapp === '919876543210') {
       settings.whatsapp = '91972455778';
       settings.mobile = '+91 97245 5778';
-      localStorage.setItem('shopSettings', JSON.stringify(settings));
+      safeSetItem('shopSettings', JSON.stringify(settings));
     }
     if (!settings.announcementText) {
       settings.announcementText = '🚚 મહત્વની સૂચના: ₹2000 થી વધુ ની ખરીદી પર જ હોમ ડિલિવરી મળશે. ₹2000 થી ઓછી ખરીદી માટે ઓર્ડર આપીને દુકાનેથી રૂબરૂ (Pick Up) લઈ જવાનું રહેશે.';
-      localStorage.setItem('shopSettings', JSON.stringify(settings));
+      safeSetItem('shopSettings', JSON.stringify(settings));
     }
     if (!settings.defaultTheme) {
       settings.defaultTheme = 'system';
-      localStorage.setItem('shopSettings', JSON.stringify(settings));
+      safeSetItem('shopSettings', JSON.stringify(settings));
     }
     if (!settings.festivalThemeActive) {
       settings.festivalThemeActive = 'none';
-      localStorage.setItem('shopSettings', JSON.stringify(settings));
+      safeSetItem('shopSettings', JSON.stringify(settings));
     }
     if (settings.aiEnabled === undefined) {
       settings.aiEnabled = true;
       settings.aiModelName = 'gemini-2.5-flash';
       settings.aiPromptTemplate = '';
       settings.aiApiKey = '';
-      localStorage.setItem('shopSettings', JSON.stringify(settings));
+      safeSetItem('shopSettings', JSON.stringify(settings));
     }
     return settings;
   });
@@ -333,7 +355,7 @@ function MainApp() {
       }
     } else {
       const initial = SEED_PRODUCTS.map((p, idx) => ({ ...cleanseProduct(p), id: `seed-${idx}` }));
-      localStorage.setItem('products', JSON.stringify(initial));
+      safeSetItem('products', JSON.stringify(initial));
       return initial;
     }
   });
@@ -352,7 +374,7 @@ function MainApp() {
         image: cat.image,
         order: idx
       }));
-      localStorage.setItem('categories', JSON.stringify(formatted));
+      safeSetItem('categories', JSON.stringify(formatted));
       return formatted;
     }
   });
@@ -456,7 +478,7 @@ function MainApp() {
       document.referrer.includes('android-app://') ||
       isWebView
     ) {
-      localStorage.setItem('ggms_apk_mode', 'true');
+      safeSetItem('ggms_apk_mode', 'true');
     } else {
       localStorage.removeItem('ggms_apk_mode');
     }
@@ -497,7 +519,7 @@ function MainApp() {
     setRecentlyViewed(prev => {
       const filtered = prev.filter(id => id !== productId);
       const updated = [productId, ...filtered].slice(0, 5);
-      localStorage.setItem('ggms_recently_viewed', JSON.stringify(updated));
+      safeSetItem('ggms_recently_viewed', JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -505,7 +527,7 @@ function MainApp() {
   const addLoyaltyPoints = useCallback((points: number) => {
     setLoyaltyPoints(prev => {
       const updated = prev + points;
-      localStorage.setItem('ggms_loyalty_points', String(updated));
+      safeSetItem('ggms_loyalty_points', String(updated));
       return updated;
     });
   }, []);
@@ -574,7 +596,7 @@ function MainApp() {
           order: 2
         }
       ];
-      localStorage.setItem('banners', JSON.stringify(defaultBanners));
+      safeSetItem('banners', JSON.stringify(defaultBanners));
       return defaultBanners;
     }
   });
@@ -751,7 +773,7 @@ function MainApp() {
   // Handler to change theme preference and sync with profile
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system' | 'time_based') => {
     setPreferredTheme(newTheme);
-    localStorage.setItem('preferredTheme', newTheme);
+    safeSetItem('preferredTheme', newTheme);
     
     if (customerUser) {
       try {
@@ -851,7 +873,7 @@ function MainApp() {
           .catch(err => console.error('Error signing out on fresh APK launch:', err));
 
         // Mark this APK installation as initialized
-        localStorage.setItem('ggms_apk_initialized', 'true');
+        safeSetItem('ggms_apk_initialized', 'true');
         
         // Force the app to show splash and onboarding walkthrough
         setShowSplash(true);
@@ -977,7 +999,7 @@ function MainApp() {
 
   // Sync cart to localStorage
   useEffect(() => {
-    localStorage.setItem('ggms_cart', JSON.stringify(cart));
+    safeSetItem('ggms_cart', JSON.stringify(cart));
   }, [cart]);
 
   // Install PWA Helper Function
@@ -1176,7 +1198,7 @@ function MainApp() {
         });
         list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setProducts(list);
-        localStorage.setItem('products', JSON.stringify(list));
+        safeSetItem('products', JSON.stringify(list));
         hasSeededProducts = true; // data exists, no need to seed
       } else if (!snapshot.metadata.fromCache && !hasSeededProducts) {
         // Collection is genuinely empty on server – seed once
@@ -1203,7 +1225,7 @@ function MainApp() {
         });
         list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setCategoryItems(list);
-        localStorage.setItem('categories', JSON.stringify(list));
+        safeSetItem('categories', JSON.stringify(list));
         hasSeededCategories = true;
       } else if (!snapshot.metadata.fromCache && !hasSeededCategories) {
         hasSeededCategories = true;
@@ -1234,7 +1256,7 @@ function MainApp() {
         });
         list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         setBanners(list);
-        localStorage.setItem('banners', JSON.stringify(list));
+        safeSetItem('banners', JSON.stringify(list));
         hasSeededBanners = true;
       } else if (!snapshot.metadata.fromCache && !hasSeededBanners) {
         hasSeededBanners = true;
@@ -1302,7 +1324,7 @@ function MainApp() {
       
       isInitial = false;
       setOrders(list);
-      localStorage.setItem('orders', JSON.stringify(list));
+      safeSetItem('orders', JSON.stringify(list));
     }, (error) => {
       console.error("Firestore orders read error:", error);
     });
@@ -1325,7 +1347,7 @@ function MainApp() {
             festivalThemeActive: data.shopSettings.festivalThemeActive || 'none',
           };
           setShopSettings(settingsObj);
-          localStorage.setItem('shopSettings', JSON.stringify(settingsObj));
+          safeSetItem('shopSettings', JSON.stringify(settingsObj));
         }
         if (data.customCategories) {
           setCustomCategories(data.customCategories);
@@ -1335,9 +1357,9 @@ function MainApp() {
         }
         if (data.qrValue) {
           setQrValue(data.qrValue);
-          localStorage.setItem('qrValue', data.qrValue);
+          safeSetItem('qrValue', data.qrValue);
         }
-        localStorage.setItem('settings', JSON.stringify({
+        safeSetItem('settings', JSON.stringify({
           customCategories: data.customCategories || [],
           customUnits: data.customUnits || [],
           qrValue: data.qrValue || ''
@@ -1433,7 +1455,7 @@ function MainApp() {
             setCustomerProfile(profile);
             if (profile.preferredTheme) {
               setPreferredTheme(profile.preferredTheme);
-              localStorage.setItem('preferredTheme', profile.preferredTheme);
+              safeSetItem('preferredTheme', profile.preferredTheme);
             }
           } else {
             profile = {
@@ -2188,7 +2210,7 @@ function MainApp() {
       });
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('adminSession', data.token);
+        safeSetItem('adminSession', data.token);
         setIsAdminUnlocked(true);
         setAdminPassword('');
         return;
@@ -2200,7 +2222,7 @@ function MainApp() {
     // Client-side fallback for static web hosting deployments (Vercel, GitHub Pages, etc.)
     if (adminUsername === 'admin' && adminPassword === 'Admin@123456') {
       const token = 'local-session-' + Math.random().toString(36).substring(2);
-      localStorage.setItem('adminSession', token);
+      safeSetItem('adminSession', token);
       setIsAdminUnlocked(true);
       setAdminPassword('');
     } else {
@@ -4502,7 +4524,7 @@ function MainApp() {
     const queryStr = transcriptText.trim();
     setVoiceSearchHistory(prev => {
       const updated = [queryStr, ...prev.filter(item => item !== queryStr)].slice(0, 5);
-      localStorage.setItem('voiceSearchHistory', JSON.stringify(updated));
+      safeSetItem('voiceSearchHistory', JSON.stringify(updated));
       return updated;
     });
 
@@ -4552,7 +4574,7 @@ function MainApp() {
               <button
                 onClick={() => {
                   setShowPermissionPrompt(false);
-                  localStorage.setItem('notifPromptDismissed', 'true');
+                  safeSetItem('notifPromptDismissed', 'true');
                 }}
                 className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
               >
@@ -5658,7 +5680,7 @@ function MainApp() {
                 {introStep < 3 && (
                   <button
                     onClick={() => {
-                      localStorage.setItem('ggms_intro_seen', 'true');
+                      safeSetItem('ggms_intro_seen', 'true');
                       setShowIntro(false);
                     }}
                     className="text-[10px] font-black uppercase text-slate-400 tracking-wider hover:text-white transition-colors bg-white/5 px-3.5 py-1.5 rounded-full border border-white/10 cursor-pointer"
@@ -6058,7 +6080,7 @@ function MainApp() {
                   <div className="flex flex-col gap-2.5 w-full">
                     <button
                       onClick={() => {
-                        localStorage.setItem('ggms_intro_seen', 'true');
+                        safeSetItem('ggms_intro_seen', 'true');
                         setShowIntro(false);
                       }}
                       className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 active:scale-[0.98] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer border-none shadow-lg shadow-emerald-950/25"
@@ -6067,7 +6089,7 @@ function MainApp() {
                     </button>
                     <button
                       onClick={() => {
-                        localStorage.setItem('ggms_intro_seen', 'true');
+                        safeSetItem('ggms_intro_seen', 'true');
                         setShowIntro(false);
                       }}
                       className="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors cursor-pointer border-none bg-transparent"
