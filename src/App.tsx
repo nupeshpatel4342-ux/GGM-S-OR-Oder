@@ -282,6 +282,7 @@ export default function App() {
       aiModelName: 'gemini-2.5-flash',
       aiPromptTemplate: '',
       aiApiKey: '',
+      selectedVoiceAlert: 'ggms_attention_order_gu',
     };
     // Auto-migrate if old dummy number is in local storage
     if (settings.whatsapp === '919876543210') {
@@ -628,7 +629,8 @@ export default function App() {
     setIsAdminAlertPlaying(true);
     
     // Play audio
-    const audio = new Audio('/sounds/ggms_ringtone.wav');
+    const voiceAlert = shopSettings.selectedVoiceAlert || 'ggms_attention_order_gu';
+    const audio = new Audio(`/sounds/${voiceAlert}.mp3`);
     audio.loop = true;
     adminAudioRef.current = audio;
     
@@ -3344,6 +3346,7 @@ export default function App() {
                       announcementText: fd.get('announcementText') as string,
                       defaultTheme: fd.get('defaultTheme') as 'light' | 'dark' | 'system',
                       festivalThemeActive: fd.get('festivalThemeActive') as 'none' | 'diwali' | 'navratri' | 'new_year',
+                      selectedVoiceAlert: fd.get('selectedVoiceAlert') as string,
                     });
                   }}
                   className="space-y-4"
@@ -3402,6 +3405,17 @@ export default function App() {
                       </select>
                       <span className="text-[10px] text-slate-400 block pl-1">આખી વેબસાઈટ પર તહેવારની રંગપદ્ધતિ ચાલુ કરો.</span>
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">GGMS Admin Voice Alert / નવો ઓર્ડર વોઇસ ટોન</label>
+                    <select name="selectedVoiceAlert" defaultValue={shopSettings.selectedVoiceAlert || 'ggms_attention_order_gu'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:border-primary-green outline-hidden">
+                      <option value="ggms_order_gu">Variation 1: GGMS પર ઓર્ડર આવ્યો છે 📢</option>
+                      <option value="ggms_new_order_gu">Variation 2: GGMS પર નવો ઓર્ડર આવ્યો છે 🔔</option>
+                      <option value="ggms_attention_order_gu">Variation 3: ધ્યાન આપો, GGMS પર નવો ઓર્ડર આવ્યો છે 🚨 (Recommended)</option>
+                      <option value="ggms_grocery_order_gu">Variation 4: GGMS Grocery માં નવો ઓર્ડર મળ્યો છે 🛒</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block pl-1">જ્યારે નવો ગ્રાહક ઓર્ડર આપશે ત્યારે એડમિન એપ આ ગુજરાતી અવાજમાં જાહેરાત કરશે.</span>
                   </div>
 
                   <motion.button

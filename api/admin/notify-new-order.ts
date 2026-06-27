@@ -97,7 +97,7 @@ export default async function handler(req: any, res: any) {
           icon: "/icon-192.png",
           badge: "/icon-192.png",
           vibrate: [200, 100, 200, 100, 200],
-          sound: "/sounds/ggms_ringtone.wav"
+          sound: "/sounds/ggms_attention_order_gu.mp3"
         },
         fcmOptions: {
           link: "/admin"
@@ -105,7 +105,7 @@ export default async function handler(req: any, res: any) {
       },
       data: {
         url: "/admin",
-        sound: "ringtone"
+        sound: "ggms_attention_order_gu"
       }
     }));
 
