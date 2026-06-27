@@ -199,6 +199,69 @@ async function startServer() {
   app.get("/api/admin/settings", requireAdminAuth, (_req, res) => res.json({ ok: true }));
   app.get("/api/admin/reports", requireAdminAuth, (_req, res) => res.json({ ok: true }));
 
+  // ─── New Order Notification Endpoint (Public/Customer Triggered) ──────
+  app.post("/api/admin/notify-new-order", async (req, res) => {
+    if (!adminMessaging) {
+      return res.status(500).json({ error: "Firebase Admin Messaging not initialized" });
+    }
+
+    const { orderId, customerName, amount } = req.body || {};
+    if (!orderId || !customerName || !amount) {
+      return res.status(400).json({ error: "orderId, customerName, and amount are required" });
+    }
+
+    try {
+      const customersSnap = await dbGetDocs("customers");
+      const adminTokens: string[] = [];
+      customersSnap.forEach((doc) => {
+        const data = doc.data();
+        if (data && data.fcmToken) {
+          if (data.phone === "919724557728" || data.phone === "hpatel4342" || data.name?.toLowerCase().includes("admin") || data.name?.toLowerCase().includes("nupesh")) {
+            adminTokens.push(data.fcmToken);
+          }
+        }
+      });
+
+      if (adminTokens.length === 0) {
+        console.warn("⚠️ No admin FCM tokens found to notify.");
+        return res.json({ success: true, message: "No admins registered for push alerts." });
+      }
+
+      const title = "🔔 New Order Received - GGMS Grocery";
+      const body = `તમને નવો ઓર્ડર મળ્યો છે.\nOrder ID: #${orderId}\nCustomer: ${customerName}\nAmount: ₹${amount}`;
+
+      const messages = adminTokens.map((token) => ({
+        token,
+        notification: { title, body },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            vibrate: [200, 100, 200, 100, 200],
+            sound: "/sounds/ggms_ringtone.wav"
+          },
+          fcmOptions: {
+            link: "/admin"
+          }
+        },
+        data: {
+          url: "/admin",
+          sound: "ringtone"
+        }
+      }));
+
+      const response = await adminMessaging.sendEach(messages);
+      console.log(`✅ New order notifications sent to ${response.successCount} admin devices.`);
+
+      return res.json({ success: true, sentCount: response.successCount });
+    } catch (error: any) {
+      console.error("❌ Send new order notification failed:", error);
+      return res.status(500).json({ error: "Failed to send new order notification: " + (error?.message || String(error)) });
+    }
+  });
+
   // ─── Push Notification Endpoint ──────────────────────────────────────
   app.post("/api/admin/send-notification", requireAdminAuth, async (req, res) => {
     if (!adminMessaging) {

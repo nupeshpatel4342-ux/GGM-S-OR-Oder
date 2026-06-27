@@ -619,6 +619,52 @@ export default function App() {
   const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false);
   const [authRedirectAction, setAuthRedirectAction] = useState<(() => void) | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [isAdminAlertPlaying, setIsAdminAlertPlaying] = useState(false);
+  const adminAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playAdminAlert = useCallback(() => {
+    if (adminAudioRef.current) return;
+    setIsAdminAlertPlaying(true);
+    
+    // Play audio
+    const audio = new Audio('/sounds/ggms_ringtone.wav');
+    audio.loop = true;
+    adminAudioRef.current = audio;
+    
+    audio.play().catch(err => {
+      console.warn("Audio playback failed (interaction required):", err);
+      // fallback beep using Web Audio API in case audio file play fails
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const playBeep = () => {
+          if (!adminAudioRef.current) return;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.3);
+          setTimeout(() => {
+            if (adminAudioRef.current) playBeep();
+          }, 1000);
+        };
+        playBeep();
+      } catch (audioCtxErr) {
+        console.error("Failed to create Web Audio API context:", audioCtxErr);
+      }
+    });
+  }, []);
+
+  const stopAdminAlert = useCallback(() => {
+    setIsAdminAlertPlaying(false);
+    if (adminAudioRef.current) {
+      adminAudioRef.current.pause();
+      adminAudioRef.current = null;
+    }
+  }, []);
 
   // Toast notification helper
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -987,11 +1033,13 @@ export default function App() {
 
   // Auto-request or auto-register FCM token when user logs in
   useEffect(() => {
-    if (customerUser && typeof Notification !== 'undefined') {
+    if (typeof Notification !== 'undefined') {
       if (Notification.permission === 'default') {
-        // Auto-request permission on first load/login
-        requestNotificationPermission();
-      } else if (Notification.permission === 'granted') {
+        const isDismissed = localStorage.getItem('notifPromptDismissed');
+        if (!isDismissed) {
+          setShowPermissionPrompt(true);
+        }
+      } else if (Notification.permission === 'granted' && customerUser) {
         registerFcmToken();
       }
     }
@@ -1208,19 +1256,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let isInitial = true;
     const unsub = onSnapshot(collection(db, 'orders'), (snapshot) => {
       const list: Order[] = [];
       snapshot.forEach((doc) => {
         list.push({ ...doc.data(), id: doc.id } as Order);
       });
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      const isAdmin = Boolean(localStorage.getItem('adminSession'));
+      if (isAdmin && !isInitial) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const o = change.doc.data() as Order;
+            if (o.status === 'pending') {
+              const diffMs = Date.now() - new Date(o.createdAt).getTime();
+              if (diffMs < 120000) { // last 2 minutes
+                playAdminAlert();
+                showToast(`🔔 નવો ઓર્ડર મળ્યો છે! ID: ${o.id.substring(0, 8)}`, 'info');
+              }
+            }
+          }
+        });
+      }
+      
+      isInitial = false;
       setOrders(list);
       localStorage.setItem('orders', JSON.stringify(list));
     }, (error) => {
       console.error("Firestore orders read error:", error);
     });
     return () => unsub();
-  }, []);
+  }, [playAdminAlert]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
@@ -2289,32 +2356,47 @@ export default function App() {
               if (!fcmToken) {
                 showToast('Debug: Customer has NO fcmToken registered in database!', 'error');
               } else {
-                showToast('Debug: Sending push notification request...', 'info');
-                const adminSession = localStorage.getItem('adminSession');
-                let title = '';
-                let body = '';
-                if (newStatus === 'processing') {
-                  title = '🛒 GGMS Grocery Order Accepted';
-                  body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
-                } else if (newStatus === 'cancelled') {
-                  title = '❌ GGMS Grocery Order Cancelled';
-                  body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
-                }
-                const resp = await fetch(`/api/admin/send-notification?t=${Date.now()}`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${adminSession}`
-                  },
-                  body: JSON.stringify({ fcmToken, title, body, data: { url: '/account', orderId } })
-                });
-                if (resp.ok) {
-                  showToast('Push notification sent successfully! 🔔', 'success');
-                } else {
-                  const errorText = await resp.text();
-                  showToast(`Debug: API failed: ${errorText}`, 'error');
-                  console.warn('Push notification failed:', errorText);
-                }
+                 showToast('Debug: Sending push notification request...', 'info');
+                 const adminSession = localStorage.getItem('adminSession');
+                 let title = '';
+                 let body = '';
+                 if (newStatus === 'processing') {
+                   title = '🛒 GGMS Grocery Order Accepted';
+                   body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
+                 } else if (newStatus === 'cancelled') {
+                   title = '❌ GGMS Grocery Order Cancelled';
+                   body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
+                 }
+
+                 // Save log to notifications collection for customer
+                 const statusNotifId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                 await setDoc(doc(db, 'notifications', statusNotifId), {
+                   id: statusNotifId,
+                   sender_type: 'admin',
+                   receiver_id: order.customerId,
+                   title,
+                   message: body,
+                   type: newStatus === 'processing' ? 'order_accepted' : 'order_cancelled',
+                   sound: 'default',
+                   read_status: 'unread',
+                   created_at: new Date().toISOString()
+                 });
+
+                 const resp = await fetch(`/api/admin/send-notification?t=${Date.now()}`, {
+                   method: 'POST',
+                   headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${adminSession}`
+                   },
+                   body: JSON.stringify({ fcmToken, title, body, data: { url: '/account', orderId } })
+                 });
+                 if (resp.ok) {
+                   showToast('Push notification sent successfully! 🔔', 'success');
+                 } else {
+                   const errorText = await resp.text();
+                   showToast(`Debug: API failed: ${errorText}`, 'error');
+                   console.warn('Push notification failed:', errorText);
+                 }
               }
             }
           } catch (notifErr: any) {
@@ -2365,6 +2447,36 @@ export default function App() {
 
     try {
       await setDoc(doc(db, 'orders', newOrder.id), JSON.parse(JSON.stringify(newOrder)));
+      
+      // Trigger two-way order notifications
+      try {
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const notifPayload = {
+          id: notifId,
+          sender_type: 'customer',
+          receiver_id: 'admin',
+          title: '🔔 New Order Received - GGMS Grocery',
+          message: `તમને નવો ઓર્ડર મળ્યો છે.\nOrder ID: #${newOrder.id}\nCustomer: ${cleanCustomer.name}\nAmount: ₹${finalTotal}`,
+          type: 'order_created',
+          sound: 'ringtone',
+          read_status: 'unread',
+          created_at: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'notifications', notifId), notifPayload);
+
+        // Notify Admin via FCM endpoint
+        fetch('/api/admin/notify-new-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: newOrder.id,
+            customerName: cleanCustomer.name,
+            amount: finalTotal
+          })
+        }).catch(err => console.warn('FCM Admin order notification failed:', err));
+      } catch (notifErr) {
+        console.error('Failed to log order notification:', notifErr);
+      }
       
       // Update coupon usage if applicable
       if (appliedCoupon && customerUser) {
@@ -4391,6 +4503,64 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg-page">
+      {/* Custom Notification Permission Modal */}
+      {showPermissionPrompt && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
+          <div className="bg-white dark:bg-slate-800 rounded-[28px] max-w-md w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col gap-4 text-center">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/40 rounded-full flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400 animate-pulse">
+              <Bell className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">🔔 Notification ચાલુ કરો</h3>
+              <p className="text-sm text-slate-650 dark:text-slate-350 font-medium leading-relaxed">
+                Order updates, offers અને important information માટે notifications મેળવો.
+              </p>
+            </div>
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => {
+                  setShowPermissionPrompt(false);
+                  localStorage.setItem('notifPromptDismissed', 'true');
+                }}
+                className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
+              >
+                Later
+              </button>
+              <button
+                onClick={async () => {
+                  setShowPermissionPrompt(false);
+                  await requestNotificationPermission();
+                }}
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/20"
+              >
+                Allow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Order Alert Silence Banner */}
+      {isAdminAlertPlaying && (
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-2 z-[999]">
+          <div className="bg-red-600 dark:bg-red-900/90 text-white px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg border border-red-500 animate-pulse">
+            <div className="flex items-center gap-3">
+              <span className="text-xl sm:text-2xl animate-bounce">🔔</span>
+              <div className="text-center sm:text-left">
+                <h4 className="text-sm font-black uppercase tracking-wider">નવો ઓર્ડર મળ્યો છે! / New Order Received</h4>
+                <p className="text-[10px] sm:text-xs font-semibold opacity-90">GGMS Grocery Admin Order Audio Alert</p>
+              </div>
+            </div>
+            <button
+              onClick={stopAdminAlert}
+              className="px-5 py-2.5 bg-white hover:bg-slate-100 text-red-700 font-extrabold rounded-xl text-[10px] uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer"
+            >
+              Silence Alert / અવાજ બંધ કરો
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-6">
         
         {/* Responsive Navbar - Professional Mobile Header */}
