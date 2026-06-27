@@ -211,12 +211,32 @@ async function startServer() {
     }
 
     try {
+      // Fetch store settings from Firestore
+      const settingsSnap = await dbGetDoc("settings", "global");
+      const settingsData = settingsSnap.exists() ? settingsSnap.data() : {};
+      const shopSettings = (settingsData as any)?.shopSettings || {};
+      const configuredWhatsapp = shopSettings.whatsapp ? String(shopSettings.whatsapp).replace(/\D/g, '') : "";
+
       const customersSnap = await dbGetDocs("customers");
       const adminTokens: string[] = [];
       customersSnap.forEach((doc) => {
         const data = doc.data();
         if (data && data.fcmToken) {
-          if (data.phone === "919724557728" || data.phone === "hpatel4342" || data.name?.toLowerCase().includes("admin") || data.name?.toLowerCase().includes("nupesh")) {
+          const cleanPhone = data.phone ? String(data.phone).replace(/\D/g, '') : "";
+          
+          // Match the configured store WhatsApp number (last 10 digits for reliability)
+          const isConfiguredAdmin = configuredWhatsapp && cleanPhone && 
+            (cleanPhone === configuredWhatsapp || 
+             (cleanPhone.length >= 10 && configuredWhatsapp.length >= 10 && 
+              cleanPhone.endsWith(configuredWhatsapp.slice(-10))));
+              
+          // Keep hardcoded fallback admins for safety in case settings match fails
+          const isFallbackAdmin = cleanPhone === "919724557728" || 
+                                  cleanPhone === "hpatel4342" || 
+                                  data.name?.toLowerCase().includes("admin") || 
+                                  data.name?.toLowerCase().includes("nupesh");
+
+          if (isConfiguredAdmin || isFallbackAdmin) {
             adminTokens.push(data.fcmToken);
           }
         }
