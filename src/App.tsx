@@ -1089,14 +1089,27 @@ function MainApp() {
         console.log('📬 Foreground FCM message:', payload);
         const title = payload.notification?.title || 'GGMS Grocery';
         const body = payload.notification?.body || '';
+        
+        const isNewOrder = title.toLowerCase().includes('new order') || payload.data?.url === '/admin';
+        const isCurrentlyInAdminView = window.location.pathname.startsWith('/admin');
+
+        // Ignore admin alerts on the customer-facing views to prevent customer confusion
+        if (isNewOrder && !isCurrentlyInAdminView) {
+          console.log('Ignoring admin alert on customer panel');
+          return;
+        }
+
         showToast(`${title}: ${body}`, 'info');
 
-        // Play pleasant notification chime sound for customer
-        try {
-          const chime = new Audio('/sounds/customer_chime.wav');
-          chime.play().catch(e => console.warn('Foreground sound block (interaction required):', e));
-        } catch (audioErr) {
-          console.warn('Failed to play foreground notification sound:', audioErr);
+        // Only play customer chime if this is NOT an admin new order notification
+        // (to prevent double-sound overlap with the looping Gujarati voice alert in admin view)
+        if (!isNewOrder) {
+          try {
+            const chime = new Audio('/sounds/customer_chime.wav');
+            chime.play().catch(e => console.warn('Foreground sound block (interaction required):', e));
+          } catch (audioErr) {
+            console.warn('Failed to play foreground notification sound:', audioErr);
+          }
         }
       });
     })();
@@ -2404,10 +2417,10 @@ function MainApp() {
                  let title = '';
                  let body = '';
                  if (newStatus === 'processing') {
-                   title = '🛒 GGMS Grocery Order Accepted';
+                   title = 'Order Accepted - GGMS Grocery';
                    body = 'તમારો ઓર્ડર સ્વીકારી લેવામાં આવ્યો છે. હાલમાં તમારો ઓર્ડર Processing માં છે. આગામી 3-4 કલાકમાં તમારું ઓર્ડર ડિલિવર કરવામાં આવશે. 🚚';
                  } else if (newStatus === 'cancelled') {
-                   title = '❌ GGMS Grocery Order Cancelled';
+                   title = 'Order Cancelled - GGMS Grocery';
                    body = 'માફ કરશો, તમારો ઓર્ડર કેટલીક ટેક્નિકલ સમસ્યાના કારણે Cancel કરવામાં આવ્યો છે. થયેલી અસુવિધા બદલ ક્ષમા કરશો.';
                  }
 

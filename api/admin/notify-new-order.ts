@@ -84,8 +84,8 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, message: "No admins registered for push alerts." });
     }
 
-    const title = "🔔 New Order Received - GGMS Grocery";
-    const body = `તમને નવો ઓર્ડર મળ્યો છે.\nOrder ID: #${orderId}\nCustomer: ${customerName}\nAmount: ₹${amount}`;
+    const title = "New Order - GGMS Grocery";
+    const body = `${customerName} નો ₹${amount} નો ઓર્ડર મળ્યો છે (ID: #${orderId.substring(0, 8)})`;
 
     const messages = adminTokens.map((token) => ({
       token,
