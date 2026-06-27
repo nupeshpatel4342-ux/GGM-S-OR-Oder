@@ -1056,6 +1056,14 @@ export default function App() {
         const title = payload.notification?.title || 'GGMS Grocery';
         const body = payload.notification?.body || '';
         showToast(`${title}: ${body}`, 'info');
+
+        // Play pleasant notification chime sound for customer
+        try {
+          const chime = new Audio('/sounds/customer_chime.wav');
+          chime.play().catch(e => console.warn('Foreground sound block (interaction required):', e));
+        } catch (audioErr) {
+          console.warn('Failed to play foreground notification sound:', audioErr);
+        }
       });
     })();
     return () => { if (unsubscribe) unsubscribe(); };
