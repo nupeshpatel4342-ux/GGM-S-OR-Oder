@@ -9,6 +9,7 @@ import { getFirestore, doc, getDoc, getDocs, collection, setDoc, deleteDoc } fro
 import { initializeApp as initAdminApp, cert } from "firebase-admin/app";
 import { getAuth as getAdminAuth, type Auth as AdminAuth } from "firebase-admin/auth";
 import { getMessaging as getAdminMessaging } from "firebase-admin/messaging";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -19,6 +20,7 @@ dotenv.config();
 // ATHVA service-account-key.json file project root ma muko.
 let adminAuth: AdminAuth | null = null;
 let adminMessaging: ReturnType<typeof getAdminMessaging> | null = null;
+let adminDb: ReturnType<typeof getAdminFirestore> | null = null;
 try {
   const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account-key.json";
   if (fs.existsSync(saPath)) {
@@ -28,6 +30,7 @@ try {
     });
     adminAuth = getAdminAuth();
     adminMessaging = getAdminMessaging();
+    adminDb = getAdminFirestore();
     console.log("✅ Firebase Admin SDK initialized — push notifications & password reset enabled.");
   } else {
     console.warn("⚠️  Service account key not found at:", saPath);
@@ -50,6 +53,46 @@ const firebaseConfig = {
 
 const firebaseApp = initializeFirebaseApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+
+// Helper functions that automatically use adminDb if available to bypass security rules
+async function dbGetDocs(collectionName: string) {
+  if (adminDb) {
+    const snap = await adminDb.collection(collectionName).get();
+    const docsList: any[] = [];
+    snap.forEach((d) => {
+      docsList.push({
+        id: d.id,
+        data: () => d.data()
+      });
+    });
+    return {
+      forEach: (callback: (doc: any) => void) => docsList.forEach(callback),
+      size: snap.size
+    };
+  } else {
+    return await getDocs(collection(db, collectionName));
+  }
+}
+
+async function dbGetDoc(collectionName: string, docId: string) {
+  if (adminDb) {
+    const d = await adminDb.collection(collectionName).doc(docId).get();
+    return {
+      exists: () => d.exists,
+      data: () => d.data()
+    };
+  } else {
+    return await getDoc(doc(db, collectionName, docId));
+  }
+}
+
+async function dbSetDoc(collectionName: string, docId: string, data: any) {
+  if (adminDb) {
+    await adminDb.collection(collectionName).doc(docId).set(data, { merge: true });
+  } else {
+    await setDoc(doc(db, collectionName, docId), data, { merge: true });
+  }
+}
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123456";
@@ -228,10 +271,10 @@ async function startServer() {
 
       if (target_type === "all") {
         targetValueDescription = "All Customers";
-        const customersSnap = await getDocs(collection(db, "customers"));
+        const customersSnap = await dbGetDocs("customers");
         customersSnap.forEach((doc) => {
           const data = doc.data();
-          if (data.fcmToken) {
+          if (data && data.fcmToken) {
             targetTokens.push({ token: data.fcmToken, customerId: doc.id });
           }
         });
@@ -242,11 +285,10 @@ async function startServer() {
         targetValueDescription = `${selected_customer_ids.length} Selected Customer(s)`;
         
         for (const customerId of selected_customer_ids) {
-          const docRef = doc(db, "customers", customerId);
-          const docSnap = await getDoc(docRef);
+          const docSnap = await dbGetDoc("customers", customerId);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.fcmToken) {
+            if (data && data.fcmToken) {
               targetTokens.push({ token: data.fcmToken, customerId });
             }
           }
@@ -256,8 +298,8 @@ async function startServer() {
           return res.status(400).json({ error: "segment_type is required for target_type 'segment'" });
         }
 
-        const customersSnap = await getDocs(collection(db, "customers"));
-        const ordersSnap = await getDocs(collection(db, "orders"));
+        const customersSnap = await dbGetDocs("customers");
+        const ordersSnap = await dbGetDocs("orders");
         
         const allCustomers = [];
         customersSnap.forEach((doc) => {
@@ -396,7 +438,7 @@ async function startServer() {
         status: "sent"
       };
 
-      await setDoc(doc(db, "notifications", notificationId), newNotification);
+      await dbSetDoc("notifications", notificationId, newNotification);
 
       return res.json({ 
         success: true, 
@@ -422,10 +464,9 @@ async function startServer() {
     }
 
     try {
-      const settingsRef = doc(db, "settings", "global");
-      const settingsSnap = await getDoc(settingsRef);
+      const settingsSnap = await dbGetDoc("settings", "global");
       const settingsData = settingsSnap.exists() ? settingsSnap.data() : {};
-      const shopSettings = settingsData.shopSettings || {};
+      const shopSettings = (settingsData as any).shopSettings || {};
 
       const aiEnabled = shopSettings.aiEnabled !== false;
       const aiModelName = shopSettings.aiModelName || "gemini-2.5-flash";
@@ -443,8 +484,7 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API key is not configured" });
       }
 
-      const productsRef = collection(db, "products");
-      const productsSnap = await getDocs(productsRef);
+      const productsSnap = await dbGetDocs("products");
       const allProducts: any[] = [];
       productsSnap.forEach((doc) => {
         allProducts.push({ id: doc.id, ...doc.data() });
@@ -522,7 +562,7 @@ Verify that the recommendedProductIds contains only valid IDs from the store inv
 
       try {
         const logId = `ai-log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        await setDoc(doc(db, "aiChatAnalytics", logId), {
+        await dbSetDoc("aiChatAnalytics", logId, {
           id: logId,
           query: message,
           responseMessage: botMessage,
